@@ -146,3 +146,20 @@ for tgt_loc in tgt_locs:
     print((df['name'][df['name_lc'].str.contains(tgt_loc.lower())]))
 print('Just searched this feature: ', feat_names[idx_feat])
 pd.DataFrame.to_csv(df, os.path.join(path_out, '{0}_{1}{2}'.format(feat_names[idx_feat], 'unitName','.csv')))
+
+
+# UTILITIES
+# Utils 1
+path_to_feat
+def print_feats():
+    '''
+    Lists feature classes in current workspace
+    '''
+    feat_obj = arcpy.ListFeatureClasses()
+my_values_stripped = []
+for feats in my_values:
+    try:
+        my_values_stripped_lower.append(val_str.encode('utf-8').lower())
+        my_values_stripped.append(val_str.encode('utf-8'))  # to use in dataframe
+    except AttributeError:
+        pass

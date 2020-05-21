@@ -1,10 +1,9 @@
-# import arcpy
+
 import copy
 import pandas as pd
 import os
 import numpy as np
 import arcpy
-
 
 def path_create(data1, data2):
     parent_dirs1 = data1.split('/')[:].append('_')
@@ -30,8 +29,6 @@ def path_create(data1, data2):
 
 # Start comparing files
 # get paths to features
-# Method 1
-# Manually from desired feature names list
 def summary_data(feat_path1, feat_path2):
     # Check if we are passing one path to compare or multiple.  Multiple ar passed
     # as a list which is requirement for this function
@@ -41,6 +38,8 @@ def summary_data(feat_path1, feat_path2):
         feat_path1 = [feat_path1]
         feat_path2 = [feat_path2]
     for fp1, fp2 in zip(feat_path1, feat_path2):
+        feat1 = fp1.split('/')[-1]
+        feat2 = fp2.split('/')[-1]
         # find fields added and removed and common
         fields1 = arcpy.ListFields(fp1)
         fields2 = arcpy.ListFields(fp2)
@@ -55,13 +54,8 @@ def summary_data(feat_path1, feat_path2):
         d1_num_feat = arcpy.GetCount_management(fp1)
         d2_num_feat = arcpy.GetCount_management(fp2)
 
-        # Make a dataframe
-        unique1, unique2 = path_create(fp1, fp2)[:2]
-        # initiate dataframe
-
         # unpack fields to be one list with comma separated using unpack_list fctn
-        unique1 = [unique1]
-        unique2 = [unique2]
+        # needs to be list like obj
         fields1 = unpack_list(fields1, True)
         fields2 = unpack_list(fields2, True)
         common_fields = unpack_list(common_fields, False)
@@ -69,12 +63,14 @@ def summary_data(feat_path1, feat_path2):
         d1_d2_added = unpack_list(d1_d2_added, False)
         # create dataframe if first feature in list
         if 'df' not in locals():
+            df = pd.DataFrame({'feature_1':[feat1]})
             # when initiating dataframe, the string needs to be a list to generate index
-            df = pd.DataFrame({'unique_d1':unique1})
+            df['d1_path'] = fp1
             # unpack fields to be one list with comma separated using unpack_list fctn
             df['d1_fields'] = fields1
             df['d1_num_features'] = d1_num_feat
-            df['unique_d2'] =unique2
+            df['feature_2'] = feat2
+            df['d2_path'] =fp2
             df['d2_fields'] = fields2
             df['d2_num_features'] = d2_num_feat
             df['common_fields'] = common_fields
@@ -82,16 +78,21 @@ def summary_data(feat_path1, feat_path2):
             df['d1_d2_added'] = d1_d2_added
         # now add an entire row with cols in order as above
         else:
-            new_row = [unique1, fields1, d1_num_feat, unique2, fields2, d2_num_feat,
+            new_row = [feat1, fp1, fields1, d1_num_feat, feat2, fp2, fields2, d2_num_feat,
                         common_fields, d1_d2_removed, d1_d2_added]
+            # add new row to dataframe
             df.loc[len(df)] = new_row
 
     return(df)
 
 def unpack_list(list_in, arcobj):
     '''
-     unpacks lists
-     arcobj:    bullshit because can't check custom types. Hack to say this is a wierd arcobject
+    ZRU 5/6/2020
+    unpacks lists
+    ARGS:
+    arcobj:    bullshit because can't check custom types. Bool = True if list_in is arcobject
+    RETURNS:
+    fields_out: list converted into 'item, item2, item3' for item in list_in
     '''
     if len(list_in) > 0:
         fields_temp=[]
@@ -102,16 +103,22 @@ def unpack_list(list_in, arcobj):
             else:
                 fields_temp.append(field.encode('utf-8'))
         fields_out = ', '.join(fields_temp)
+    # if list blank, then set to NULL
     else:
         fields_out = 'NULL'
     return(fields_out)
 
 
-def file_paths_arc(folder_or_gdb):
+def file_paths_arc(folder_or_gdb, want_df):
     '''
     ZRU 5/6/2020
     returns list of all paths to feature classes including path/to/featureDataset/features
     Note Will change environment temporarilly
+    ARGS:
+    folder_or_gdb       Currently designed for a gdb
+    want_df                  boolean - if True, output dataframe
+    RETURNS:
+    path_to_dset_feats          list of paths/to/dataset/feature
     '''
     # get current workspace
     current_workspace = arcpy.env.workspace
@@ -121,53 +128,54 @@ def file_paths_arc(folder_or_gdb):
     # NOTE have not done anything yet with standalone_feats
     standalone_feats = arcpy.ListFeatureClasses()
     dsets = [dset.encode('utf-8') for dset in arcpy.ListDatasets()]
-    dset_feats=[]
+    path_to_dset_feats = []
+    feats_df = []
+    dsets_df =[]
     for dset in dsets:
         feats = arcpy.ListFeatureClasses(feature_dataset = dset)
         for feat in feats:
-            dset_feats.append('{}/{}'.format(dset, feat.encode('utf-8')))
-    return(dset_feats)
+            feat = feat.encode('utf-8')
+            path_to_dset_feats.append('{}/{}/{}'.format(folder_or_gdb, dset, feat))
+            if want_df:
+                # append feat name
+                feats_df.append(feat)
+                # repeat dset name for every feature layer within it
+                dsets_df.append(dset)
+                # returns a dataframe for manually comparing tables with changed feature names
+                df = pd.DataFrame({'dataset':dsets_df, 'feature':feats_df})
+            else:
+                df = 'FIX LATER'
+    return(path_to_dset_feats, df)
 
-
-# COMPARISON FILES
-# i) wetlans, riparian, etc
-Wetlands = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb/Copco/Copco_Wetlands'
-Wetlands_Draft = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/CDM/Klamath_Wetlands_2019_DRAFT.gdb/Copco_Wetlands'
-Wetlands_09302020 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/Klamath_Wetlands_09302019/Klamath_Wetlands_09302019.gdb/Copco/Copco_Wetlands'
-
-Irongate_Wetlands = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb/Iron_Gate_Wetlands'
-Irongate_Wetlands_CDM = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/CDM_WETLANDS_DRAFT_Iron_Gates_Stream_Channels_01-29-20/CDM_WETLANDS_DRAFT_Iron_Gate_Wetlands.shp'
-
-Irongate_Riparian = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb/Iron_Gate_Riparian'
-Irongate_Riparian_CDM = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/CDM_WETLANDS_DRAFT_Iron_Gates_Stream_Channels_01-29-20/CDM_WETLANDS_DRAFT_Iron_Gate_Riparian.shp'
-
-# ii) Project_Data
-dataset_BA = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/temp_DRAFT_Klamath_BA_GIS_updates/DRAFT_Klamath.gdb/Project_Data'
-feat_list_BA = ['DRAFT_Cut_Areas_60_Design','DRAFT_Cut_Fill_Areas_60_Design', 'DRAFT_Demolition_60_Design',
-'DRAFT_Disposal_60_Design', 'DRAFT_Fill_Areas_60_Design','DRAFT_Yreka_Pipeline_Options_60_Design']
-
-dataset_20200428 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/CDM_20200429_Current/Klamath_20200428.gdb/Project_Data'
-feat_list_20200428 = ['Cut_Areas_60_Design','Cut_Fill_Areas_60_Design', 'Demolition_60_Design',
-            'Disposal_60_Design', 'Fill_Areas_60_Design',
-            'Yreka_Pipeline_Options_60_Design']
-
-feat_paths_project_data_BA = []
-feat_paths_project_data_20200428 = []
-[feat_paths_project_data_BA.append(os.path.join(dataset_BA, feat)) for feat in feat_list_BA]
-[feat_paths_project_data_20200428.append(os.path.join(dataset_20200428, feat)) for feat in feat_list_20200428]
-
-# go through wetlands
-wetlands20191004_gdb = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb'
-wetlands20190930_gdb = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/Klamath_Wetlands_09302019/Klamath_Wetlands_09302019.gdb'
-
-feat_paths_20191004 = file_paths_arc(wetlands20191004_gdb)
-feat_paths_20190930 = file_paths_arc(wetlands20190930_gdb)
-
-d1 = copy.copy(feat_paths_20191004)
-d2 = copy.copy(feat_paths_20190930)
-path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
-file_name_out = 'Wetlands_20201004_Vs_20200930.csv'
-
-df = summary_data(d1, d2)
-
-pd.DataFrame.to_csv(df, os.path.join(path_out, file_name_out))
+def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):
+    '''
+    ZRU 5/7/2020
+    For finding intersections in path/to/gdb/dataset/feature in to
+    path_to_features lists i.e. CDM_20191004 vs. CDM_Draft
+    ARGS:
+    path_to_dset_feats1     path list gdb1
+    path_to_dset_feats2     path list gdb2
+    RETURNS:
+    feat_list1              intersection paths (common paths
+    feat_list2              intersection paths (common paths)
+    '''
+    dset_feat1 = []
+    dset_feat2 = []
+    path1_gdb = []
+    path2_gdb = []
+    for path in path_to_dset_feats1:
+        path1_components = path.split('/')
+        dset_feat1.append('/'.join(path1_components[-2:]))
+    for path in path_to_dset_feats2:
+        path2_components = path.split('/')
+        dset_feat2.append('/'.join(path2_components[-2:]))
+    set1 = set(dset_feat1)
+    set2 = set(dset_feat2)
+    common_dset_feats = list(set1.intersection(set2))
+    path1_gdb = '/'.join(path1_components[:-2])
+    path2_gdb = '/'.join(path2_components[:-2])
+    feat_paths1 = []
+    feat_paths2 = []
+    [feat_paths1.append(os.path.join(path1_gdb, dset_feat)) for dset_feat in common_dset_feats]
+    [feat_paths2.append(os.path.join(path2_gdb, dset_feat)) for dset_feat in common_dset_feats]
+    return (feat_paths1, feat_paths2)

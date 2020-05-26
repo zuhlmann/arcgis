@@ -100,8 +100,13 @@ def unpack_list(list_in, arcobj):
             # if an arcpy featlist object
             if arcobj:
                 fields_temp.append(field.name.encode('utf-8'))
+            # Needs work.  If not string don't encode
             else:
-                fields_temp.append(field.encode('utf-8'))
+                if isinstance(field, basestring):
+                    fields_temp.append(field.encode('utf-8'))
+            # isinstance does not work on int
+                else:
+                    fields_temp.append(str(field))
         fields_out = ', '.join(fields_temp)
     # if list blank, then set to NULL
     else:

@@ -146,7 +146,11 @@
 # items = [item for item in path_list_temp]
 # for path in items[6:]:
 #     arcpy.FeatureClassToGeodatabase_conversion (path, gdb_out)
+
 from utilities import *
-show_table()
-path = get_path(0)
-print(path)
+paths_table = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv'
+fp_klam_vect = get_path('fp_Klamath_Vector')
+fp_feat = os.path.join(fp_klam_vect, 'Transportation', 'Roads_Consolidated_Draft')
+fp_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_temp.csv'
+exclude_fields = ['shape', 'OBJECTID', 'shape_Length', 'shape_Area']
+unique_values(fp_feat, fp_out, exclude_fields)

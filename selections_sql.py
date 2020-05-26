@@ -178,6 +178,8 @@ def sql_selection(files_in, files_out, where_clauses):
         arcpy.Select_analysis(file_in, file_out, where_clause)
 
 
+# Explore data for extent map
+
 
 # At some point, figure this out and add to arcpy
 https://gis.stackexchange.com/questions/27457/including-variable-in-where-clause-of-arcpy-select-analysis

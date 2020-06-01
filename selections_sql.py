@@ -194,39 +194,43 @@ path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS
 # fp_out = os.path.join(fp_KRRP_project, 'Roads_Consolidated_Draft_selections_names_GT_3rows')
 # arcpy.Select_analysis(fp_feat, fp_out, where_clause)
 
-# # 2) selections BlM ROW
-# # ZRU 5/27/2020
-# 1. Selected OR and CA from states boundaries, then dissolved
-# 2. Clipped ROW BLM to states then Decided to:
-# 3. select by location ('intersect') ROW BLM from project_clip (map clip boundary)
-# also added some item description
+# # 2) selections Roads
+# # ZRU 6/1/2020
 arcpy.env.workspace = 'in_memory'
-fp_roads_consolidated_draft = os.path.join(get_path('fp_Klamath_Vector'), 'Transportation', 'Roads_Consolidated_Draft')
+fp_roads_consolidated_draft = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_Draft_copy')
 fp_selected = copy.copy(fp_roads_consolidated_draft)
 fp_location = get_path('fp_translines_2019_11_temp')
-fp_out = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_select_atts_intersect_translines')
-arcpy.MakeFeatureLayer_management(fp_selected, 'in_lyr')
-arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr')
+fp_out = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_select_names_intersect_translines2')
+arcpy.MakeFeatureLayer_management(fp_selected, 'in_lyr')  # roads
+arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr') #translines
 field1 = arcpy.AddFieldDelimiters(fp_selected, "NAME")
 field2 = arcpy.AddFieldDelimiters(fp_selected, "OBJECTID")
-roads_consolidated_name = ['Copco Rd/Iron Gate Lake Rd', 'Copco', 'HWY 66', 'I-5', 'US Hwy 97', 'Dagget Rd']
+roads_consolidated_name = ['Copco Rd/Iron Gate Lake Rd', 'Copco Rd', 'HWY 66', 'I-5', 'US Hwy 97', 'Dagget Rd']
 roads_consolidated_OBJECTID = [174, 185, 246]
-# combine for 1 BIG where clause
-vals_to_select = roads_consolidated_name + roads_consolidated_OBJECTID
-# replciate fields to match length of attributes
-field1 = field1 * len(roads_consolidated_name)
-field2 = field2 * len(roads_consolidated_OBJECTID)
-fields = field1 + field2
-where_clause =  ["({field} = '{val}')".format(field=field, val=vals) for vals in vals_to_select]
+where_clause1  =  ["({field} = '{val}')".format(field=field1, val=vals)
+                                    for vals in roads_consolidated_name]
+where_clause2 = ["({field} = {val})".format(field=field2, val=vals)
+                                    for vals in roads_consolidated_OBJECTID]
+where_clause = where_clause1 + where_clause2
 where_clause = ' OR '.join(where_clause)
-klamath_roads_vals_to_select_OBJID = [26936, 53020, 42384]
+print(where_clause)
+# add these later from 20200429/Transportation/Klamath_Roads
+klamath_roads_OBJID = [26936, 53020, 42384]
+vals_trans = ['kiewit_transmission_lines_demo', 'kiewit_distribution_lines_demo',
+                'pacific_power_transmission_demo', 'proposed_transmission_lines']
+where_clause_trans  =  ["({field} = '{val}')".format(field='layer_camas', val=vals)
+                                    for vals in vals_trans]
+                                    
 arcpy.SelectLayerByLocation_management('in_lyr', "INTERSECT", 'location_lyr')
 arcpy.SelectLayerByAttribute_management('in_lyr', "ADD_TO_SELECTION", where_clause)
 arcpy.CopyFeatures_management('in_lyr', fp_out)
 
 # # 2b) Select by location
-# fp_out = '{}_{}'.format(fp_selected.split('\\')[-1])
-# fp_out = '{}_{}'.format(fp_out, 'intersect_KRRP_powerLines')
+# fp_KRRP_project = get_path('fp_KRRP_project')
+# fp_selected = os.path.join(get_path('fp_project_working'), 'ROW\\ROW_SECDIV_Q_FRSTDIV_selected_OR_CA')
+# fp_location = get_path('fp_project_clip')
+# # fp_out = '{}_{}'.format(fp_KRRP_project, fp_selected.split('\\')[-1])
+# fp_out = '{}_{}'.format('ROW_SECDIV_Q_FRSTDIV', 'intersect_projectArea')
 # fp_out = os.path.join(fp_KRRP_project, fp_out)
 # select_by_location(fp_selected, fp_location, 'intersect', fp_out)
 

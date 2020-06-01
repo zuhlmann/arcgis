@@ -107,6 +107,23 @@ def attribute_inventory(fp_feat, fp_out, exclude, attr_list):
             df = pd.DataFrame(series_sort.sort_values())
             pd.DataFrame.to_csv(df, os.path.join(fp_out, '{}_{}.csv'.format(feat_name, field)))
 
+def list_unique_fields(fp_feat, field):
+    '''
+    ZRU 6/1/20
+    '''
+    import arcpy
+    import pandas as pd
+
+    # exclude fields
+    feat_name = fp_feat.split('\\')[-1]
+    with arcpy.da.SearchCursor(fp_feat, [field]) as cursor:
+        # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
+        vals = [row[0] for row in cursor]
+        df = pd.DataFrame(vals, columns = ['value'])
+        series_sort = df.groupby('value').size()
+        df = pd.DataFrame(series_sort.sort_values())
+    return(df)
+
 def where_clause_create(fp_list, field_list, val_list):
     where_clause=[]
     for fp, field, val in zip(fp_list, field_list, val_list):

@@ -1,5 +1,5 @@
-import arcpy
-import pandas as pd
+# import arcpy
+# import pandas as pd
 import os
 from compare_data import *
 import copy
@@ -65,13 +65,13 @@ fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_
 # feat_paths_Klamath_20191004 = ['{}/{}/{}'.format(Klamath_CDM_20191004, dset, feats) for dset, feats in zip(dset_clean, feats1_clean)]
 # feat_paths_Klamath_20200428 = ['{}/{}/{}'.format(Klamath_20200428, dset, feats) for dset, feats in zip(dset_clean, feats2_clean)]
 
-# # vi) one offs
-feat_path_low1 = os.path.join(fp_Klamath_20200428, 'Observations/Osprey_Observations')
-feat_path_low2 = os.path.join(fp_klamath_vector, 'Biology_SurveyData2018/Osprey_Observations')
-feat_path1 = copy.copy(feat_path_low1)
-feat_path2 = copy.copy(feat_path_low2)
-df = summary_data(feat_path1, feat_path2)
-pd.DataFrame.to_csv(df, '{}/{}'.format(fp_compare_vers, 'Osprey_Observations_KlamathVector_vs_20200428.csv'))
+# # # vi) one offs
+# feat_path_low1 = os.path.join(fp_Klamath_20200428, 'Observations/Osprey_Observations')
+# feat_path_low2 = os.path.join(fp_klamath_vector, 'Biology_SurveyData2018/Osprey_Observations')
+# feat_path1 = copy.copy(feat_path_low1)
+# feat_path2 = copy.copy(feat_path_low2)
+# df = summary_data(feat_path1, feat_path2)
+# pd.DataFrame.to_csv(df, '{}/{}'.format(fp_compare_vers, 'Osprey_Observations_KlamathVector_vs_20200428.csv'))
 # # Pretty sure delete
 # # # pre cleaned feat paths to find added and/or removed
 # # # original path/to/dataset/feat
@@ -107,13 +107,23 @@ pd.DataFrame.to_csv(df, '{}/{}'.format(fp_compare_vers, 'Osprey_Observations_Kla
 # df = pd.read_csv(os.path.join(path_out, 'Features_Klamath_CDM_20200428_20190930.csv'))
 # print(df.dropna().shape)
 
-# 6) create shapefiles in bulk
-fp_temp = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/camas_transLines_20200422.gdb/'
-dset = 'transLines_categories'
-arcpy.env.workspace = fp_temp
-feats = arcpy.ListFeatureClasses()
+# # 6) create shapefiles in bulk
+# fp_temp = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/camas_transLines_20200422.gdb/'
+# dset = 'transLines_categories'
+# arcpy.env.workspace = fp_temp
+# feats = arcpy.ListFeatureClasses()
+#
+# scratch_dir = copy.copy('C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/AGOL_DataUploads/scratch')
+# if not os.path.exists(scratch_dir):
+#     os.mkdir('C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/AGOL_DataUploads/scratch')
+# arcpy.FeatureClassToShapefile_conversion(feats, scratch_dir)
 
-scratch_dir = copy.copy('C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/AGOL_DataUploads/scratch')
-if not os.path.exists(scratch_dir):
-    os.mkdir('C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/AGOL_DataUploads/scratch')
-arcpy.FeatureClassToShapefile_conversion(feats, scratch_dir)
+# 7) 5/26/20 inventory attributes
+# Seedlings of database creation.  List unique values using attribe_values function
+from utilities import *
+paths_table = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv'
+path_key = 'fp_ROW_BLM_intersect_index'
+fp_feat = os.path.join(get_path('fp_KRRP_project'), 'ROW_SECDIV_Q_FRSTDIV_from_camas_intersect_projectArea')
+fp_out = get_path('fp_compare_vers')
+include_fields = ['Cust_NM']
+attribute_inventory(fp_feat, fp_out, False, include_fields)

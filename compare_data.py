@@ -184,3 +184,17 @@ def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):
     [feat_paths1.append(os.path.join(path1_gdb, dset_feat)) for dset_feat in common_dset_feats]
     [feat_paths2.append(os.path.join(path2_gdb, dset_feat)) for dset_feat in common_dset_feats]
     return (feat_paths1, feat_paths2)
+
+def select_by_location(fp_in, fp_location, spatial_slxn_type, fp_out):
+    '''
+    select features within boundary and output as new feature class
+    ZRU 5/27/2020
+    ARGS:
+    fp_in               file path to feature being locationally selected
+    fp_location         file path to feature location is referenced to - kind've the clip feature
+    fp_out              file path out
+    '''
+    arcpy.MakeFeatureLayer_management(fp_in, 'in_lyr')
+    arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr')
+    arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr')
+    arcpy.CopyFeatures_management('in_lyr', fp_out)

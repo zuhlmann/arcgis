@@ -1,12 +1,12 @@
 
 # import fnmatch
 # import copy
-# import pandas as pd
+import pandas as pd
 # import numpy as np
 # import os
 # from compare_data_utilities import add_path_multiIndex
 # from compare_data import *
-# from utilities import *
+from utilities import *
 # import arcpy
 
 # base_dataReceived = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived'
@@ -147,10 +147,7 @@
 # for path in items[6:]:
 #     arcpy.FeatureClassToGeodatabase_conversion (path, gdb_out)
 
-from utilities import *
-paths_table = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv'
-fp_klam_vect = get_path('fp_Klamath_Vector')
-fp_feat = os.path.join(fp_klam_vect, 'Transportation', 'Roads_Consolidated_Draft')
-fp_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_temp.csv'
-exclude_fields = ['shape', 'OBJECTID', 'shape_Length', 'shape_Area']
-unique_values(fp_feat, fp_out, exclude_fields)
+# 5) Indexing sandbox
+fp_file_path = get_path('fp_path_lists')
+df = pd.read_csv(fp_file_path)
+print(df.loc[df['alias'] is 'fp_comare_vers'])

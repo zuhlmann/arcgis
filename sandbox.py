@@ -118,12 +118,22 @@ fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_
 #     os.mkdir('C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/AGOL_DataUploads/scratch')
 # arcpy.FeatureClassToShapefile_conversion(feats, scratch_dir)
 
-# 7) 5/26/20 inventory attributes
-# Seedlings of database creation.  List unique values using attribe_values function
+# # 7) 5/26/20 inventory attributes
+# # Seedlings of database creation.  List unique values using attribe_values function
+# from utilities import *
+# paths_table = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv'
+# path_key = 'fp_ROW_BLM_intersect_index'
+# fp_feat = os.path.join(get_path('fp_KRRP_project'), 'ROW_SECDIV_Q_FRSTDIV_from_camas_intersect_projectArea')
+# fp_out = get_path('fp_compare_vers')
+# include_fields = ['Cust_NM']
+# attribute_inventory(fp_feat, fp_out, False, include_fields)
+
+# 6/2 DELETE!   just decomposing a function for diagnosis
 from utilities import *
-paths_table = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv'
-path_key = 'fp_ROW_BLM_intersect_index'
-fp_feat = os.path.join(get_path('fp_KRRP_project'), 'ROW_SECDIV_Q_FRSTDIV_from_camas_intersect_projectArea')
-fp_out = get_path('fp_compare_vers')
-include_fields = ['Cust_NM']
-attribute_inventory(fp_feat, fp_out, False, include_fields)
+fp_roads_consolidated_draft = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_Draft_copy')
+fp_selected = copy.copy(fp_roads_consolidated_draft)
+print([obj.name for obj in arcpy.ListFields(fp_selected)])
+with arcpy.da.SearchCursor(fp_selected, ['OBJECTID', 'name']) as cursor:
+    # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
+    name = [row[1] for row in cursor]
+    print(name)

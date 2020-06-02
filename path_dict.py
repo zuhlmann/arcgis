@@ -30,9 +30,9 @@ fp_relative_parcels_master = 'Administrative/Parcels_2019_Master_Rectified'
 # pd.DataFrame.to_csv(df, paths_table)
 
 # When we want to concatenate new rows
-alias_add = 'fp_project_working'
-desc_add = 'working directory for creating project files to assemble over time'
-path_add = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\working.gdb'
+alias_add = 'fp_scratch'
+desc_add = 'scratch gdb'
+path_add = 'C:\Users\uhlmann\GIS\data\scratch\scratch.gdb'
 add_table_entry(alias_add, desc_add, path_add)
 
 # # replace entry

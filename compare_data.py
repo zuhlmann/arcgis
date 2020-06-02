@@ -198,3 +198,6 @@ def select_by_location(fp_in, fp_location, spatial_slxn_type, fp_out):
     arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr')
     arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr')
     arcpy.CopyFeatures_management('in_lyr', fp_out)
+
+def select_by_attribute(fp_in, atts, ):
+    arcpy.SelectLayerByAttribute_management()

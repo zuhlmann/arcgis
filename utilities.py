@@ -134,6 +134,28 @@ def where_clause_create(fp_list, field_list, val_list):
         where_clause.append("{field} = '{val}'".format(field=field_delim, val=val))
     return where_clause
 
+def custom_select(fp_or_feat, field, target_vals):
+    '''
+    used to get indices for selecting features.  getting objectid from dataframe
+    easier than running multiple arcpy and CopyFeature_management functions.
+    ZRU 6/2/2020
+    Needs to be generalized.
+    ARGS:
+    fp_or_feat              seems to work with either lyr object or file path
+    field                   currently only takes one field as str
+    target_vals             list of vals
+    RETURNS:
+    df                      dataframe which will be used to extract indices/objectid
+    '''
+    with arcpy.da.SearchCursor(fp_or_feat, ['OBJECTID', field]) as cursor:
+        # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
+        objectid, source_val = [], []
+        for row in cursor:
+            objectid.append(row[0])
+            source_val.append(row[1])
+    df = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
+    df = df[df.val.isin(target_vals)]
+    return(df)
 def parse_dir(obj, substr):
     '''
     matchses substrings to dir(obj) from python interactive

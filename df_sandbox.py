@@ -93,29 +93,34 @@ from utilities import *
 # fp_ferc = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/Klamath_Vector_Data.gdb/
 #                 Boundaries/FERC_Project_Footprint"""
 #
-
+#
 # multiI = pd.MultiIndex.from_product([category, ['loc1', 'loc2']])
 # path_to = pd.DataFrame([fp_wetlands, None, fp_ferc, None, fp_trans_lines, fp_trans_line2], index = multiI)
-
+#
 # path_out = 'C:/Users/uhlmann/Desktop/test.csv'
 # # pd.DataFrame.to_csv(path_to, 'C:/Users/uhlmann/Desktop/test.csv')
-#
-# path_inventory = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/KRRP_GIS_Data_Priority_List_ArcGIS_Online_copy.csv'
-# # df_read_multiI = pd.read_csv(path_inventory, skipfooter=1, index_col=[0,1])
-# df_read = pd.read_csv(path_inventory, skipfooter=2, index_col = 0)
-# # print(df_read.index.values)
-# df_read = df_read.loc[[itm2 for itm in df_read.index.values for itm2 in [itm, itm]]]
-# # ser = pd.Series({'Locations':['loc1', 'loc1'] * (len(df_read)/2)})
-# # df_read['Locations'] = [item2 for iter in range(len(df_read)/2) for item2 in ['loc1', 'loc2']]
-# loc_vals = ['loc1', 'loc2'] * 26
-# df_read.insert(0, 'Locations', loc_vals)
-# # pd.DataFrame.to_csv(df_read, path_out)
+
+fp_project_inventory = get_path('fp_project_inventory_working')
+df_read = pd.read_csv(fp_project_inventory, skipfooter=2, index_col = 0)
+# print(df_read.index.values)
+print('index values')
+print(df_read.index.values)
+df_read = df_read.loc[[itm2 for itm in df_read.index.values for itm2 in [itm, itm]]]
+# ser = pd.Series({'Locations':['loc1', 'loc1'] * (len(df_read)/2)})
+# df_read['Locations'] = [item2 for iter in range(len(df_read)/2) for item2 in ['loc1', 'loc2']]
+loc_vals = ['loc1', 'loc2'] * len(df_read)
+df_read.insert(0, 'Locations', loc_vals)
+# pd.DataFrame.to_csv(df_read, path_out)
+
+# # 3a) Note this was created chronologically behind #4 on Fri 6/5/2020
+# fp_project_inventory = get_path('fp_project_inventory_working')
+# df = pd.read_csv(fp_project_inventory, index_col = [0,1])
+# print(df.index.levels)
+
+
 
 # # 4) Build inventory df and csv
-# fp_dataReceived = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived'
-# klamath_vector = os.path.join(fp_dataReceived, 'Klamath_Vector_Data.gdb')
-# base_new_data = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS'
-# fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
+# fp_compare_vers = get_path('fp_compare_vers')
 # file_inventory = 'KRRP_GIS_Data_Priority_List_ArcGIS_Online_working.csv'
 # fp_inventory =os.path.join(fp_compare_vers, file_inventory)
 # # read in csv as multindex
@@ -146,8 +151,3 @@ from utilities import *
 # items = [item for item in path_list_temp]
 # for path in items[6:]:
 #     arcpy.FeatureClassToGeodatabase_conversion (path, gdb_out)
-
-# 5) Indexing sandbox
-fp_file_path = get_path('fp_path_lists')
-df = pd.read_csv(fp_file_path)
-print(df.loc[df['alias'] is 'fp_comare_vers'])

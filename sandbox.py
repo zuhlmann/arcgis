@@ -1,7 +1,8 @@
-# import arcpy
+import arcpy
 # import pandas as pd
 import os
 from compare_data import *
+from utilities import *
 import copy
 
 # # COMPARISON FILES
@@ -11,6 +12,7 @@ fp_Klamath_20200428 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Rene
 fp_Klamath_CDM_20191004 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_20191004.gdb'
 fp_klamath_vector = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/Klamath_Vector_Data.gdb'
 fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
+fp_KRRP_project = get_path('fp_KRRP_project')
 
 # # i) wetlans, riparian, etc
 # Wetlands = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb/Copco/Copco_Wetlands'
@@ -128,12 +130,47 @@ fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_
 # include_fields = ['Cust_NM']
 # attribute_inventory(fp_feat, fp_out, False, include_fields)
 
-# 6/2 DELETE!   just decomposing a function for diagnosis
-from utilities import *
-fp_roads_consolidated_draft = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_Draft_copy')
-fp_selected = copy.copy(fp_roads_consolidated_draft)
-print([obj.name for obj in arcpy.ListFields(fp_selected)])
-with arcpy.da.SearchCursor(fp_selected, ['OBJECTID', 'name']) as cursor:
-    # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
-    name = [row[1] for row in cursor]
-    print(name)
+# 6/2 Water Quality Map
+# from utilities import *
+# fp_kml_waterQ = "C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA" \
+#                     "\GIS_Request_Tracking\GIS_Requests_RES\\2020_06_02\\" \
+#                     "Klamath Water Quality Stations-060120.gdb\Placemarks\Points"
+#
+# fp_out = os.path.join(get_path('fp_KRRP_project'), 'klam_water_qual_stations_not_pacificorp')
+# fp_feat = copy.copy(fp_kml_waterQ)
+# field = 'Name'
+# substring = 'Station'
+# # sql_statement(fp_feat, field, substring, fp_out)
+# fp_selected = 'path/to/ndd'
+# fp_location = fp_kml_waterQ
+# fp_selected = get_path('fp_nhd')
+# fp_location = copy.copy(fp_kml_waterQ)
+# within_dist = 1
+# fp_out = os.path.join(fp_KRRP_project, 'NHD_within_{}mile_water_qual_stations'.format(within_dist))
+# select_by_location(fp_selected, 'within_a_distance', fp_location, fp_out, search_distance = '{} Miles'.format(within_dist))
+
+# import arcpy
+# sql_stat = "(Visibility = 5000000) AND (GNIS_NAME = 'Trinity River')"
+# fp_flowline = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\\new_data_downloads\NHD_H_18010211_HU8_Shape\Shape\NHDFlowline.shp'
+# arcpy.MakeFeatureLayer_management(fp_flowline, 'fp_flow', sql_stat)
+# arcpy.CopyFeatures_management('fp_flow', os.path.join(fp_KRRP_project, 'NHD_H_18010211_triniteyR'))
+
+# # 6/5/20 Water Quality Stations Map
+# # Delete once map is signed off.
+# def fix_names(feat):
+#     with arcpy.da.UpdateCursor(feat, ['Name', 'callout']) as cursor:
+#         for row in cursor:
+#             name = copy.copy(row[0])
+#             idx = name.find('USGS')
+#             if idx == -1:
+#                 row[1] = name
+#             else:
+#                 idx_gaugeID = name.find('[') +1
+#                 idx_gaugeID2 = name.find(']') -1
+#                 temp = 'USGS ' + name[idx_gaugeID : idx_gaugeID2]
+#                 row[1] = temp
+#             cursor.updateRow(row)
+#
+# fp_water_gauge_not_pac = os.path.join(fp_KRRP_project, 'klam_water_qual_stations_not_pacificorp')
+# fp_water_gauge_pac = os.path.join(get_path('fp_KRRP_project'), 'klam_water_qual_stations_pacificorp_only')
+# # fix_names(fp_water_gauge_pac)

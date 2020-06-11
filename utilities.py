@@ -107,23 +107,47 @@ def attribute_inventory(fp_feat, fp_out, exclude, attr_list):
             df = pd.DataFrame(series_sort.sort_values())
             pd.DataFrame.to_csv(df, os.path.join(fp_out, '{}_{}.csv'.format(feat_name, field)))
 
-def list_unique_fields(fp_feat, field):
+def list_unique_fields(fp_feat, field, **kwargs):
     '''
     ZRU 6/1/20
+    ARGS:
+    fp_feat         file path to feature (string).  could prob be feature layer too
+    field           N = 1 or more field names from attribute table.  List of strings
+                    Individual string will also be handled if just one field
     '''
     import arcpy
     import pandas as pd
 
-    # exclude fields
-    feat_name = fp_feat.split('\\')[-1]
-    with arcpy.da.SearchCursor(fp_feat, [field]) as cursor:
-        # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
-        vals = [row[0] for row in cursor]
-        df = pd.DataFrame(vals, columns = ['value'])
-        series_sort = df.groupby('value').size()
-        df = pd.DataFrame(series_sort.sort_values())
+    # turn FIELD into list if not a list
+    if isinstance(field, list):
+        pass
+    else:
+        field = [field]
+    # try except and kwargs should be removed.  Apparently da.searchcursor only
+    # accepts feature classes or tables - not feature layers
+    try:
+        feat_lyr = 'in_memory\\{}'.format(kwargs['feat_lyr'])
+        arcpy.CopyFeatures_management(fp_feat, feat_lyr)
+    except KeyError:
+        feat_lyr = fp_feat
+    with arcpy.da.SearchCursor(feat_lyr, field) as cursor:
+        rows = [row for row in cursor]
+        vals = zip(*rows)
+        for idx, field in enumerate(field):
+            if 'dict' not in locals():
+                dict = {field : vals[idx]}
+            else:
+                dict[field] = vals[idx]
+        df = pd.DataFrame(dict)
     return(df)
-
+def where_clause_create2(field, vals):
+    if isinstance(vals[0], str):
+        where_clause  =  ["({field} = '{val}')".format(field=field, val=val)
+                                            for val in vals]
+    else:
+        where_clause = ["({field} = {val})".format(field=field, val=val)
+                                            for val in vals]
+    return(where_clause)
 def where_clause_create(fp_list, field_list, val_list):
     where_clause=[]
     for fp, field, val in zip(fp_list, field_list, val_list):
@@ -156,6 +180,39 @@ def custom_select(fp_or_feat, field, target_vals):
     df = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
     df = df[df.val.isin(target_vals)]
     return(df)
+def new_unpack_cursor(fp_in):
+    # from stack exchange Q I posted
+    with arcpy.da.SearchCursor(fp_in, ['OBJECTID', 'name']) as cursor:
+        rows = [row for row in cursor]    # I don't know if zip() works with cursor (can't test)
+        objectid, name = zip(*rows) # If it does work, use objectid, name = list(zip(*cursor))
+def add_path_multiIndex(df, layer, loc_idx, new_path, append):
+    '''
+    Fix hacky if/else to be vararg or something better.  Also should be a class
+    ZRU 5/14/2020
+    ARGS:
+    df          dataframe
+    layer       layer name string
+    loc_idx     either 1 or 2 (int) to be formatted to "loc1" or "loc2"
+    new_path    path to be addes
+    append      True or False.  False will print dataframe
+    '''
+    try:
+        isinstance(loc_idx, int)
+    except:
+        print('loc varible must be an integer, either 1 or 2')
+
+    level_idx = 'loc{}'.format(loc_idx)
+    try:
+        if append == True:
+            df.loc[(layer, level_idx), 'Original_Location'] = new_path
+            return df
+        else:
+            print(df.loc[(layer, level_idx), 'Original_Location'])
+    except KeyError:
+        print('layer key does not exist i.e. FERC Boundary.  Check spelling')
+
+
+
 def parse_dir(obj, substr):
     '''
     matchses substrings to dir(obj) from python interactive

@@ -185,19 +185,45 @@ def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):
     [feat_paths2.append(os.path.join(path2_gdb, dset_feat)) for dset_feat in common_dset_feats]
     return (feat_paths1, feat_paths2)
 
-def select_by_location(fp_in, fp_location, spatial_slxn_type, fp_out):
+def select_by_location(fp_select, spatial_slxn_type, fp_location, fp_out, **kwargs):
     '''
     select features within boundary and output as new feature class
     ZRU 5/27/2020
     ARGS:
-    fp_in               file path to feature being locationally selected
+    fp_select              file path to feature being locationally selected
     fp_location         file path to feature location is referenced to - kind've the clip feature
     fp_out              file path out
     '''
-    arcpy.MakeFeatureLayer_management(fp_in, 'in_lyr')
+    arcpy.MakeFeatureLayer_management(fp_select, 'in_lyr')
     arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr')
-    arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr')
+    if spatial_slxn_type.lower() == 'within_a_distance':
+        arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr', kwargs['search_distance'])
+    else:
+        arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr')
     arcpy.CopyFeatures_management('in_lyr', fp_out)
 
 def select_by_attribute(fp_in, atts, ):
     arcpy.SelectLayerByAttribute_management()
+
+def sql_statement(fp_feat, field, substring, fp_out):
+    '''
+    ZRU 6/3/2020
+    One day this will all be organized.  Expand to allow multiple fields and
+    substrings
+    ARGS
+    df          dataframe from feature class
+    field       field to search for substrings
+    substring   substring
+    '''
+    from utilities import list_unique_fields
+    df = list_unique_fields(fp_feat, field)
+    val = df[field][~df[field].str.contains(substring)].tolist()
+    # diff sql statement conventions for diff val types
+    if isinstance(val[0], int):
+        sql_sub = ','.join([str(val) for val in val])
+    elif (isinstance(val[0], str)) or (isinstance(val[0], unicode)):
+        sql_sub = ','.join(["'" + str(val) + "'" for val in val])
+    sql_statement = '"{}" in ({})'.format(field, sql_sub)
+    arcpy.MakeFeatureLayer_management(fp_feat, 'feat_lyr')
+    arcpy.SelectLayerByAttribute_management('feat_lyr', 'ADD_TO_SELECTION', sql_statement)
+    arcpy.CopyFeatures_management('feat_lyr', fp_out)

@@ -11,6 +11,7 @@ path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS
 path_to_cdm_20191004 = os.path.join(path_to_data_received, 'AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_20191004.gdb')
 fp_klamath_vector= os.path.join(path_to_data_received, 'Klamath_Vector_Data.gdb')
 fp_KRRP_proj = get_path('fp_KRRP_project')
+fp_compare_vers = get_path('fp_compare_vers')
 path_to_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
 fp_index = os.path.join(fp_KRRP_proj, 'index_medium_zoom')
 fp_ROW_BLM_intersect_index = os.path.join(fp_KRRP_proj, 'ROW_SECDIV_Q_FRSTDIV_selected_index')
@@ -30,12 +31,12 @@ fp_relative_parcels_master = 'Administrative/Parcels_2019_Master_Rectified'
 # pd.DataFrame.to_csv(df, paths_table)
 
 # When we want to concatenate new rows
-alias_add = 'fp_scratch'
-desc_add = 'scratch gdb'
-path_add = 'C:\Users\uhlmann\GIS\data\scratch\scratch.gdb'
+alias_add = 'fp_working'
+desc_add = 'working folder to feed into KRRP periodically'
+path_add = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/McmJac_KRRP_GIS_data/working.gdb'
 add_table_entry(alias_add, desc_add, path_add)
 
 # # replace entry
-# alias_idx_replace = 'fp_KRRP_proj'
-# replacement = 'fp_KRRP_project'
-# replace_table_entry('alias', alias_idx_replace, replacement)
+# alias_idx_replace = 'fp_McmJac_KRRP_GIS_data'
+# replacement = '{}.csv'.format(get_path(alias_idx_replace))
+# replace_table_entry('path', alias_idx_replace, replacement)

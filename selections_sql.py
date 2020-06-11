@@ -4,10 +4,13 @@ import copy
 import os
 from utilities import *
 from compare_data import select_by_location
-# Base Paths
-path_to_base = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/'
-path_to_data_received = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/'
-path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/LoW_from_CAD.gdb'
+
+fp_McmJac = get_path('fp_McmJac_KRRP_GIS_data')
+
+# # Base Paths
+# path_to_base = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/'
+# path_to_data_received = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/'
+# path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/LoW_from_CAD.gdb'
 
 
 # # gdb paths
@@ -164,17 +167,6 @@ path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS
 #     where_clause_camas =  "{field} = '{val}'".format(field=field, val=feat)
 #     arcpy.Select_analysis(path_in, path_out_ind_feat, where_clause_camas)
 
-#
-# def where_clause_create(fp_list, field_list, val_list):
-#     where_clause=[]
-#     for fp, field, val in zip(fp_list, field_list, val_list):
-#         field_delim = arcpy.AddFieldDelimiters(fp, field)
-#         # check here and here to find code and learn unicode background:
-#         # https://gis.stackexchange.com/questions/153444/using-select-layer-by-attribute-in-arcpy
-#         # https://pro.arcgis.com/en/pro-app/help/data/geodatabases/overview/a-quick-tour-of-unicode.htm
-#         where_clause.append("{field} = '{val}'".format(field=field_delim, val=val))
-#     return where_clause
-#
 # def sql_selection(files_in, files_out, where_clauses):
 #     for file_in, file_out, where_clause in zip(files_in, files_out, where_clauses):
 #         arcpy.Select_analysis(file_in, file_out, where_clause)
@@ -194,57 +186,110 @@ path_out = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS
 # fp_out = os.path.join(fp_KRRP_project, 'Roads_Consolidated_Draft_selections_names_GT_3rows')
 # arcpy.Select_analysis(fp_feat, fp_out, where_clause)
 
-# # 2) selections Roads
-# # ZRU 6/1/2020
-arcpy.env.workspace = 'in_memory'
-fp_roads_consolidated_draft = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_Draft_copy')
-fp_selected = copy.copy(fp_roads_consolidated_draft)
-fp_location = get_path('fp_translines_2019_11_temp')
-fp_location = copy.copy(fp_location)
-fp_scratch = os.path.join(get_path('fp_scratch'), 'Roads_Consolidated_select_names_intersect_translines')
-fp_out = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_select_names_intersect_translines8')
-field1 = arcpy.AddFieldDelimiters(fp_selected, "NAME")
-field2 = arcpy.AddFieldDelimiters(fp_selected, "OBJECTID")
-roads_consolidated_name = ['Copco Rd/Iron Gate Lake Rd', 'Copco Rd', 'HWY 66', 'I-5', 'US Hwy 97', 'Dagget Rd', 'Rogue River National Forest']
-roads_consolidated_OBJECTID = [174, 185, 246, 333, 233]
-where_clause1  =  ["({field} = '{val}')".format(field=field1, val=vals)
-                                    for vals in roads_consolidated_name]
-where_clause2 = ["({field} = {val})".format(field=field2, val=vals)
-                                    for vals in roads_consolidated_OBJECTID]
-where_clause_in_layer = where_clause1 + where_clause2
-where_clause_in_layer = ' OR '.join(where_clause_in_layer)
-# add these later from 20200429/Transportation/Klamath_Roads
-klamath_roads_OBJID = [26936, 53020, 42384]
-# basically don't select 'existing lines'
-vals_trans = ['kiewit_transmission_lines_demo', 'kiewit_distribution_lines_demo',
-                'pacific_power_transmission_demo', 'proposed_transmission_lines']
-where_clause_trans  =  ["({field} = '{val}')".format(field='layer_camas', val=vals)
-                                    for vals in vals_trans]
-where_clause_trans = ' OR '.join(where_clause_trans)
+# # # 2) selections Roads
+# # # ZRU 6/1/2020
+# arcpy.env.workspace = 'in_memory'
+# fp_roads_consolidated_draft = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_Draft_copy')
+# fp_selected = copy.copy(fp_roads_consolidated_draft)
+# fp_location = get_path('fp_translines_2019_11_temp')
+# fp_location = copy.copy(fp_location)
+# fp_scratch = os.path.join(get_path('fp_scratch'), 'Roads_Consolidated_select_names_intersect_translines')
+# fp_out = os.path.join(get_path('fp_KRRP_project'), 'Roads_Consolidated_select_names_intersect_translines8')
+# field1 = arcpy.AddFieldDelimiters(fp_selected, "NAME")
+# field2 = arcpy.AddFieldDelimiters(fp_selected, "OBJECTID")
+# roads_consolidated_name = ['Copco Rd/Iron Gate Lake Rd', 'Copco Rd', 'HWY 66', 'I-5', 'US Hwy 97', 'Dagget Rd', 'Rogue River National Forest']
+# roads_consolidated_OBJECTID = [174, 185, 246, 333, 233]
+# where_clause1  =  ["({field} = '{val}')".format(field=field1, val=vals)
+#                                     for vals in roads_consolidated_name]
+# where_clause2 = ["({field} = {val})".format(field=field2, val=vals)
+#                                     for vals in roads_consolidated_OBJECTID]
+# where_clause_in_layer = where_clause1 + where_clause2
+# where_clause_in_layer = ' OR '.join(where_clause_in_layer)
+# # add these later from 20200429/Transportation/Klamath_Roads
+# klamath_roads_OBJID = [26936, 53020, 42384]
+# # basically don't select 'existing lines'
+# vals_trans = ['kiewit_transmission_lines_demo', 'kiewit_distribution_lines_demo',
+#                 'pacific_power_transmission_demo', 'proposed_transmission_lines']
+# where_clause_trans  =  ["({field} = '{val}')".format(field='layer_camas', val=vals)
+#                                     for vals in vals_trans]
+# where_clause_trans = ' OR '.join(where_clause_trans)
+#
+# arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr', where_clause_in_layer)
+# df_roads1 = custom_select(fp_selected, 'name', roads_consolidated_name)
+# df_roads2 = custom_select(fp_selected, 'OBJECTID', roads_consolidated_OBJECTID)
+#
+# arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr', where_clause_trans)
+# arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr2')
+# arcpy.SelectLayerByLocation_management('road_lyr2', 'intersect', 'location_lyr')
+#
+# with arcpy.da.SearchCursor('road_lyr2', ['OBJECTID', 'name']) as cursor:
+#     # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
+#     objectid, source_val = [], []
+#     for row in cursor:
+#         objectid.append(row[0])
+#         source_val.append(row[1])
+# df_loc = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
+# df = pd.concat([df_roads1, df_roads2, df_loc]).drop_duplicates(subset = 'OBJECTID').reset_index(drop=True)
+# # use this list to select features
+# vals_objectid = df['OBJECTID'].tolist()
+# where_clause_final  =  ["({field} = {val})".format(field=field2, val=vals)
+#                                     for vals in vals_objectid]
+# where_clause_final = ' OR '.join(where_clause_final)
+# arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr_final', where_clause_final)
+# arcpy.CopyFeatures_management('road_lyr_final', fp_out)
 
-arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr', where_clause_in_layer)
-df_roads1 = custom_select(fp_selected, 'name', roads_consolidated_name)
-df_roads2 = custom_select(fp_selected, 'OBJECTID', roads_consolidated_OBJECTID)
+# Selections customer ID for ROW Map:
+# ZRU 6/9/20  NOTE continue working on this to incorporate spatial selections
+# Note turns out we didn't need to string search, just date
+fp_working = get_path('fp_working')
+fp_ROW = os.path.join(fp_working, 'ROW/ROW_SECDIV_Q_FRSTDIV_selected_index')
+fp_location = get_path('fp_translines_2019_11_reclassified')
+str_search = 'pacific'
+fields = ['OBJECTID', 'Act_Dt','Cust_NM', 'Serial_Nr_Full']
+df = list_unique_fields(fp_ROW, fields, feat_lyr = 'ROW_lyr')
 
-arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr', where_clause_trans)
-arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr2')
-arcpy.SelectLayerByLocation_management('road_lyr2', 'intersect', 'location_lyr')
+cond1 = df['Cust_NM'].str.contains(str_search, case = False)
+cond2 = df['Act_Dt'] > datetime.datetime.today()
+objid = df['OBJECTID'][cond1 & cond2].tolist()
+# now add a location based selection
+vals = ['kiewit_transmission_lines_demo', 'pacific_power_transmission_demo', 'proposed_transmission_lines']
+fields = 'layer_camas'
+where_clause_location = where_clause_create2(fields, vals)
+where_clause_location = ' OR '.join(where_clause_location)
+arcpy.MakeFeatureLayer_management(fp_location, 'in_memory/location_lyr', where_clause_location)
+# arcpy.SelectLayerByLocation_management('in_memory/ROW_lyr', 'in_memory/location_lyr')
+with arcpy.da.SearchCursor('in_memory/ROW_lyr', ['Serial_Nr_Full']) as cursor:
+    row = [row[0] for row in cursor]
+    print(row)
+# # why do this?
+# # Because OBJECTID is a long data type which makes [2L, 3L, 6L] lists
+# # https://stackoverflow.com/questions/11764713/why-do-integers-in-database-row-tuple-have-an-l-suffix
+# objid = [int(id) for id in objid]
+# fields =  ['OBJECTID', 'Serial_Nr_Full', 'Case_Num_Pac_Only']
+# with arcpy.da.UpdateCursor('in_memory/ROW_lyr', fields) as cursor:
+#     for row in cursor:
+#         if row[0] in objid:
+#             # set case_num_pac to serial num
+#             row[2] = row[1]
+#         else:
+#             row[2] = 'Not Pacificorp Grant ROW'
+#         cursor.updateRow(row)
+# del cursor
+# fp_out = os.path.join(fp_working, 'ROW/ROW_SECDIV_Q_FRSTDIV_selected_index_camas2')
+# arcpy.CopyFeatures_management('in_memory/Row_lyr', fp_out)
 
-with arcpy.da.SearchCursor('road_lyr2', ['OBJECTID', 'name']) as cursor:
-    # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
-    objectid, source_val = [], []
-    for row in cursor:
-        objectid.append(row[0])
-        source_val.append(row[1])
-df_loc = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
-df = pd.concat([df_roads1, df_roads2, df_loc]).drop_duplicates(subset = 'OBJECTID').reset_index(drop=True)
-# use this list to select features
-vals_objectid = df['OBJECTID'].tolist()
-where_clause_final  =  ["({field} = {val})".format(field=field2, val=vals)
-                                    for vals in vals_objectid]
-where_clause_final = ' OR '.join(where_clause_final)
-arcpy.MakeFeatureLayer_management(fp_selected, 'road_lyr_final', where_clause_final)
-arcpy.CopyFeatures_management('road_lyr_final', fp_out)
+
+
+
+
+
+# df['OBJECTID'][df['Action Text'] == 'Expires' & df]
+# with arcpy.da.UpdateCursor(fp_ROW, ) as cursor:
+# with arcpy.da.SearchCursor(fp_ROW, ['Act_Dt']) as cursor:
+#     rows = [row for row in cursor]
+#     print(rows[0])
+
+
 
 # # 2b) Select by location
 # fp_KRRP_project = get_path('fp_KRRP_project')
@@ -253,7 +298,6 @@ arcpy.CopyFeatures_management('road_lyr_final', fp_out)
 # # fp_out = '{}_{}'.format(fp_KRRP_project, fp_selected.split('\\')[-1])
 # fp_out = '{}_{}'.format('ROW_SECDIV_Q_FRSTDIV', 'intersect_projectArea')
 # fp_out = os.path.join(fp_KRRP_project, fp_out)
-# select_by_location(fp_selected, fp_location, 'intersect', fp_out)
 
 # # At some point, figure this out and add to arcpy
 # https://gis.stackexchange.com/questions/27457/including-variable-in-where-clause-of-arcpy-select-analysis

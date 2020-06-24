@@ -5,12 +5,7 @@ from compare_data import *
 from utilities import *
 import copy
 
-# # COMPARISON FILES
-# BASE PATHS
-fp_CDM_20191004 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_20191004.gdb'
-fp_Klamath_20200428 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/NEW DATA DOWNLOADS/CDM_20200429_Current/Klamath_20200428.gdb'
-fp_Klamath_CDM_20191004 = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_20191004.gdb'
-fp_klamath_vector = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/Klamath_Vector_Data.gdb'
+
 fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
 fp_KRRP_project = get_path('fp_KRRP_project')
 
@@ -68,12 +63,10 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # feat_paths_Klamath_20200428 = ['{}/{}/{}'.format(Klamath_20200428, dset, feats) for dset, feats in zip(dset_clean, feats2_clean)]
 
 # # # vi) one offs
-# feat_path_low1 = os.path.join(fp_Klamath_20200428, 'Observations/Osprey_Observations')
-# feat_path_low2 = os.path.join(fp_klamath_vector, 'Biology_SurveyData2018/Osprey_Observations')
-# feat_path1 = copy.copy(feat_path_low1)
-# feat_path2 = copy.copy(feat_path_low2)
-# df = summary_data(feat_path1, feat_path2)
-# pd.DataFrame.to_csv(df, '{}/{}'.format(fp_compare_vers, 'Osprey_Observations_KlamathVector_vs_20200428.csv'))
+# fp1 = os.path.join(get_path('fp_Klamath_Vector'), 'Project_Feature_Def_Plan/Access_Routes_DefPlan')
+# fp2 = os.path.join(get_path('fp_CDM_20200428'),'Project_Data/Access_Routes')
+# df = summary_data(fp1, fp2)
+# pd.DataFrame.to_csv(df, '{}/{}'.format(fp_compare_vers, 'Access_Routes_Klamath_Vector_vs_CDM_20200428.csv'))
 # # Pretty sure delete
 # # # pre cleaned feat paths to find added and/or removed
 # # # original path/to/dataset/feat
@@ -158,7 +151,8 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # # 6/5/20 Water Quality Stations Map
 # # Delete once map is signed off.
 # def fix_names(feat):
-#     with arcpy.da.UpdateCursor(feat, ['Name', 'callout']) as cursor:
+#     with arcpy.da.
+# Cursor(feat, ['Name', 'callout']) as cursor:
 #         for row in cursor:
 #             name = copy.copy(row[0])
 #             idx = name.find('USGS')
@@ -174,3 +168,24 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # fp_water_gauge_not_pac = os.path.join(fp_KRRP_project, 'klam_water_qual_stations_not_pacificorp')
 # fp_water_gauge_pac = os.path.join(get_path('fp_KRRP_project'), 'klam_water_qual_stations_pacificorp_only')
 # # fix_names(fp_water_gauge_pac)
+
+# fp_select = os.path.join(get_path(4), 'Roads_Consolidated_Draft_copy')
+# fp_location = os.path.join(get_path(4), 'States_OR_CA_dissolve')
+# spatial_slxn_type = 'intersect'
+# fp_out = os.path.join(get_path(4), 'Roads_Consolidated_draft_intersect_OR_CA')
+# select_by_location(fp_select, spatial_slxn_type, fp_location, fp_out)
+
+# # 8) Copy all feature classes within gdb to new gdb
+# arcpy.env.workspace = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\\new_data_downloads\\20200508_KRRP_Hazmat\Klamath Hazmat Data.gdb'
+# feats = arcpy.ListFeatureClasses()
+# # create feature paths to features
+# feat_paths = [os.path.join(arcpy.env.workspace, feat) for feat in feats]
+# fp_out = get_path(18)
+# for fp, feat in zip(feat_paths, feats):
+#     arcpy.FeatureClassToFeatureClass_conversion(fp, fp_out, feat)
+
+# copy feature class to new location
+feat = 'Access_Routes_Buffer'
+fp_in = os.path.join(get_path(18), 'Project_Data', feat)
+fp_out = os.path.join(get_path(20), '2020_06_23/Access_Routes_Buffer')
+arcpy.FeatureClassToFeatureClass_conversion(fp_in, fp_out, feat)

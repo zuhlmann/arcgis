@@ -241,26 +241,41 @@ fp_McmJac = get_path('fp_McmJac_KRRP_GIS_data')
 # Selections customer ID for ROW Map:
 # ZRU 6/9/20  NOTE continue working on this to incorporate spatial selections
 # Note turns out we didn't need to string search, just date
+# RUN this to check where code is taking long
+# https://gis.stackexchange.com/questions/31699/ways-to-speed-up-python-scripts-running-as-arcgis-tools
+# from cProfile import run
+ # replace code with your code or function
+# run("code")
+import time
+
 fp_working = get_path('fp_working')
 fp_ROW = os.path.join(fp_working, 'ROW/ROW_SECDIV_Q_FRSTDIV_selected_index')
-fp_location = get_path('fp_translines_2019_11_reclassified')
+fp_location = get_path('fp_translines_2019_11_recategorized')
 str_search = 'pacific'
 fields = ['OBJECTID', 'Act_Dt','Cust_NM', 'Serial_Nr_Full']
-df = list_unique_fields(fp_ROW, fields, feat_lyr = 'ROW_lyr')
-
+t1 = time.time()
+df = list_unique_fields(fp_ROW, fields, 'feature_layer', name = 'ROW_lyr')
+print(time.time() - t1)
+# Turns out Cust_NM does not need to be specified
 cond1 = df['Cust_NM'].str.contains(str_search, case = False)
 cond2 = df['Act_Dt'] > datetime.datetime.today()
 objid = df['OBJECTID'][cond1 & cond2].tolist()
+
 # now add a location based selection
-vals = ['kiewit_transmission_lines_demo', 'pacific_power_transmission_demo', 'proposed_transmission_lines']
-fields = 'layer_camas'
-where_clause_location = where_clause_create2(fields, vals)
+# vals = ['kiewit_transmission_lines_demo', 'pacific_power_transmission_demo', 'proposed_transmission_lines']
+# field = 'layer_camas'
+vals = [700]
+field = 'Shape_Length'
+# Note need to test new where_clause_create_p1
+where_clause_location = where_clause_create_p1(field, vals, operator = 'gt')
 where_clause_location = ' OR '.join(where_clause_location)
-arcpy.MakeFeatureLayer_management(fp_location, 'in_memory/location_lyr', where_clause_location)
-# arcpy.SelectLayerByLocation_management('in_memory/ROW_lyr', 'in_memory/location_lyr')
-with arcpy.da.SearchCursor('in_memory/ROW_lyr', ['Serial_Nr_Full']) as cursor:
+print(where_clause_location)
+arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr', where_clause_location)
+arcpy.SelectLayerByLocation_management('ROW_lyr', 'intersect', 'location_lyr')
+with arcpy.da.SearchCursor('ROW_lyr', ['OBJECTID']) as cursor:
     row = [row[0] for row in cursor]
     print(row)
+
 # # why do this?
 # # Because OBJECTID is a long data type which makes [2L, 3L, 6L] lists
 # # https://stackoverflow.com/questions/11764713/why-do-integers-in-database-row-tuple-have-an-l-suffix

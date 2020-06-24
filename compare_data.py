@@ -30,6 +30,13 @@ def path_create(data1, data2):
 # Start comparing files
 # get paths to features
 def summary_data(feat_path1, feat_path2):
+    '''
+    ARGS
+    feat_path1      self explanatory
+    feat_path2      self explanatory
+    RETURNS
+    df              returns but does not save dataframe
+    '''
     # Check if we are passing one path to compare or multiple.  Multiple ar passed
     # as a list which is requirement for this function
     if (type(feat_path1) is list) & (type(feat_path2) is list):
@@ -190,7 +197,8 @@ def select_by_location(fp_select, spatial_slxn_type, fp_location, fp_out, **kwar
     select features within boundary and output as new feature class
     ZRU 5/27/2020
     ARGS:
-    fp_select              file path to feature being locationally selected
+    fp_select           file path to feature being locationally selected
+    spatial_slxn_typ    'intersect'
     fp_location         file path to feature location is referenced to - kind've the clip feature
     fp_out              file path out
     '''
@@ -198,7 +206,7 @@ def select_by_location(fp_select, spatial_slxn_type, fp_location, fp_out, **kwar
     arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr')
     if spatial_slxn_type.lower() == 'within_a_distance':
         arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr', kwargs['search_distance'])
-    else:
+    elif spatial_slxn_type.lower() == 'intersect':
         arcpy.SelectLayerByLocation_management('in_lyr', spatial_slxn_type, 'location_lyr')
     arcpy.CopyFeatures_management('in_lyr', fp_out)
 

@@ -1,9 +1,9 @@
 
 # import fnmatch
-# import copy
+import copy
 import pandas as pd
 # import numpy as np
-# import os
+import os
 # from compare_data_utilities import add_path_multiIndex
 # from compare_data import *
 from utilities import *
@@ -100,24 +100,33 @@ from utilities import *
 # path_out = 'C:/Users/uhlmann/Desktop/test.csv'
 # # pd.DataFrame.to_csv(path_to, 'C:/Users/uhlmann/Desktop/test.csv')
 
-fp_project_inventory = get_path('fp_project_inventory_working')
-df_read = pd.read_csv(fp_project_inventory, skipfooter=2, index_col = 0)
+# fp_project_inventory = get_path('fp_project_inventory_working')
+# df_read = pd.read_csv(fp_project_inventory, skipfooter=2, index_col = 0)
+# # print(df_read.index.values)
+# print('index values')
 # print(df_read.index.values)
-print('index values')
-print(df_read.index.values)
-df_read = df_read.loc[[itm2 for itm in df_read.index.values for itm2 in [itm, itm]]]
-# ser = pd.Series({'Locations':['loc1', 'loc1'] * (len(df_read)/2)})
-# df_read['Locations'] = [item2 for iter in range(len(df_read)/2) for item2 in ['loc1', 'loc2']]
-loc_vals = ['loc1', 'loc2'] * len(df_read)
-df_read.insert(0, 'Locations', loc_vals)
+# df_read = df_read.loc[[itm2 for itm in df_read.index.values for itm2 in [itm, itm]]]
+# # ser = pd.Series({'Locations':['loc1', 'loc1'] * (len(df_read)/2)})
+# # df_read['Locations'] = [item2 for iter in range(len(df_read)/2) for item2 in ['loc1', 'loc2']]
+# loc_vals = ['loc1', 'loc2'] * len(df_read)
+# df_read.insert(0, 'Locations', loc_vals)
 # pd.DataFrame.to_csv(df_read, path_out)
 
-# # 3a) Note this was created chronologically behind #4 on Fri 6/5/2020
-# fp_project_inventory = get_path('fp_project_inventory_working')
-# df = pd.read_csv(fp_project_inventory, index_col = [0,1])
-# print(df.index.levels)
+# 3a) Note this was created chronologically behind #4 on Fri 6/5/2020
+fp_project_inventory = get_path('fp_project_inventory_working')
+df = pd.read_csv(fp_project_inventory, index_col = [0,1])
+# do this because partial slices require lexographical ofer
+df = df.sort_index()
+# Indexing
+# Use keys
+df['Status']
+# narrow it down
+df.loc['Bat Observations']['Notes']
+# more verbose
+df.loc[['Bat Observations']]['Notes']
 
-
+# note: argument for get_level_values is index, so 1 or 0 for two indices
+df.iloc[df.index.get_level_values(1) == 'loc1']
 
 # # 4) Build inventory df and csv
 # fp_compare_vers = get_path('fp_compare_vers')

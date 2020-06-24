@@ -30,13 +30,13 @@ fp_relative_parcels_master = 'Administrative/Parcels_2019_Master_Rectified'
 # df.iloc[:]['path'] = path_list
 # pd.DataFrame.to_csv(df, paths_table)
 
-# When we want to concatenate new rows
-alias_add = 'fp_working'
-desc_add = 'working folder to feed into KRRP periodically'
-path_add = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/McmJac_KRRP_GIS_data/working.gdb'
+#When we want to concatenate new rows
+alias_add = 'fp_AGOL_data_uploads'
+desc_add = 'data upload root folder'
+path_add = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\AGOL_DataUploads'
 add_table_entry(alias_add, desc_add, path_add)
 
 # # replace entry
-# alias_idx_replace = 'fp_McmJac_KRRP_GIS_data'
-# replacement = '{}.csv'.format(get_path(alias_idx_replace))
+# alias_idx_replace = 'fp_nhd'
+# replacement = os.path.join(get_path(4), 'NHD')
 # replace_table_entry('path', alias_idx_replace, replacement)

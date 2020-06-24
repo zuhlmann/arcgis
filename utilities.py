@@ -30,6 +30,13 @@ def get_path(idx):
     return(path_out)
     pd.DataFrame.to_csv(df, paths_table)
 def add_table_entry(alias, desc, fp):
+    '''
+    can add table entry by passing three required args
+    ARGS
+    alias       string. alias should be 'fp_<descriptive name>'
+    desc        description of feature class
+    fp          file path to dataset
+    '''
     paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 0)
     if isinstance(df, pd.DataFrame):
@@ -45,6 +52,11 @@ def add_table_entry(alias, desc, fp):
     df_concat.index = range(len(df_concat))
     pd.DataFrame.to_csv(df_concat, paths_table)
 def remove_table_entry(alias):
+    '''
+    remove table entry by passing alias
+    ARGS
+    alias       string. alias
+    '''
     paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 1)
     # get index of row
@@ -107,13 +119,16 @@ def attribute_inventory(fp_feat, fp_out, exclude, attr_list):
             df = pd.DataFrame(series_sort.sort_values())
             pd.DataFrame.to_csv(df, os.path.join(fp_out, '{}_{}.csv'.format(feat_name, field)))
 
-def list_unique_fields(fp_feat, field, **kwargs):
+def list_unique_fields(fp_feat, field, data_storage, **kwargs):
     '''
     ZRU 6/1/20
     ARGS:
     fp_feat         file path to feature (string).  could prob be feature layer too
     field           N = 1 or more field names from attribute table.  List of strings
                     Individual string will also be handled if just one field
+    data_storage    string.  options: 'in_memory', 'feature_layere', 'none'
+    kwargs          currently, specify 'name' Keywork = Value pair when specifying
+                    data_storage value not 'none'
     '''
     import arcpy
     import pandas as pd
@@ -124,13 +139,17 @@ def list_unique_fields(fp_feat, field, **kwargs):
     else:
         field = [field]
     # try except and kwargs should be removed.  Apparently da.searchcursor only
-    # accepts feature classes or tables - not feature layers
-    try:
-        feat_lyr = 'in_memory\\{}'.format(kwargs['feat_lyr'])
-        arcpy.CopyFeatures_management(fp_feat, feat_lyr)
-    except KeyError:
-        feat_lyr = fp_feat
-    with arcpy.da.SearchCursor(feat_lyr, field) as cursor:
+    # accepts feature classes or tables - not feature layers.  False statment??
+    if data_storage == 'in_memory':
+        feat = 'in_memory\\{}'.format(kwargs['name'])
+        arcpy.MakeFeatureLayer_management(fp_feat, feat)
+    elif data_storage == 'feature_layer':
+        feat = kwargs['name']
+        arcpy.MakeFeatureLayer_management(fp_feat, feat)
+    elif data_storage == 'none':
+        feat = fp_feat
+
+    with arcpy.da.SearchCursor(feat, field) as cursor:
         rows = [row for row in cursor]
         vals = zip(*rows)
         for idx, field in enumerate(field):
@@ -140,23 +159,40 @@ def list_unique_fields(fp_feat, field, **kwargs):
                 dict[field] = vals[idx]
         df = pd.DataFrame(dict)
     return(df)
-def where_clause_create2(field, vals):
+def where_clause_create_p1(field,  vals, **kwargs):
+    '''
+    ZRU 6/11/2020
+    should be expanded.  Follow comments at the end to combine multiple lists
+    field       currently just accepts single string
+    vals         list of strings or ints.  Make sure to pass int as a list even if single item
+    kwargs      currently just val pair 'operator' = [pick val in operator_dict]
+    RETURNS
+    where_clause_components     list of string or strings
+    '''
+
     if isinstance(vals[0], str):
-        where_clause  =  ["({field} = '{val}')".format(field=field, val=val)
+        where_clause_components  =  ["({field} = '{val}')".format(field=field, val=val)
                                             for val in vals]
     else:
-        where_clause = ["({field} = {val})".format(field=field, val=val)
-                                            for val in vals]
-    return(where_clause)
-def where_clause_create(fp_list, field_list, val_list):
-    where_clause=[]
-    for fp, field, val in zip(fp_list, field_list, val_list):
-        field_delim = arcpy.AddFieldDelimiters(fp, field)
-        # check here and here to find code and learn unicode background:
-        # https://gis.stackexchange.com/questions/153444/using-select-layer-by-attribute-in-arcpy
-        # https://pro.arcgis.com/en/pro-app/help/data/geodatabases/overview/a-quick-tour-of-unicode.htm
-        where_clause.append("{field} = '{val}'".format(field=field_delim, val=val))
-    return where_clause
+        try:
+            # get operator type from kwarg operator = operator
+            operator = kwargs['operator']
+            operator_dict = {'equal':'=', 'gt':'>', 'lt':'<'}
+            operator = operator_dict[operator]
+            where_clause_components = ["({field} {operator} {val})".format(field=field, operator = operator, val=vals)
+                                                                            for val in vals]
+        except KeyError:
+            print('operator string not valid.  gt = > lt = < equal = =')
+            # Note: nest in list for consistency when stringing together multiple calls
+    return(where_clause_components)
+    # 1) take output and run below line to combine with OR conditional.  Change
+    # to AND if need be
+    # where_clause_location = ' OR '.join(where_clause_location)
+    # 2) Try adding this in future to ensure field delimeter instead of if else statment
+    # field_delim = arcpy.AddFieldDelimiters(fp, field)
+    # # check here and here to find code and learn unicode background:
+    # # https://gis.stackexchange.com/questions/153444/using-select-layer-by-attribute-in-arcpy
+    # # https://pro.arcgis.com/en/pro-app/help/data/geodatabases/overview/a-quick-tour-of-unicode.htm
 
 def custom_select(fp_or_feat, field, target_vals):
     '''
@@ -211,14 +247,53 @@ def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     except KeyError:
         print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
+def sequential_update_field(fp, field, incr):
+    '''
+    quick tool to add sequential numbers to field
+    '''
+    if isinstance(field, list):
+        pass
+    else:
+        field = [field]
+    with arcpy.da.UpdateCursor(fp, field) as cursor:
+        ct = 1
+        for row in cursor:
+            row[0] = ct
+            cursor.updateRow(row)
+            ct += incr
 
+def buffer_and_create_feat(fp_line, fp_out, buff_dist, line_end_type = 'ROUND', dissolve_option = 'NONE'):
+    '''
+    ZRU 6/24/2020
+    buffer and output file
+    ARGS:
 
+    '''
+    # Attrocious hack to account for my lack of fixing file path slash issue with windows and python
+    # try except to handle both .shp and feat classes from gdb
+    print(line_end_type)
+    print(dissolve_option)
+    try:
+        feat = fp_line.split('/')[-1].split('\\')[-1].split('.')[-2]
+    except IndexError:
+        feat = fp_line.split('/')[-1].split('\\')[-1]
+    arcpy.MakeFeatureLayer_management(fp_line, feat)
+    arcpy.Buffer_analysis(feat, fp_out, buff_dist, 'FULL', line_end_type, dissolve_option)
 def parse_dir(obj, substr):
     '''
     matchses substrings to dir(obj) from python interactive
     document and add to: ZRU 5/26/2020
     '''
-    methods = dir(obj)
+    # if dir used on list:
+    if isinstance(obj, list):
+        methods = dir(obj)
+        print('here')
+        pass
+    # if dir is used on locals then a dictionary is returned
+    elif isinstance(obj, dict):
+        methods = obj.keys()
+        print('dict')
+
     indices_match = [idx for idx, method in enumerate(methods) if substr in method]
     methods_match = [methods[idx] for idx in indices_match]
     return(indices_match, methods_match)

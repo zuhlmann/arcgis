@@ -3,13 +3,19 @@ import pandas as pd
 from tabulate import tabulate
 from compare_data import *
 
-def show_table():
+def show_table(display_preference):
+    '''
+    ARGS:
+    display_preference:  desc or path. string
+    '''
     paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv"""
     # use index_col = 0 for show_table.  So .iloc values will accompany table
     df = pd.read_csv(paths_table, index_col = 0)
     df.index.name = 'index'
     # somehow need to be accessed this way
-    df2 = df[['alias', 'desc']]
+    display_list = ['alias']
+    display_list.append(display_preference)
+    df2 = df[display_list]
     table = tabulate(df2, headers = 'keys', colalign = ["left",  "left"], tablefmt = "github")
     # display table with options for filepaths
     print('')
@@ -271,14 +277,40 @@ def buffer_and_create_feat(fp_line, fp_out, buff_dist, line_end_type = 'ROUND', 
     '''
     # Attrocious hack to account for my lack of fixing file path slash issue with windows and python
     # try except to handle both .shp and feat classes from gdb
-    print(line_end_type)
-    print(dissolve_option)
     try:
         feat = fp_line.split('/')[-1].split('\\')[-1].split('.')[-2]
     except IndexError:
         feat = fp_line.split('/')[-1].split('\\')[-1]
     arcpy.MakeFeatureLayer_management(fp_line, feat)
-    arcpy.Buffer_analysis(feat, fp_out, buff_dist, 'FULL', line_end_type, dissolve_option)
+    fp_temp = os.path.join(get_path('fp_scratch'), 'temp_buff')
+    arcpy.Buffer_analysis(feat, fp_temp, buff_dist, 'FULL', line_end_type, dissolve_option)
+    # arcpy.Union_management()
+    # os.path.remove
+
+def field_mappings(fp_target, fp_append, mapping_csv, fp_out):
+    df = pd.read_csv(mapping_csv)
+    temp1 = df['append'].notnull()
+    temp2 = df['mapping']!='discard'
+    notnull = temp1 & temp2
+    target_fields = df['mapping'][notnull].tolist()
+    append_fields = df['append'][notnull].tolist()
+    new_field_names = df['new_field_name'][notnull].tolist()
+    fms = arcpy.FieldMappings()
+    ct = 0
+    for field_target, field_append, new_name in zip(target_fields, append_fields, new_field_names):
+        fm = arcpy.FieldMap()
+        print(field_target, type(field_target))
+        print(field_append, type(field_append))
+        print(fp_append)
+        fm.addInputField(fp_target, field_target)
+        fm.addInputField(fp_append, field_append)
+        output_name = fm.outputField
+        output_name.name = new_name
+        fm.outputField = output_name
+        fms.addFieldMap(fm)
+        ct += 1
+    arcpy.Merge_management([fp_target, fp_append], fp_out, fms)
+
 def parse_dir(obj, substr):
     '''
     matchses substrings to dir(obj) from python interactive

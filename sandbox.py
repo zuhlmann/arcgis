@@ -8,6 +8,9 @@ import copy
 
 fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
 fp_KRRP_project = get_path('fp_KRRP_project')
+fp_KRRP_project_scratch = get_path(19)
+fp_working = get_path(18)
+
 
 # # i) wetlans, riparian, etc
 # Wetlands = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/AECOM/100719/WetlandAndBio_GISData_20191004/Klamath_CDM_Wetlands_20191004.gdb/Copco/Copco_Wetlands'
@@ -123,7 +126,7 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # include_fields = ['Cust_NM']
 # attribute_inventory(fp_feat, fp_out, False, include_fields)
 
-# 6/2 Water Quality Map
+# # 6/2 Water Quality Map
 # from utilities import *
 # fp_kml_waterQ = "C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA" \
 #                     "\GIS_Request_Tracking\GIS_Requests_RES\\2020_06_02\\" \
@@ -141,7 +144,7 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # within_dist = 1
 # fp_out = os.path.join(fp_KRRP_project, 'NHD_within_{}mile_water_qual_stations'.format(within_dist))
 # select_by_location(fp_selected, 'within_a_distance', fp_location, fp_out, search_distance = '{} Miles'.format(within_dist))
-
+#
 # import arcpy
 # sql_stat = "(Visibility = 5000000) AND (GNIS_NAME = 'Trinity River')"
 # fp_flowline = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\\new_data_downloads\NHD_H_18010211_HU8_Shape\Shape\NHDFlowline.shp'
@@ -168,7 +171,7 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # fp_water_gauge_not_pac = os.path.join(fp_KRRP_project, 'klam_water_qual_stations_not_pacificorp')
 # fp_water_gauge_pac = os.path.join(get_path('fp_KRRP_project'), 'klam_water_qual_stations_pacificorp_only')
 # # fix_names(fp_water_gauge_pac)
-
+#
 # fp_select = os.path.join(get_path(4), 'Roads_Consolidated_Draft_copy')
 # fp_location = os.path.join(get_path(4), 'States_OR_CA_dissolve')
 # spatial_slxn_type = 'intersect'
@@ -184,8 +187,74 @@ fp_KRRP_project = get_path('fp_KRRP_project')
 # for fp, feat in zip(feat_paths, feats):
 #     arcpy.FeatureClassToFeatureClass_conversion(fp, fp_out, feat)
 
-# copy feature class to new location
-feat = 'Access_Routes_Buffer'
-fp_in = os.path.join(get_path(18), 'Project_Data', feat)
-fp_out = os.path.join(get_path(20), '2020_06_23/Access_Routes_Buffer')
-arcpy.FeatureClassToFeatureClass_conversion(fp_in, fp_out, feat)
+# # 9) copy feature class to new location
+# fp_CDM_20200428 = get_path(6)
+# arcpy.env.workspace = fp_CDM_20200428
+# feats = arcpy.ListFeatureClasses(feature_dataset = 'Project_Data')
+# fp_dsets = [os.path.join(fp_CDM_20200428, feat) for feat in feats]
+# fp_out = os.path.join(get_path(20), '2020_06_29\project_data_20200629.gdb')
+# # arcpy.env.workspace = fp_CDM_20200428
+# # print(fp_dsets)
+# arcpy.FeatureClassToGeodatabase_conversion(fp_dsets, fp_out)
+
+# 10) Append Special Plants layers onto each other
+arcpy.env.workspace = fp_KRRP_project_scratch
+
+# https://www.esri.com/news/arcuser/1012/use-field-mapping-and-python-scripting-to-make-your-job-easier.html
+# https://desktop.arcgis.com/en/arcmap/latest/analyze/arcpy-classes/fieldmappings.htm
+import arcpy
+
+# Set the workspace
+arcpy.env.workspace = 'c:/base'
+
+fp_target = os.path.join(get_path(6), 'Observations\Special_Status_Plant_Pts')
+# target_feat = arcpy.CopyFeatures_management(fp_target, 'target_lyr')
+append_feat = os.path.join(fp_KRRP_project_scratch, 'Special_Status_Plants_2018_append_2019')
+fp_out = os.path.join(fp_KRRP_project_scratch)
+
+fields = arcpy.ListFields(append_feat)
+with open('C:\Users\\uhlmann\Desktop\\fields_append.txt', 'w') as f:
+    for field in fields:
+        print >> f, field.name
+
+
+# # Create the required FieldMap and FieldMappings objects
+# fm_type = arcpy.FieldMap()
+# fm_diam = arcpy.FieldMap()
+# fms = arcpy.FieldMappings()
+#
+# # Get the field names of vegetation type and diameter for both original
+# # files
+# tree_type = "Tree_Type"
+# plant_type = "Plant_Type"
+#
+# tree_diam = "Tree_Diameter"
+# plant_diam = "Diameter"
+#
+# # Add fields to their corresponding FieldMap objects
+# fm_type.addInputField(in_file1, tree_type)
+# fm_type.addInputField(in_file2, plant_type)
+#
+# fm_diam.addInputField(in_file1, tree_diam)
+# fm_diam.addInputField(in_file2, plant_diam)
+#
+# # Set the output field properties for both FieldMap objects
+# type_name = fm_type.outputField
+# type_name.name = 'Veg_Type'
+# fm_type.outputField = type_name
+#
+# diam_name = fm_diam.outputField
+# diam_name.name = 'Veg_Diam'
+# fm_diam.outputField = diam_name
+#
+# # Add the FieldMap objects to the FieldMappings object
+# fms.addFieldMap(fm_type)
+# fms.addFieldMap(fm_diam)
+#
+# # Merge the two feature classes
+# arcpy.Merge_management([in_file1, in_file2], output_file, fms)
+#
+#
+#
+# Append_management (input, fp_out, 'NO_TEST', {field_mapping}, {subtype})
+#

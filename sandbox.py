@@ -198,24 +198,29 @@ fp_working = get_path(18)
 # arcpy.FeatureClassToGeodatabase_conversion(fp_dsets, fp_out)
 
 # 10) Append Special Plants layers onto each other
-arcpy.env.workspace = fp_KRRP_project_scratch
-
-# https://www.esri.com/news/arcuser/1012/use-field-mapping-and-python-scripting-to-make-your-job-easier.html
-# https://desktop.arcgis.com/en/arcmap/latest/analyze/arcpy-classes/fieldmappings.htm
-import arcpy
-
-# Set the workspace
-arcpy.env.workspace = 'c:/base'
-
-fp_target = os.path.join(get_path(6), 'Observations\Special_Status_Plant_Pts')
-# target_feat = arcpy.CopyFeatures_management(fp_target, 'target_lyr')
-append_feat = os.path.join(fp_KRRP_project_scratch, 'Special_Status_Plants_2018_append_2019')
-fp_out = os.path.join(fp_KRRP_project_scratch)
-
-fields = arcpy.ListFields(append_feat)
-with open('C:\Users\\uhlmann\Desktop\\fields_append.txt', 'w') as f:
-    for field in fields:
-        print >> f, field.name
+# # A. First output fields for both layers and cut paste into csv
+# arcpy.env.workspace = fp_KRRP_project_scratch
+# # https://desktop.arcgis.com/en/arcmap/latest/analyze/arcpy-classes/fieldmappings.htm
+# import arcpy
+#
+# # Set the workspace
+# arcpy.env.workspace = 'c:/base'
+#
+# fp_target = os.path.join(get_path(6), 'Observations\Special_Status_Plant_Pts')
+# # target_feat = arcpy.CopyFeatures_management(fp_target, 'target_lyr')
+# append_feat = os.path.join(fp_KRRP_project_scratch, 'Special_Status_Plants_2018_append_2019')
+# fp_out = os.path.join(fp_KRRP_project_scratch)
+#
+# fields = arcpy.ListFields(append_feat)
+# with open('C:\Users\\uhlmann\Desktop\\fields_append.txt', 'w') as f:
+#     for field in fields:
+#         print >> f, field.name
+# B. Now run function
+fp_target = os.path.join(get_path(6), 'Observations/Special_Status_Plant_Pts')
+fp_append = os.path.join(get_path(19), 'Special_Status_Plants_2018_append_2019')
+mapping_csv = os.path.join(get_path(5), 'dataframe_special_status_plants.csv')
+fp_out = os.path.join(get_path(19), 'Special_Status_Plants_2018_2019_allFields')
+field_mappings(fp_target, fp_append, mapping_csv, fp_out, True)
 
 
 # # Create the required FieldMap and FieldMappings objects

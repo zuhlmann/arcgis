@@ -1,5 +1,8 @@
-import arcpy
 
-def test_feat_methods(fp_in):
-    arcpy.MakeFeatureLayer_management(fp_in, 'layer_make_feature')
-    arcpy.CopyFeatures_management(fp_in, 'in_memory/in_memory_feature')
+
+intersection =  [6441236.64, 2603756.13, 6463978.64, 2588196.13]
+gt1 =  ]6439264.16079, 1.0, 0.0, 2605714.10272, 0.0, -1.0]
+gt2 =  [6441236.64, 1.0, 0.0, 2603756.13, 0.0, -1.0]
+xoffset =  [1973, 24714]
+yoffset =  [1958, 17517]
+xsize, ysize = 25754, 20851

@@ -31,9 +31,9 @@ fp_relative_parcels_master = 'Administrative/Parcels_2019_Master_Rectified'
 # pd.DataFrame.to_csv(df, paths_table)
 
 #When we want to concatenate new rows
-alias_add = 'fp_KlamathDataHD_Upload'
-desc_add = 'topo, bathy and klamath_vect.gdb, klamath_raster.gdb'
-path_add = 'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath\DataReceived\AECOM\KlamathDataHD_Upload'
+alias_add = 'fp_box_offline'
+desc_add = 'place to copy big gdb and files like DataHD_Upload klamath_raster.gdb'
+path_add = 'C:\Users\uhlmann\\box_offline'
 add_table_entry(alias_add, desc_add, path_add)
 
 # # replace entry

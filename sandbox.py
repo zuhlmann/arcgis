@@ -215,51 +215,23 @@ fp_working = get_path(18)
 # with open('C:\Users\\uhlmann\Desktop\\fields_append.txt', 'w') as f:
 #     for field in fields:
 #         print >> f, field.name
-# B. Now run function
-fp_target = os.path.join(get_path(6), 'Observations/Special_Status_Plant_Pts')
-fp_append = os.path.join(get_path(19), 'Special_Status_Plants_2018_append_2019')
-mapping_csv = os.path.join(get_path(5), 'dataframe_special_status_plants.csv')
-fp_out = os.path.join(get_path(19), 'Special_Status_Plants_2018_2019_allFields')
-field_mappings(fp_target, fp_append, mapping_csv, fp_out, True)
+
+# # B. Now run function
+# fp_target = os.path.join(get_path(6), 'Observations/Special_Status_Plant_Pts')
+# fp_append = os.path.join(get_path(19), 'Special_Status_Plants_2018_append_2019')
+# mapping_csv = os.path.join(get_path(5), 'dataframe_special_status_plants.csv')
+# fp_out = os.path.join(get_path(19), 'Special_Status_Plants_2018_2019_allFields')
+# field_mappings(fp_target, fp_append, mapping_csv, fp_out, True)
 
 
-# # Create the required FieldMap and FieldMappings objects
-# fm_type = arcpy.FieldMap()
-# fm_diam = arcpy.FieldMap()
-# fms = arcpy.FieldMappings()
-#
-# # Get the field names of vegetation type and diameter for both original
-# # files
-# tree_type = "Tree_Type"
-# plant_type = "Plant_Type"
-#
-# tree_diam = "Tree_Diameter"
-# plant_diam = "Diameter"
-#
-# # Add fields to their corresponding FieldMap objects
-# fm_type.addInputField(in_file1, tree_type)
-# fm_type.addInputField(in_file2, plant_type)
-#
-# fm_diam.addInputField(in_file1, tree_diam)
-# fm_diam.addInputField(in_file2, plant_diam)
-#
-# # Set the output field properties for both FieldMap objects
-# type_name = fm_type.outputField
-# type_name.name = 'Veg_Type'
-# fm_type.outputField = type_name
-#
-# diam_name = fm_diam.outputField
-# diam_name.name = 'Veg_Diam'
-# fm_diam.outputField = diam_name
-#
-# # Add the FieldMap objects to the FieldMappings object
-# fms.addFieldMap(fm_type)
-# fms.addFieldMap(fm_diam)
-#
-# # Merge the two feature classes
-# arcpy.Merge_management([in_file1, in_file2], output_file, fms)
-#
-#
-#
-# Append_management (input, fp_out, 'NO_TEST', {field_mapping}, {subtype})
-#
+# 11) DELETE clean up FERC G mess
+dset_out = os.path.join(get_path(4), 'FERC_G')
+fcs = ['Klamath_River_FERC_Map', 'structures_digitized_FERC_G',
+    'structures_digitized_FERC_GAnno', 'structures_digitized_FERC_G_poly',
+    'temp_FERC_bdry_line']
+fp_fcs = [os.path.join(fp_KRRP_project, fc) for fc in fcs]
+[arcpy.FeatureClassToGeodatabase_conversion(fc, dset_out) for fc in fp_fcs]
+
+
+'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/Klamath_Vector_Data.gdb/Biology_SurveyData2018/Special_Status_Plants_2018_found'
+'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_DATA/new_data_downloads\\CDM_20200429_Current/Klamath_20200428.gdb/Observations/Special_Status_Plants_Pts'

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from tabulate import tabulate
-from compare_data import *
+# from compare_data import *
 
 def show_table(display_preference):
     '''
@@ -298,12 +298,21 @@ def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
     fp_target           file path of target fc
     fp_append           file path of append fc
     mapping_csv         .csv file with field names and such (check description)
+                        csv has these fields: 1) target 2) append 3) mapping
+                        4) new_field_name.  1 is the target field name.
+                        2 the append field name 3 if append field is to be mapped
+                        this field will have target field which to map corresponding
+                        append field 4 new field name for mapped field. IF not
+                        mapping - then set value to 'discard'.
     fp_out              file path out
     unmapped            Boolean.  if True then include unmapped fields from target.
-                        this will set vals in fp_append to NULL since presumably
-                        those values do not exist
+                        this will add ALL fields from target and set those vals
+                        in fp_append to NULL since presumably those values do not
+                        exist if they were not mapped.  This option retains mapped
+                        fields as well.
     '''
     df = pd.read_csv(mapping_csv)
+    # create notnull mask
     temp1 = df['append'].notnull()
     temp2 = df['mapping']!='discard'
     notnull = temp1 & temp2
@@ -317,26 +326,23 @@ def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
         arcpy.MakeFeatureLayer_management(fp_append, 'append_lyr')
         fp_append = 'append_lyr'
         fields = arcpy.ListFields(fp_target)
+        # unsure if encodiing is necessary
         target_names_unmapped_all = [field.name.encode('utf-8') for field in fields]
         target_type_unmapped_all = [field.type for field in fields]
         # create dataframe for selecting type
         df = pd.DataFrame(np.column_stack([target_names_unmapped_all, target_type_unmapped_all]), columns = ['field_name', 'field_type'])
         target_names_unmapped_set = set(target_names_unmapped_all)
         target_set = set(target_fields)
-        # remove target values which will be mapped
+        # remove mapped target values
         target_names_unmapped_set.difference_update(target_set)
         target_names_unmapped_list = list(target_names_unmapped_set)
         target_types_unmapped = df[df['field_name'].isin(target_names_unmapped_list)].field_type.tolist()
         target_names_unmapped = df[df['field_name'].isin(target_names_unmapped_list)].field_name.tolist()
-        print(df)
 
         # add fields to append fc
         # https://desktop.arcgis.com/en/arcmap/10.3/analyze/arcpy-classes/field.htm
         # The field object's type property does not match completely
         #  with the choices listed for the Add Field tool's field_type parameter.
-        #To allow the Add Field tool to use all type keywords, field types are
-        # mapped: Integer to LONG, String to TEXT, and SmallInteger to SHORT.
-        # Not sure if this is necessary
         dict_ToField = {'Integer':'LONG', 'String':'TEXT', 'SmallInteger':'SHORT'}
         for name_add, type_add in zip(target_names_unmapped, target_types_unmapped):
             print('in the for loop')
@@ -346,6 +352,7 @@ def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
             # now that we are types AddField can handle
             elif name_add in ['Shape']:
                 pass
+            # now add all unmapped (which were screened) fields to mapping lists
             else:
                 try:
                     type_add = dict_ToField[type_add]
@@ -357,11 +364,7 @@ def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
                 target_fields.append(name_add)
                 append_fields.append(name_add)
                 new_field_names.append(name_add)
-        # [target_fields.append(unmapped_field) for unmapped_field in target_names_unmapped_list]
-        # [append_fields.append(unmapped_field) for unmapped_field in target_names_unmapped_list]
-        # [new_field_names.append(unmapped_field) for unmapped_field in target_names_unmapped_list]
-        print(target_names_unmapped_list)
-        print(target_fields)
+    # begin mapping
     fms = arcpy.FieldMappings()
     for field_target, field_append, new_name in zip(target_fields, append_fields, new_field_names):
         fm = arcpy.FieldMap()
@@ -383,7 +386,7 @@ def parse_dir(obj, substr):
     '''
     # if dir used on list:
     if isinstance(obj, list):
-        methods = dir(obj)
+        methods = obj
         print('here')
         pass
     # if dir is used on locals then a dictionary is returned

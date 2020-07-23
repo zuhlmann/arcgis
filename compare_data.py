@@ -3,6 +3,10 @@ import copy
 import pandas as pd
 import os
 import numpy as np
+import sys
+sys.path = [p for p in sys.path if '86' not in p]
+for item in sys.path:
+    print(item)
 import arcpy
 
 def path_create(data1, data2):
@@ -235,3 +239,56 @@ def sql_statement(fp_feat, field, substring, fp_out):
     arcpy.MakeFeatureLayer_management(fp_feat, 'feat_lyr')
     arcpy.SelectLayerByAttribute_management('feat_lyr', 'ADD_TO_SELECTION', sql_statement)
     arcpy.CopyFeatures_management('feat_lyr', fp_out)
+
+def parse_gdb_dsets(fp_gdb, **kwargs):
+    '''
+    similiar to file_paths_arc function here but didn't want to spend time
+    assimilating them.  Used for gdb with datasets.  Unpacks, creates file path
+    for all feature classes.  Option to create shapefiles
+     Saves in folder specified as shapfiles individually
+    - note will add option to detect all datasets from gdb using arcpy.
+    ZRU 7/23/2020
+
+    ARGS:
+    fp_gdb          file path (string) to geodatabase of interest
+    fp_out          file path (string) to save shapefiles
+    **kwargs        only option is datasets which = list of strings - names of datasets
+                    if no dataset kwarg is passed then all datasets within gdb
+                    are used
+    RETURNS:
+    fcs_names       returns a list of feature class names (sans path)
+    '''
+    arcpy.env.workspace = copy.copy(fp_gdb)
+
+    # datasets can be passed as a list or selected wholesale from gdb
+    try:
+        dsets = kwargs['dsets']
+    except KeyError:
+        dsets = arcpy.ListDatasets()
+
+    # file paths created to feature classes i.e. fp_gdb/dataset/fc_name
+    fp_fcs = []
+    # grab and flatten all names sans root path
+    fcs_names =[]
+    for dset in dsets:
+        print('dset: {}'.format(dset))
+        fcs = arcpy.ListFeatureClasses(feature_dataset = dset)
+        [fp_fcs.append('{}\\{}\\{}'.format(fp_gdb, dset, fc)) for fc in fcs]
+        fcs_names.append(fcs)
+    # Convert to shapefiles in specified file path
+    fcs_names = [item for sublist in fcs_names for item in sublist]
+    for name in fcs_names:
+        print('name fc:  {}'.format(name))
+
+    # save to shapefile if fp_out passed kwarg
+    try:
+        fp_out = kwargs['fp_out']
+        for fp_fc in fp_fcs:
+            # feature_name + .shp extension
+            shp_name = '{}.shp'.format(fp_fc.split('\\')[-1])
+            # create shapefiles from fc and output to AGOL data_upload folder
+            arcpy.FeatureClassToFeatureClass_conversion(fp_fc, fp_out, shp_name)
+    except KeyError:
+        pass
+    # return fcs_names
+    return(fcs_names)

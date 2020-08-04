@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from tabulate import tabulate
+import math
 # from compare_data import *
 
 def show_table(display_preference):
@@ -397,3 +398,194 @@ def parse_dir(obj, substr):
     indices_match = [idx for idx, method in enumerate(methods) if substr in method]
     methods_match = [methods[idx] for idx in indices_match]
     return(indices_match, methods_match)
+
+def zipShapefilesInDir(inDir, outDir):
+    '''
+    Should be part of class when reorganizing.  Used and canabilized from
+    spyder_arcgis.py to shapefile a gdb, zip and add to AGOL Content.  This
+    takes a folder full of shapefiles and outputs individual zipfiles with
+    <shapefile title>.zip folder containing zipped contents per shapefile
+    Note: Use compare_data.parse_gdb_dsets to unpack shapefiles from gdb,
+    then feed to this function. Note two functions use each other
+    (zipShapefilesInDir and zipShapeFile).
+    From here: https://community.esri.com/thread/28985
+    ZRU 7/23/2020
+    ARGS:
+    inDir:      path/to/directory with shapfiles
+    outDir:     path/to/zipdir parent where folders.zip will be added (one per
+                shapefile)
+
+    '''
+    import zipfile
+    import glob
+
+    # Check that input directory exists
+    if not os.path.exists(inDir):
+        print("Input directory {} does not exist!".format(inDir))
+        return False
+
+    # Check that output directory exists
+    if not os.path.exists(outDir):
+        # Create it if it does not
+        print('Creating output directory {}'.format(outDir))
+        os.mkdir(outDir)
+
+    print("Zipping shapefile(s)in folder {} to output folder {}".format(inDir, outDir))
+
+    # Loop through shapefiles in input directory
+    for inShp in glob.glob(os.path.join(inDir, "*.shp")):
+        # Build the filename of the output zip file
+        outZip = os.path.join(outDir, os.path.splitext(os.path.basename(inShp))[0] + ".zip")
+
+        # Zip the shapefile
+        zipShapefile(inShp, outZip)
+    return True
+
+def zipShapefile(inShapefile, newZipFN):
+    '''
+    Should be part of class when reorganizing.  Used and canabilized from
+    spyder_arcgis.py to shapefile a gdb, zip and add to AGOL Content.  This
+    takes a folder full of shapefiles and outputs individual zipfiles with
+    <shapefile title>.zip folder containing zipped contents per shapefile
+    Note: Use compare_data.parse_gdb_dsets to unpack shapefiles from gdb,
+    then feed to this function.  Note two functions use each other
+    (zipShapefilesInDir and zipShapeFile).
+    From here: https://community.esri.com/thread/28985
+    ZRU 7/23/2020
+    ARGS:
+    inDir:      path/to/directory with shapfiles
+    outDir:     path/to/zipdir parent where folders.zip will be added (one per
+                shapefile)
+    '''
+
+    print('Starting to Zip '+ inShapefile +' to '+ newZipFN)
+
+    # Check that input shapefile exists
+    if not (os.path.exists(inShapefile)):
+        print(inShapefile + ' Does Not Exist')
+        return False
+
+    # Delete output zipfile if it already exists
+    if (os.path.exists(newZipFN)):
+        print('Deleting '+newZipFN)
+        os.remove(newZipFN)
+
+    # Output zipfile still exists, exit
+    if (os.path.exists(newZipFN)):
+        print('Unable to Delete'+newZipFN)
+        return False
+
+    # Open zip file object
+    zipobj = zipfile.ZipFile(newZipFN,'w')
+
+    # Loop through shapefile components
+    for infile in glob.glob( inShapefile.lower().replace(".shp",".*")):
+        # Skip .zip file extension
+        if os.path.splitext(infile)[1].lower() != ".zip":
+            print("Zipping {}".format(infile))
+            # Zip the shapefile component
+            zipobj.write(infile, os.path.basename(infile), zipfile.ZIP_DEFLATED)
+
+    # Close the zip file object
+    zipobj.close()
+    return True
+
+def get_extents(fc_in, fp_out, **kwarg):
+    '''
+    Wrapper for some arcpy extent grabbers.  But can find max min extent for
+    feat or feat class with multiple features.  Vectors.
+    ZRU 7/24/2020 - used for getting extents in bathymetry OpenTopo downloads
+
+    ARGS:
+    fc_in       string. file path to feature.  Can call directly from python
+                console in arcmap with loaded feat_lyr
+    fp_out      sting. path to csv to save dataframe
+    kwarg       expand = number of feet or whatever unit to buffer extent on
+                all four sides
+    '''
+    import arcpy
+    import numpy as np
+    maxx, maxy, minx, miny = [],[],[],[]
+    for row in arcpy.da.SearchCursor(fc_in, ["SHAPE@"]):
+        maxx.append(row[0].extent.XMax)
+        maxy.append(row[0].extent.YMax)
+        minx.append(row[0].extent.XMin)
+        miny.append(row[0].extent.YMin)
+    maxx, maxy, minx, miny = max(maxx), max(maxy), min(minx), min(miny)
+    try:
+        expand_scalar = kwarg['expand']
+        maxx, maxy = maxx + expand_scalar, maxy + expand_scalar
+        minx, miny = minx - expand_scalar, miny - expand_scalar
+    except KeyError:
+        pass
+    df = pd.DataFrame(np.column_stack([maxx, maxy, minx, miny]), columns = ['maxx', 'maxy', 'minx', 'miny'],  index = ['JC_Boyle'])
+    pd.DataFrame.to_csv(df, fp_out)
+
+def get_overlap(ds1, ds2, **kwarg):
+    '''
+    Used initially for sedimentation analysis in July 2020.  But simply finds
+    min bounding extents of two geotiffs, then based on kwargs outputs extents
+    to file and/or returns clipped numpy arrays of rasters.  Before reusing
+    switch to rasterio as gdal is pain in butt.
+    ARGS:
+    ds1:        dataset opened with gdal
+    ds2:        dataset opened with gdal
+    KWARGS:
+    reservoir_name:     String. This option will save extents to text file using the res
+                        name in file path
+    output_args:        Boolean. returns clipped numpy arrays for ds1 and ds2
+    '''
+    import gdal
+
+    # from here: https://gis.stackexchange.com/questions/16834/how-to-add-different-sized-rasters-in-gdal-so-the-result-is-only-in-the-intersec
+    gt1 = ds1.GetGeoTransform()
+    gt2 = ds2.GetGeoTransform()
+    # note geotransform yields list with 6 items (https://gdal.org/user/raster_data_model.html):
+    # [easting, x-transform, y-transform, northing, x-transform, y-transform]
+    # translation: [west_bdry, step easting, step northing, north boundar, step easting, step northing]
+
+    # r1 has left, top, right, bottom of dataset's bounds in geospatial coordinates.
+    # note Raster<X,Y>Size = ncells
+    # west, north, east, south
+    r1 = [gt1[0], gt1[3], gt1[0] + (gt1[1] * ds1.RasterXSize), gt1[3] + (gt1[5] * ds1.RasterYSize)]
+
+    # Do the same for dataset 2 ...
+    r2 = [gt2[0], gt2[3], gt2[0] + (gt2[1] * ds2.RasterXSize), gt2[3] + (gt2[5] * ds2.RasterYSize)]
+    intersection = [max(r1[0], r2[0]), min(r1[1], r2[1]), min(r1[2], r2[2]), max(r1[3], r2[3])]
+    xsize1, ysize1 = ds1.RasterXSize, ds1.RasterXSize
+    # x_offset1 = [math.ceil(intersection[0] - r2[0]), math.floor(intersection[2] - r2[0])]
+    x_offset1 = [intersection[0] - r1[0], intersection[2] - r1[0]]
+    x_buff1 = x_offset1[1] - x_offset1[0]
+    x_offset2 = [intersection[0] - r2[0], intersection[2] - r2[0]]
+    x_buff2 = x_offset2[1] - x_offset2[0]
+    # the offsets are from west to east easting vals.  For some reason buffer is used
+    # for the second subset position. It's the distance from the first easting
+    # to the second eastng.  Ditto for y_offset but from north to south
+    y_offset1 = [r1[1] - intersection[1], r1[1] - intersection[3]]
+    y_buff1 = y_offset1[1] - y_offset1[0]
+    y_offset2 = [r2[1] - intersection[1], r2[1] - intersection[3]]
+    y_buff2 = y_offset2[1] - y_offset2[0]
+    print('x_extents: ', ds2.RasterXSize + intersection[0])
+    print('y_extents: ', ds2.RasterYSize - intersection[1])
+    print('intersection: ', intersection)
+    print('gt1: ', gt1)
+    print('gt2: ', gt2)
+    print('xoffset: {} x_buff: {}'.format(math.ceil(x_offset1[0]), math.floor(x_buff1)))
+    print('yoffset: {} y_buff: {}'.format(math.ceil(y_offset1[0]), math.floor(y_buff1)))
+    print('xoffset2: {} x_buff: {}'.format(math.ceil(x_offset2[0]), math.floor(x_buff2)))
+    print('yoffset2: {} y_buff: {}'.format(math.ceil(y_offset2[0]), math.floor(y_buff2)))
+
+    # if you want to return intersections include this
+    try:
+        reservoir_name = kwarg['reservoir_name']
+        with open('C:/Users/uhlmann/box_offline/bathymetry_project/overlap_extents_{}.txt'.format(reservoir_name), 'w') as text_file:
+            text_file.write('intersection: {}'.format(intersection))
+    except KeyError:
+        pass
+    try:
+        kwarg['output_args']
+        arr1 = ds1.ReadAsArray(math.ceil(x_offset1[0]), math.ceil(y_offset1[0]), math.floor(x_buff1), math.floor(y_buff1))
+        arr2 = ds2.ReadAsArray(math.ceil(x_offset2[0]), math.ceil(y_offset2[0]), math.floor(x_buff2), math.floor(y_buff2))
+        return(arr1, arr2)
+    except KeyError:
+        pass

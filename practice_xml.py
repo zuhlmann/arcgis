@@ -2,6 +2,7 @@ import pandas as pd
 import utilities
 import glob
 import datetime
+import math
 
 # Editing Item Descriptions in XML
 # 8/6/2020
@@ -12,26 +13,34 @@ fp_new_purp = 'C:\\Users\\uhlmann\\code\\xml_practice.txt'
 fp_new_purp_csv = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv'
 #
 # index_col = <name of column in csv with row names i.e. filenames
-df = pd.read_csv(fp_new_purp_csv, index_col = 'ITEM', na_values = 'NA')
+df = pd.read_csv(fp_new_purp_csv, index_col = 'ITEM', na_values = 'NA', dtype='string')
 
+# index of last column bracketing Purpose statement items
+idx_purpose = df.columns.get_loc('SOURCE_CONTACT_ORIGINAL')
+idx_abstract = df.columns.get_loc('ABSTRACT')
+idx_credit = df.columns.get_loc('CREDITS')
 # create string from columns with \n delimeters
 purp = []
+abstract = []
+credits = []
+# loop through columns which created or will create Purpose Statement
 for rw in df.iterrows():
     # rw = tuple of len 2 - rw[0] = row index beginning with 0. rw[1] = series of particular row
-    # so this is a series
-    dict = rw[1].dropna().to_dict()
-    # If purpose already created i.e. messing around with Item Description, then delete and create anew
-    try:
-        del(dict['PURPOSE'])
-    except KeyError:
-        pass
+    # so this is a series with the columns as rows
+    row_full = rw[1]
+    dict = row_full[:idx_purpose].dropna().to_dict()
     # create list of strings i.e. ['key1: val1', 'key2: val2']
     purp_indiv = ['{}: {}'.format(key, val) for key, val in zip(dict.keys(), dict.values())]
-    print(purp_indiv)
     # make string from list with \n between items
     purp_indiv = '\n'.join(purp_indiv)
     purp.append(purp_indiv)
+    # # now append abstract and credits if exist
+    # abstract.append(row_full.ABSTRACT)
+    # credits.append(row_full.CREDITS)
+
+#If purpose already created i.e. messing around with Item Description, then delete and create anew
 df['PURPOSE'] = purp
+
 pd.DataFrame.to_csv(df, fp_new_purp_csv)
 
 # 2) Loop through XML files and update/add Purpose
@@ -45,10 +54,23 @@ fp_base = df['DATA_LOCATION']
 item_names = df['ITEM']
 glob_strings = ['{}\\{}*.xml'.format(fp_base, item_name) for fp_base, item_name in zip(fp_base, item_names)]
 fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
-purpose_new = df['PURPOSE']
+purpose_new = df['PURPOSE'].to_list()
+abstract_new = df['ABSTRACT'].to_list()
+credits_new = df['CREDITS'].to_list()
+
+# escape characters not follow prob due to i don't know.
+credits_new_temp = []
+for cred in credits_new:
+    try:
+        # fixes escape character issue
+        cred = cred.replace('\\n', '\n')
+    except AttributeError:
+        pass
+    credits_new_temp.append(cred)
+credits_new = credits_new_temp
 
 ct = 0
-# fp_xml_orig = [p2]
+
 for idx, fp_xml in enumerate(fp_xml_orig):
     print('count {}. path {}'.format(ct, fp_xml))# refer to notes below for diff betw trees and elements
     ct+=1
@@ -62,20 +84,41 @@ for idx, fp_xml in enumerate(fp_xml_orig):
     # stops at first DIRECT child.  use root.iter for recursive search
     # if doesn't exist.  Add else statements for if does exist and update with dict
     purp = dataIdInfo.find('idPurp')
-    if purp is not None:
-        purp.text = purpose_new[idx]
-        purp.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
-        print('if')
-        tree.write(fp_xml)
-    elif purp is None:
-        # purp = purpose.text
-        purp = ET.SubElement(dataIdInfo, 'idPurp')
-        purp.text = purpose_new[idx]
-        ET.dump(dataIdInfo)
-        # OPTIONAL: this adds an attribute - a key, val pair
-        purp.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
-        print('elif')
-        tree.write(fp_xml)
+    abstract = dataIdInfo.find('idAbs')
+    credits = dataIdInfo.find('idCredit')
+
+    # now do abstract and credits
+    element_list = [purp, abstract, credits]
+    element_title = ['idPurp', 'idAbs', 'idCredit']
+    element_text_list = [purpose_new[idx], abstract_new[idx], credits_new[idx]]
+    for el, el_title, el_text in zip(element_list, element_title, element_text_list):
+        # print('{}\n{}\n{}\n'.format(el,el_title,el_text))
+        # print('\nel_text: \n{}\nel_type:\n{}'.format(el_text[idx], type(el_text[idx])))
+        if el is not None:
+            el.text = el_text
+            el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+            # tree.write(fp_xml)
+            print('if\n')
+        # if the element does not exist yet
+        elif (el is None):
+            # wierd if/else but if string means it exists
+            if isinstance(el_text, str):
+                # purp = purpose.text
+                el = ET.SubElement(dataIdInfo, el_title)
+                el.text = el_text
+                ET.dump(dataIdInfo)
+                # OPTIONAL: this adds an attribute - a key, val pair
+                el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+                print('elif\n')
+            # when csv has no value - i.e. nan, str becomes a float to signify nan
+            # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
+            elif math.isnan(el_text):
+                print('this means nan float for thing')
+                pass
+
+    tree.write(fp_xml)
+
+
     # # used to remove subelements made messing arounc
     # el_list = ['idTestZRU', 'idPurp']
     # for el_str in el_list:

@@ -8,7 +8,6 @@ import copy
 import plotables as pltz
 import math
 
-
 # file paths PRIOR to getting surgical with this shit
 fp_box_offline = 'C:\\Users\\uhlmann\\box_offline'
 fp_copco_10 = os.path.join(utilities.get_path(22), 'bathymetry_project/Bathy_1ft_Copco_2010.tif')
@@ -49,22 +48,18 @@ arr_JCB_diff = ds6.ReadAsArray()
 mask_IG = (arr_IG_diff != np.min(arr_IG_diff)) & (arr_IG_10 > -100)
 IG_diff_masked = np.min(arr_IG_diff[mask_IG])
 IG_10_masked = np.min(arr_IG_10[mask_IG])
-print('min diff {} 10 {}'.format(IG_diff_masked, IG_10_masked))
-print(type(arr_copco_diff), type(arr_copco_diff[0,0]))
-print(type(arr_IG_diff), type(arr_IG_10[0,0]))
 
 print('shape slim: {} shape_orig: {}'.format(arr_copco_diff.shape, arr_copco_10.shape))
 print('shape slim: {} shape_orig: {}'.format(arr_IG_diff.shape, arr_IG_10.shape))
+
 # replace nans with numpy nan value
 # in this version nans were wierd negative neglible vals
-print('line 20')
 mask_copco = arr_copco_diff!=np.nanmin(arr_copco_diff)
 # mask_IG = (arr_IG_diff>-100) & (arr_IG_diff<100)
 mask_IG = (arr_IG_diff!=np.nanmin(arr_IG_diff)) & (arr_IG_10 > 2000)
-print('IG sum: {}  copco sum: {}'.format(np.sum(mask_IG), np.sum(mask_copco)))
 
 mask_JCB = arr_JCB_diff!=np.nanmin(arr_JCB_diff)
-print('IG sum: {}  copco sum: {} jcb sum: {}'.format(np.sum(mask_IG), np.sum(mask_copco), np.sum(mask_JCB)))
+
 # elevations from Greg assumed to be at 100% reservoir fill
 # https://www.pacificorp.com/content/dam/pcorp/documents/en/pacificorp/energy/hydro/klamath-river/relicensing/klamath-final-license-application/Exhibit_B_Project_Operation_and_Resource_Utilization.pdf
 elev_copco = 2607.5
@@ -92,14 +87,11 @@ arr_storage_copco = elev_masked_copco - arr_masked_copco_10
 # acre_feet_copco_2018 = acre_feet_copco_2010 - acre_feet_change_copco
 
 # IG
-print('line 38')
 arr_masked_IG_diff = arr_IG_diff[mask_IG]
 arr_masked_IG_10 = arr_IG_10[mask_IG]
-print('IG min {} copco min {}'.format(np.min(arr_masked_IG_10), np.min(arr_masked_copco_10)))
-print('mean bath copco {} IG {}'.format(np.mean(arr_masked_copco_10), np.mean(arr_masked_IG_10)))
 elev_masked_IG = elev_IG[mask_IG]
 arr_storage_IG = elev_masked_IG - arr_masked_IG_10
-print('mean storage copco {} IG {}'.format(np.mean(arr_storage_copco), np.mean(arr_storage_IG)))
+
 # reservoir_storage_IG = round(np.mean(arr_storage_IG),1)
 # reservoir_acre_IG = round(np.sum(mask_IG) * acres_convert, 1)
 # reservoir_mean_change_IG = round(np.mean(arr_masked_IG_diff), 1)
@@ -110,7 +102,6 @@ print('mean storage copco {} IG {}'.format(np.mean(arr_storage_copco), np.mean(a
 # acre_feet_change_IG = reservoir_mean_change_IG * reservoir_acre_IG
 # acre_feet_IG_2018 = acre_feet_IG_2010 - acre_feet_change_IG
 
-print(arr_JCB_diff.shape, mask_JCB.shape)
 arr_masked_JCB_diff = arr_JCB_diff[mask_JCB]
 arr_masked_JCB_10 = arr_JCB_10[mask_JCB]
 elev_masked_JCB = elev_JCB[mask_JCB]

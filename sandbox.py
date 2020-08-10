@@ -4,7 +4,7 @@ import os
 from compare_data import *
 from utilities import *
 import copy
-
+import sys
 
 fp_compare_vers = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers'
 fp_KRRP_project = get_path('fp_KRRP_project')
@@ -222,16 +222,3 @@ fp_working = get_path(18)
 # mapping_csv = os.path.join(get_path(5), 'dataframe_special_status_plants.csv')
 # fp_out = os.path.join(get_path(19), 'Special_Status_Plants_2018_2019_allFields')
 # field_mappings(fp_target, fp_append, mapping_csv, fp_out, True)
-
-
-# 11) DELETE clean up FERC G mess
-dset_out = os.path.join(get_path(4), 'FERC_G')
-fcs = ['Klamath_River_FERC_Map', 'structures_digitized_FERC_G',
-    'structures_digitized_FERC_GAnno', 'structures_digitized_FERC_G_poly',
-    'temp_FERC_bdry_line']
-fp_fcs = [os.path.join(fp_KRRP_project, fc) for fc in fcs]
-[arcpy.FeatureClassToGeodatabase_conversion(fc, dset_out) for fc in fp_fcs]
-
-
-'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath/DataReceived/Klamath_Vector_Data.gdb/Biology_SurveyData2018/Special_Status_Plants_2018_found'
-'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_DATA/new_data_downloads\\CDM_20200429_Current/Klamath_20200428.gdb/Observations/Special_Status_Plants_Pts'

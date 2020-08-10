@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<data>
+  <person name = "martha">
+    <qualities>strong</qualities>
+    <origin>ethiopia</origin>
+  </person>
+  <person name = "daddy">
+    <qualities>annoying</qualities>
+    <origin>seattle</origin>
+  </person>
+  <person name = "menelik">
+    <qualities>smart</qualities>
+    <origin>shoreline</origin>
+  </person>
+</data>

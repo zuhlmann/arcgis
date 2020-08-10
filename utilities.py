@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from tabulate import tabulate
 import math
 # from compare_data import *
 
@@ -9,6 +8,7 @@ def show_table(display_preference):
     ARGS:
     display_preference:  desc or path. string
     '''
+    from tabulate import tabulate
     paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv"""
     # use index_col = 0 for show_table.  So .iloc values will accompany table
     df = pd.read_csv(paths_table, index_col = 0)
@@ -457,6 +457,9 @@ def zipShapefile(inShapefile, newZipFN):
     outDir:     path/to/zipdir parent where folders.zip will be added (one per
                 shapefile)
     '''
+
+    import zipfile
+    import glob
 
     print('Starting to Zip '+ inShapefile +' to '+ newZipFN)
 

@@ -271,7 +271,7 @@ def parse_gdb_dsets(fp_gdb, **kwargs):
     # grab and flatten all names sans root path
     fcs_names =[]
     for dset in dsets:
-        print('dset: {}'.format(dset))
+        # print('dset: {}'.format(dset))
         fcs = arcpy.ListFeatureClasses(feature_dataset = dset)
         [fp_fcs.append('{}\\{}\\{}'.format(fp_gdb, dset, fc)) for fc in fcs]
         fcs_names.append(fcs)

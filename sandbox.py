@@ -187,15 +187,15 @@ fp_working = get_path(18)
 # for fp, feat in zip(feat_paths, feats):
 #     arcpy.FeatureClassToFeatureClass_conversion(fp, fp_out, feat)
 
-# # 9) copy feature class to new location
-# fp_CDM_20200428 = get_path(6)
+# 9) copy feature class to new location
+fp_CDM_20200428 = get_path(6)
+arcpy.env.workspace = fp_CDM_20200428
+feats = arcpy.ListFeatureClasses(feature_dataset = 'Project_Data')
+fp_dsets = [os.path.join(fp_CDM_20200428, feat) for feat in feats]
+fp_out = os.path.join(get_path(20), '2020_06_29\project_data_20200629.gdb')
 # arcpy.env.workspace = fp_CDM_20200428
-# feats = arcpy.ListFeatureClasses(feature_dataset = 'Project_Data')
-# fp_dsets = [os.path.join(fp_CDM_20200428, feat) for feat in feats]
-# fp_out = os.path.join(get_path(20), '2020_06_29\project_data_20200629.gdb')
-# # arcpy.env.workspace = fp_CDM_20200428
-# # print(fp_dsets)
-# arcpy.FeatureClassToGeodatabase_conversion(fp_dsets, fp_out)
+# print(fp_dsets)
+arcpy.FeatureClassToGeodatabase_conversion(fp_dsets, fp_out)
 
 # 10) Append Special Plants layers onto each other
 # # A. First output fields for both layers and cut paste into csv

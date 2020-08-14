@@ -11,38 +11,41 @@ import glob
 import copy
 # import pandas as pd
 import utilities
+# import compare_data
 
 # # since i don't have system admin rights I cannot remove python 2.7 arcpy path (Program Files 86)
-sys.path = [p for p in sys.path if '86' not in p]
+# sys.path = [p for p in sys.path if '86' not in p]
 # use my modules
-sys.path.append('C:\\Users\\uhlmann\\code')
-for item in sys.path:
-    print(item)
-import arcpy
-import compare_data
+# sys.path.append('C:\\Users\\uhlmann\\code')
+# for item in sys.path:
+#     print(item)
+# import arcpy
 
 # get file paths to upload
 fp_table = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\compare_vers\\comparison_tables\\Wetlands\\Wetlands_20191004_Vs_20190930.csv'
 fp_gdb = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath\\DataReceived\\AECOM\\100719\\WetlandAndBio_GISData_20191004\\Klamath_CDM_Wetlands_20191004.gdb'
-fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_08_05\\2020_08_05'
+fp_out_wetlands = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_08_10\\2020_08_10'
 fp_new_data = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\new_data_downloads'
 
-# 1) ZIP SHAPEFILES
-# only need to do this ONCE!
-# NOTE: these files were created with compare_data.parse_gdb_datasets function used earlier
-inDir = copy.copy(fp_out)
-outDir = '{}zip2'.format(inDir)
-utilities.zipShapefilesInDir(inDir, outDir)
+# 1) fc to folder
+# compare_data.parse_gdb_dsets(fp_gdb, fp_out = fp_out_wetlands)
 
-# 2)  Tag, Zip and Upload
-# 2a) general
-title = [dir[:-4] for dir in os.listdir(outDir)]
-tags = ['eagles', 'observations', 'krrp']
-tags_final = []
-# dumb way to make a nested list with duplicate tags for each feature
-for i in range(len(title)):
-    tags_final.append(tags)
-snippet = ['eagle observation data current as of 7/13/2020'] * len(title)
+# # 1) ZIP SHAPEFILES
+# # only need to do this ONCE!
+# # NOTE: these files were created with compare_data.parse_gdb_datasets function used earlier
+# inDir = copy.copy(fp_out_wetlands)
+# outDir = '{}_zip'.format(inDir)
+# # utilities.zipShapefilesInDir(inDir, outDir)
+#
+# # 2)  Tag, Zip and Upload
+# # 2a) general
+# title = [dir[:-4] for dir in os.listdir(outDir)]
+# tags = ['wetlands', 'krrp']
+# tags_final = []
+# # dumb way to make a nested list with duplicate tags for each feature
+# for i in range(len(title)):
+#     tags_final.append(tags)
+# snippet = ['wetland delineations current as of May 2020'] * len(title)
 
 # # 2b) wetlands.gdb
 # # CREATE SHAPEFILES and get titles
@@ -86,18 +89,34 @@ print('Connected to {} as {}'.format(mcmjac_gis.properties.portalHostname, mcmja
 # # my_content = gis.content.search(query = query_str, item_type = 'shapefile', max_items = 15)
 # to get group info use group id from html 'html?id-<HERE IS ID #>'
 krrp_geospatial = Group(mcmjac_gis, 'a6384c0909384a43bfd91f5d9723912b')
+#
+# # 3b) AGOL Add data to Content and Groups
+# # file paths to .zip in alphabetical order
+# zipped_dirs = [subD.path for subD in os.scandir(outDir)]
+#
+# for idx, shp in enumerate(zipped_dirs):
+#     properties_dict = {'title':title[idx],
+#                         'tags':tags_final[idx],
+#                         'snippet':snippet[idx]}
+#     fc_item = mcmjac_gis.content.add(properties_dict, data = shp)
+#     # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
+#     print('ct = {} \\n fc_item {} '.format(idx, fc_item))
 
-# 3b) AGOL Add data to Content and Groups
-# file paths to .zip in alphabetical order
-zipped_dirs = [subD.path for subD in os.scandir(outDir)]
+# 4) share items
+feat_layer_list = mcmjac_gis.content.search(query = 'owner: uhlmann@mcmjac.com', item_type = 'Feature Layer Collection', max_items = 50)
+target_tag = 'wetlands'
+# find features which are wetlands
+feats = [feat for feat in feat_layer_list if target_tag in feat.tags]
 
-for idx, shp in enumerate(zipped_dirs):
-    properties_dict = {'title':title[idx],
-                        'tags':tags_final[idx],
-                        'snippet':snippet[idx]}
-    fc_item = mcmjac_gis.content.add(properties_dict, data = shp)
-    # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
-    print('ct = {} \\n fc_item {} '.format(idx, fc_item))
+# publishing is EASY:
+for feat in feats:
+    feat.publish()
+# sharing is EASY
+for feat in feats:
+    feat.share(groups = [krrp_geospatial])
+# for feat in feats:
+#     print(feat)
+
 
 # # 4) One off eagle data
 # eagle_gdb = 'eagle_features\\KlamathEagleImpactAnalysis_20200714_gdb\\KlamathEagleImpactAnalysis_20200714.gdb'
@@ -120,3 +139,18 @@ for idx, shp in enumerate(zipped_dirs):
 # gdb_name = 'eagle.gdb'
 # result = feature_collection.export(gdb_name, 'File Geodatabase')
 # result.download(fp_download)
+
+
+# dir(feat) from features mcmjac_gis.content.search()
+'_ux_item_type', '_workdir', 'access', 'accessInformation', 'add_comment', 'add_relationship',
+ 'appCategories', 'app_info', 'avgRating', 'banner', 'categories', 'clear', 'comments', 'content_status',
+ 'copy', 'copy_feature_layer_collection', 'create_thumbnail', 'create_tile_service', 'created', 'culture',
+  'delete', 'delete_rating', 'delete_relationship', 'dependencies', 'dependent_to', 'dependent_upon',
+  'description', 'documentation', 'download', 'download_metadata', 'download_thumbnail', 'export', 'extent',
+   'fromkeys', 'get', 'get_data', 'get_thumbnail', 'get_thumbnail_link', 'groupDesignations', 'guid',
+   'homepage', 'id', 'industries', 'isOrgItem', 'itemid', 'items', 'keys', 'languages', 'largeThumbnail',
+   'layers', 'licenseInfo', 'listed', 'metadata', 'modified', 'move', 'name', 'numComments', 'numRatings',
+   'numViews', 'owner', 'ownerFolder', 'pop', 'popitem', 'properties', 'protect', 'protected', 'proxies',
+   'proxyFilter', 'publish', 'rating', 'reassign_to', 'register', 'related_items', 'resources', 'scoreCompleteness',
+   'screenshots', 'setdefault', 'share', 'shared_with', 'snippet', 'spatialReference', 'status', 'tables', 'tags',
+    'thumbnail', 'title', 'type', 'typeKeywords', 'unregister', 'unshare', 'update', 'url', 'usage', 'values']

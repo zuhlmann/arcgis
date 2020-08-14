@@ -3,23 +3,24 @@ import utilities
 import glob
 import datetime
 import math
+# import compare_data
 
 # Editing Item Descriptions in XML
 # 8/6/2020
 # MAKE CLASS FOR ALL THIS!
-#
-# # 1)  Create Purpose string for Item Description, add to dataframe
+
+# 1)  Create Purpose string for Item Description, add to dataframe
 fp_new_purp = 'C:\\Users\\uhlmann\\code\\xml_practice.txt'
 fp_new_purp_csv = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv'
 #
 # index_col = <name of column in csv with row names i.e. filenames
-df = pd.read_csv(fp_new_purp_csv, index_col = 'ITEM', na_values = 'NA', dtype='string')
+df = pd.read_csv(fp_new_purp_csv, index_col = 'CATEGORY', na_values = 'NA', dtype='string')
 
 # index of last column bracketing Purpose statement items
-idx_purpose = df.columns.get_loc('SOURCE_CONTACT_ORIGINAL')
+idx_purpose = df.columns.get_loc('PURPOSE') -1
 idx_abstract = df.columns.get_loc('ABSTRACT')
 idx_credit = df.columns.get_loc('CREDITS')
-# create string from columns with \n delimeters
+# create string from columns with \\n delimeters
 purp = []
 abstract = []
 credits = []
@@ -28,10 +29,10 @@ for rw in df.iterrows():
     # rw = tuple of len 2 - rw[0] = row index beginning with 0. rw[1] = series of particular row
     # so this is a series with the columns as rows
     row_full = rw[1]
-    dict = row_full[:idx_purpose].dropna().to_dict()
+    dict = row_full[1:idx_purpose].dropna().to_dict()
     # create list of strings i.e. ['key1: val1', 'key2: val2']
     purp_indiv = ['{}: {}'.format(key, val) for key, val in zip(dict.keys(), dict.values())]
-    # make string from list with \n between items
+    # make string from list with \\n between items
     purp_indiv = '\n'.join(purp_indiv)
     purp.append(purp_indiv)
     # # now append abstract and credits if exist
@@ -50,7 +51,7 @@ p2 = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GI
 
 df = pd.read_csv(fp_new_purp_csv)
 # create file paths to shape
-fp_base = df['DATA_LOCATION']
+fp_base = df['DATA_LOCATION_MCMILLEN_JACOBS']
 item_names = df['ITEM']
 glob_strings = ['{}\\{}*.xml'.format(fp_base, item_name) for fp_base, item_name in zip(fp_base, item_names)]
 fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
@@ -68,9 +69,10 @@ for cred in credits_new:
         pass
     credits_new_temp.append(cred)
 credits_new = credits_new_temp
+for cred in credits_new:
+    print(cred)
 
 ct = 0
-
 for idx, fp_xml in enumerate(fp_xml_orig):
     print('count {}. path {}'.format(ct, fp_xml))# refer to notes below for diff betw trees and elements
     ct+=1
@@ -92,13 +94,14 @@ for idx, fp_xml in enumerate(fp_xml_orig):
     element_title = ['idPurp', 'idAbs', 'idCredit']
     element_text_list = [purpose_new[idx], abstract_new[idx], credits_new[idx]]
     for el, el_title, el_text in zip(element_list, element_title, element_text_list):
-        # print('{}\n{}\n{}\n'.format(el,el_title,el_text))
-        # print('\nel_text: \n{}\nel_type:\n{}'.format(el_text[idx], type(el_text[idx])))
+        # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
+        # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
         if el is not None:
+            print(el.text)
             el.text = el_text
             el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
             # tree.write(fp_xml)
-            print('if\n')
+            print('if\\n')
         # if the element does not exist yet
         elif (el is None):
             # wierd if/else but if string means it exists
@@ -109,7 +112,7 @@ for idx, fp_xml in enumerate(fp_xml_orig):
                 ET.dump(dataIdInfo)
                 # OPTIONAL: this adds an attribute - a key, val pair
                 el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
-                print('elif\n')
+                print('elif\\n')
             # when csv has no value - i.e. nan, str becomes a float to signify nan
             # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
             elif math.isnan(el_text):

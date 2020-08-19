@@ -9,62 +9,57 @@ from arcgis.gis import Group
 import os, sys
 import glob
 import copy
-# import pandas as pd
+import pandas as pd
 import utilities
-# import compare_data
-
-# # since i don't have system admin rights I cannot remove python 2.7 arcpy path (Program Files 86)
-# sys.path = [p for p in sys.path if '86' not in p]
-# use my modules
-# sys.path.append('C:\\Users\\uhlmann\\code')
-# for item in sys.path:
-#     print(item)
-# import arcpy
-
-# get file paths to upload
-fp_table = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\compare_vers\\comparison_tables\\Wetlands\\Wetlands_20191004_Vs_20190930.csv'
-fp_gdb = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath\\DataReceived\\AECOM\\100719\\WetlandAndBio_GISData_20191004\\Klamath_CDM_Wetlands_20191004.gdb'
-fp_out_wetlands = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_08_10\\2020_08_10'
-fp_new_data = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\new_data_downloads'
-
-# 1) fc to folder
-# compare_data.parse_gdb_dsets(fp_gdb, fp_out = fp_out_wetlands)
 
 
-# 3) ADD ITEMS TO AGOL
 class AgolAccess:
     '''
     Basic init for AGOL access
     '''
 
     def __init__(self, credentials):
+        '''
+        need to add credentials like a key thing.  hardcoded currently
+        '''
         u_name = 'uhlmann@mcmjac.com'
+        u_name2 = 'zuhlmann@mcmjac.com'
         p_word = 'Gebretekle24!'
-        setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
-        print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, mcmjac_gis.users.me.username))
-        self.item_type_dict = {'shp': 'shapefile', 'feature': 'Feature Layer Collection'}
+        p_word2 = 'Mcmjac081'
+        setattr(self, 'mcmjac_gis',  GIS(username = u_name2, password = p_word2))
+        print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
+        # dictionary that can be expanded upon
+        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
+        # move this eventually
+        self.df = pd.read_csv('C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv',  index_col = 'ITEM')
     def get_group(self, group_key):
+        '''
+        hardcoded. update if more groups become necessary.
+        '''
         group_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
                         'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
-        group_id = group_dict[group_Key]
+        group_id = group_dict[group_key]
         krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
         setattr(self, group_key, krrp_geospatial)
 
     def identify_items_online(self, itemType, **kwargs):
+        '''
+        find items already online
+        '''
         # item_type_dict created in __init__
         itemType = self.item_type_dict[itemType]
         items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
                                         item_type = itemType, max_items = 300)
-        setattr(self, 'user_content_{}'.format(itemType))
+        setattr(self, 'user_content_{}'.format(itemType), items)
         # filtered tags attribute
         try:
             tags = kwargs['tags']
             items_filtered = [item for item in items if tags in item.tags]
-            setattr(self, 'user_content_{}_{}'.format(tags, itemType))
+            setattr(self, 'user_content_{}_{}'.format(tags, itemType), items_filtered)
         except KeyError:
             pass
 
-    def zip_agol_upload(inDir):
+    def zip_agol_upload(self, inDir):
         # 1) ZIP SHAPEFILES
 
         inDir = copy.copy(inDir)
@@ -76,14 +71,35 @@ class AgolAccess:
         utilities.zipShapefilesInDir(inDir, outDir)
         setattr(self, 'outDir', outDir)
     def selection_idx(self, **kwargs):
+        '''
+        use item_descriptions.csv tags to find indices OR pass integer
+        indices.  Use kwargs to indicate type
+        '''
         # SELECT BY TAGS
         try:
             target_tag = kwargs['target_tag']
+            # list will be passed for multiple target tags
+            if not isinstance(target_tag, list):
+                target_tag = [target_tag]
             # pull tags column from df (list)
-            tags_from_df = self.parse_tags()
+            self.parse_tags()
             # find index if tags are present in col (list) and if tag matches target
-            iloc_tag = [idx for idx, tags in enumerate(tags_from_df) if z(isinstance(tags, list) and (target_tag in tags)]
-            self.indices = iloc_tag
+            # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_tag if (isinstance(tags, list)) and (val_targ in tags)]
+            iloc_temp = []
+            for target in target_tag:
+                ct = 0
+                try:
+                    for tags in self.tags_from_df:
+                        print('if {}(type = {}) in {}'.format(target, type(target), tags))
+                        if target in tags:
+                            iloc_temp.append(ct)
+                        ct += 1
+                except TypeError:
+                    ct += 1
+            print(iloc_temp)
+            iloc_tag = list(set(iloc_temp))
+            # get index names from iloc vals
+            self.indices = self.df.iloc[iloc_tag].index.tolist()
         except KeyError:
             # if not tags selection then indices will be     passed
             pass
@@ -97,14 +113,16 @@ class AgolAccess:
                 pass
             else:
                 indices = [indices]
-            # determine if indices were index_column vals or indices (integers)
+            # If indices passed were integers
             try:
-                indices = int(indices[0])
-                self.indices = df.iloc[indices].index.tolist()
+                int(indices[0])
+                print('indices {}'.format(indices))
+                self.indices = self.df.iloc[indices].index.tolist()
+            # If indices were index_column vals (stirng)
             except ValueError:
-                # this basically just CHECKS that the index_col vals passes EXIST
                 try:
-                    self.indices = df.loc[indices].index.tolist()
+                    self.indices = self.df.loc[indices].index.tolist()
+                #Check that the index_col vals passes EXIST
                 except KeyError:
                     print('index_col indices are not in index.  For examples\n'
                             'check spelling of item names')
@@ -113,35 +131,46 @@ class AgolAccess:
             pass
 
     def parse_tags(self):
-        # this should parse tags from csv
-            # turns tags column into list.  each column is a string with commas
-            tags_column = self.df.TAGS.values.tolist()
-            tags_temp = []
-            for tags in tags_column:
-                try:
-                    # i.e. tags = 'wetlands, krrc'
-                    # tags.split(',') == ['wetlands', 'krrc']
-                    # hence string to list
-                    tags_temp.append(tags.split(','))
-                except AttributeError:
-                    # nans from pd.read_csv(...) are saved as floats which have
-                    # no .split attribute
-                    tags_temp.append(tags)
-            self.tags
+        '''
+        takes string from tags column and parse into list of strings
+        '''
+        tags_column = self.df.TAGS.values.tolist()
+        tags_temp = []
+        for tags in tags_column:
+            try:
+                # i.e. tags = 'wetlands, krrc'
+                # tags.split(',') == ['wetlands', ' krrc']
+                # tag.strip(' ') removes leading space for tags after position 1 (idx 0)
+                # hence string to list
+                tags_temp.append([tag.strip(' ') for tag in tags.split(',')])
+            except AttributeError:
+                # nans from pd.read_csv(...) are saved as floats which have
+                # no .split attribute
+                tags_temp.append(tags)
+        self.tags_from_df = tags_temp
 
-    def add_agol_upload(item_description_csv, select_idx, **kwargs):
+    def add_agol_upload(self, **kwargs):
+        '''
+        currently passing snippets as kwarg but could be drawn from column in
+        csv in future.  shapefiles need to be zipped and in file structure
+        before using this.
+        '''
         # try:
         #     title = kwargs['rename_files']
         # except KeyError:
         #     title = [dir[:-4] for dir in os.listdir(self.outDir)]
-        df = pd.read_csv(item_description_csv, index_col = 'ITEM')
         # base_paths = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
         # file_names = self.indices
         # fp_items = [os.path.join(base_path, file_name) for base_path, file_name in zip(base_paths, file_names)]
-
-        # GET ROW INDICES OF DF TO SELECT
-        # grab rows
         titles = self.indices
+
+        # tags
+        try:
+            tags = self.tags_parsed
+        except AttributeError:
+            self.parse_tags()
+            tags= self.tags_from_df
+
         # consider adding snippets to item_description.csv
         try:
             snippets = kwargs['snippets']
@@ -161,22 +190,27 @@ class AgolAccess:
             else:
                 sys.exit('len(snippet) != len(indices)')
         except:
-            snippets =[None] * len(title)
+            snippets =[None] * len(titles)
 
-        zipped_dirs = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
-        zipped_dirs = '{}_zip'.format(zipped_dirs)
+        # need indices from self.selection_idx
+        upload_folders = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
+        parent_zip_folder = ['{}_zip'.format(upload_folder) for upload_folder in upload_folders]
+        zipped_folders = [os.path.join(zip_folder, title) for zip_folder, title in zip(parent_zip_folder, titles)]
+        zipped_folders = ['{}.zip'.format(zip_folder) for zip_folder in zipped_folders]
         # check if they exist:
-        for zip_dir in zipped_dirs:
+        for zip_dir in zipped_folders:
+            print(zip_dir)
             if os.path.exists(zip_dir):
                 pass
             else:
                 sys.exit('paths dont exist')
+
          # zipped_dir will be index title
-        for idx, shp in enumerate(zipped_dirs):
+        for idx, shp in enumerate(zipped_folders):
             properties_dict = {'title':titles[idx],
                                 'tags':tags[idx],
                                 'snippet':snippets[idx]}
-            fc_item = mcmjac_gis.content.add(properties_dict, data = shp)
+            fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
 

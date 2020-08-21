@@ -3,6 +3,7 @@
 # go to C:\\Program Files\\ArcGIS\\Pro\\bin\\Python\\Scripts and do: Start proenv.bat
 # python2 to python3 compatability: https://pro.arcgis.com/en/pro-app/arcpy/get-started/python-migration-for-arcgis-pro.htm
 # coding: utf-8
+
 from __future__ import print_function, unicode_literals, absolute_import
 from arcgis.gis import GIS
 from arcgis.gis import Group
@@ -10,54 +11,17 @@ import os, sys
 import glob
 import copy
 import pandas as pd
+import numpy as np
 import utilities
+import datetime
+import math
+import xml.etree.ElementTree as ET
 
 
-class AgolAccess:
-    '''
-    Basic init for AGOL access
-    '''
-
-    def __init__(self, credentials):
-        '''
-        need to add credentials like a key thing.  hardcoded currently
-        '''
-        u_name = 'uhlmann@mcmjac.com'
-        u_name2 = 'zuhlmann@mcmjac.com'
-        p_word = 'Gebretekle24!'
-        p_word2 = 'Mcmjac081'
-        setattr(self, 'mcmjac_gis',  GIS(username = u_name2, password = p_word2))
-        print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
-        # dictionary that can be expanded upon
-        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
-        # move this eventually
-        self.df = pd.read_csv('C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv',  index_col = 'ITEM')
-    def get_group(self, group_key):
-        '''
-        hardcoded. update if more groups become necessary.
-        '''
-        group_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
-                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
-        group_id = group_dict[group_key]
-        krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
-        setattr(self, group_key, krrp_geospatial)
-
-    def identify_items_online(self, itemType, **kwargs):
-        '''
-        find items already online
-        '''
-        # item_type_dict created in __init__
-        itemType = self.item_type_dict[itemType]
-        items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
-                                        item_type = itemType, max_items = 300)
-        setattr(self, 'user_content_{}'.format(itemType), items)
-        # filtered tags attribute
-        try:
-            tags = kwargs['tags']
-            items_filtered = [item for item in items if tags in item.tags]
-            setattr(self, 'user_content_{}_{}'.format(tags, itemType), items_filtered)
-        except KeyError:
-            pass
+class metaData(object):
+    def __init__(self):
+        fp_csv = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv'
+        self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
 
     def zip_agol_upload(self, inDir):
         # 1) ZIP SHAPEFILES
@@ -70,10 +34,14 @@ class AgolAccess:
             os.mkdir(outDir)
         utilities.zipShapefilesInDir(inDir, outDir)
         setattr(self, 'outDir', outDir)
+
     def selection_idx(self, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
         indices.  Use kwargs to indicate type
+        ARGS:
+        target_tags (kwarg)         item or list of strings with desired tags
+        indices (kwargs)            integer zero based indices - iloc. list of int
         '''
         # SELECT BY TAGS
         try:
@@ -87,18 +55,20 @@ class AgolAccess:
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_tag if (isinstance(tags, list)) and (val_targ in tags)]
             iloc_temp = []
             for target in target_tag:
+                # the count will be index of dataframe rows.  It will repeat with
+                # multiple target_tags but duplicates removed with set(iloc_temp)
                 ct = 0
                 try:
                     for tags in self.tags_from_df:
-                        print('if {}(type = {}) in {}'.format(target, type(target), tags))
                         if target in tags:
                             iloc_temp.append(ct)
                         ct += 1
                 except TypeError:
                     ct += 1
-            print(iloc_temp)
+            # if multiple target_tags using set will slim down duplicate indices
             iloc_tag = list(set(iloc_temp))
             # get index names from iloc vals
+            self.indices_iloc = copy.copy(iloc_tag)
             self.indices = self.df.iloc[iloc_tag].index.tolist()
         except KeyError:
             # if not tags selection then indices will be     passed
@@ -118,6 +88,7 @@ class AgolAccess:
                 int(indices[0])
                 print('indices {}'.format(indices))
                 self.indices = self.df.iloc[indices].index.tolist()
+                self.indices_iloc = copy.copy(indices)
             # If indices were index_column vals (stirng)
             except ValueError:
                 try:
@@ -148,6 +119,159 @@ class AgolAccess:
                 # no .split attribute
                 tags_temp.append(tags)
         self.tags_from_df = tags_temp
+
+    def assemble_metadata(self):
+        # index of last column bracketing Purpose statement items
+        idx_purpose = self.df.columns.get_loc('PURPOSE') -1
+        # create string from columns with \\n delimeters
+        purp = []
+        # loop through columns which created or will create Purpose Statement
+        for rw in self.df.iterrows():
+            # rw = tuple of len 2 - rw[0] = row index beginning with 0. rw[1] = series of particular row
+            # so this is a series with the columns as rows
+            row_full = rw[1]
+            dict = row_full[1:idx_purpose].dropna().to_dict()
+            # create list of strings i.e. ['key1: val1', 'key2: val2']
+            purp_indiv = ['{}: {}'.format(key, val) for key, val in zip(dict.keys(), dict.values())]
+            # make string from list with \\n between items
+            purp_indiv = '\n'.join(purp_indiv)
+            purp.append(purp_indiv)
+            # # now append abstract and credits if exist
+            # abstract.append(row_full.ABSTRACT)
+            # credits.append(row_full.CREDITS)
+
+        # get purpose, abstract, credits from csv
+        purpose_new = copy.copy(purp)
+        abstract_new = self.df['ABSTRACT'].to_list()
+        credits_new = self.df['CREDITS'].to_list()
+
+        # escape characters not follow prob due to i don't know.
+        credits_new_temp = []
+        for cred in credits_new:
+            try:
+                # fixes escape character issue
+                cred = cred.replace('\\n', '\n')
+            except AttributeError:
+                pass
+            credits_new_temp.append(cred)
+
+        # create new df to grab these elements the same indexing as main df
+        index_df = self.df.index.tolist()
+        self.df_meta_add = pd.DataFrame(np.column_stack(
+                            [index_df, purpose_new, credits_new_temp, abstract_new]),
+                            columns = ['index', 'purpose_new', 'credits_new', 'abstract'],
+                            index = index_df)
+
+    def write_xml(self):
+
+        # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
+        fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
+        item_names = self.df.loc[self.indices].index.to_list()
+        print(item_names)
+        # glob strings will create the string to pass to  glob.glob which
+        # uses th *xml wildcard to pull JUST the xml files from shapefile folder
+        glob_strings = ['{}\\{}*.xml'.format(fp_base, item_name) for fp_base, item_name in zip(fp_base, item_names)]
+        # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
+        fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+
+        ct = 0
+        for idx, fp_xml in enumerate(fp_xml_orig):
+            print('count {}. path {}'.format(ct, fp_xml))# refer to notes below for diff betw trees and elements
+            ct+=1
+            tree = ET.parse(fp_xml)
+            # root is the root ELEMENT of a tree
+            root = tree.getroot()
+            # remove the mess in root
+            # Parent for idPurp
+            dataIdInfo = root.find('dataIdInfo')
+            # search for element <idPurp> - consult python doc for more methods. find
+            # stops at first DIRECT child.  use root.iter for recursive search
+            # if doesn't exist.  Add else statements for if does exist and update with dict
+            purp = dataIdInfo.find('idPurp')
+            abstract = dataIdInfo.find('idAbs')
+            credits = dataIdInfo.find('idCredit')
+
+            element_list = [purp, abstract, credits]
+            element_title = ['idPurp', 'idAbs', 'idCredit']
+            item_name = item_names[idx]
+            purpose_new = self.df_meta_add.loc[item_name]['purpose_new']
+            credits_new = self.df_meta_add.loc[item_name]['credits_new']
+            abstract_new = self.df_meta_add.loc[item_name]['abstract']
+            element_text_list = [purpose_new, abstract_new, credits_new]
+            for el, el_title, el_text in zip(element_list, element_title, element_text_list):
+                # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
+                # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
+                if el is not None:
+                    print(el.text)
+                    el.text = el_text
+                    el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+                    # tree.write(fp_xml)
+                    print('if\n')
+                # if the element does not exist yet
+                elif (el is None):
+                    # wierd if/else but if string means it exists
+                    if isinstance(el_text, str):
+                        # purp = purpose.text
+                        el = ET.SubElement(dataIdInfo, el_title)
+                        el.text = el_text
+                        ET.dump(dataIdInfo)
+                        # OPTIONAL: this adds an attribute - a key, val pair
+                        el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+                        print('elif\n')
+                    # when csv has no value - i.e. nan, str becomes a float to signify nan
+                    # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
+                    elif math.isnan(el_text):
+                        print('this means nan float for thing')
+                        pass
+
+            tree.write(fp_xml)
+
+
+class AgolAccess(metaData):
+    '''
+    Basic init for AGOL access
+    '''
+
+    def __init__(self, credentials):
+        '''
+        need to add credentials like a key thing.  hardcoded currently
+        '''
+        u_name = 'uhlmann@mcmjac.com'
+        u_name2 = 'zuhlmann@mcmjac.com'
+        p_word = 'Gebretekle24!'
+        p_word2 = 'Mcmjac081'
+        setattr(self, 'mcmjac_gis',  GIS(username = u_name2, password = p_word2))
+        print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
+        # dictionary that can be expanded upon
+        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
+        super(AgolAccess, self).__init__()
+
+    def get_group(self, group_key):
+        '''
+        hardcoded. update if more groups become necessary.
+        '''
+        group_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
+                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
+        group_id = group_dict[group_key]
+        krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
+        setattr(self, group_key, krrp_geospatial)
+
+    def identify_items_online(self, itemType, **kwargs):
+        '''
+        find items already online
+        '''
+        # item_type_dict created in __init__
+        itemType = self.item_type_dict[itemType]
+        items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
+                                        item_type = itemType, max_items = 300)
+        setattr(self, 'user_content_{}'.format(itemType), items)
+        # filtered tags attribute
+        try:
+            tags = kwargs['tags']
+            items_filtered = [item for item in items if tags in item.tags]
+            setattr(self, 'user_content_{}_{}'.format(tags, itemType), items_filtered)
+        except KeyError:
+            pass
 
     def add_agol_upload(self, **kwargs):
         '''
@@ -214,6 +338,50 @@ class AgolAccess:
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
 
+
+    # # used to remove subelements made messing arounc
+    # el_list = ['idTestZRU', 'idPurp']
+    # for el_str in el_list:
+    #     el_remove = root.find(el_str)
+    #     try:
+    #         root.remove(el_remove)
+    #     except TypeError:
+    #         pass
+    # tree.write(fp_xml)
+
+# XML NOTES
+# 1) ATTRIBUTTES are useful for metadata (data about data)
+# 8/6/2020
+# Use attributes for Metadata (https://www.w3schools.com/xml/xml_attributes.asp):
+# SEE the id="501".  GOOD IDEA
+# <messages>
+#     <note id="501">
+#         <to>bnasty</to>
+#         <from>zach</from>
+#     </note>
+#     note id="502">
+#         <to>mom</to>
+#         <from>zach</from>
+#     </note>
+# </messages>
+
+# 2) TREES and ELEMENTS
+# 8/6/2020
+# from here: https://docs.python.org/2/library/xml.etree.elementtree.html
+# XML is an inherently hierarchical data format, and the most natural way to represent it is
+# with a tree. ET has two classes for this purpose - ElementTree represents the whole XML document
+# as a tree, and Element represents a single node in this tree. Interactions with the whole
+# document (reading and writing to/from files) are usually done on the ElementTree level.
+# Interactions with a single XML element and its sub-elements are done on the Element level.
+
+# 3)  RANDOM
+# dir from ET object
+# root iterates with [child for child in root] to datatype xml.etree.ElementTree.Element with dir of each element or child
+# ['__class__', '__copy__', '__deepcopy__', '__delattr__', '__delitem__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__',
+# '__getattribute__', '__getitem__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__len__',
+#'__lt__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setitem__', '__setstate__',
+# '__sizeof__', '__str__', '__subclasshook__', 'append', 'attrib', 'clear', 'extend', 'find', 'findall', 'findtext', 'get',
+# 'getchildren', 'getiterator', 'insert', 'items', 'iter', 'iterfind', 'itertext', 'keys', 'makeelement', 'remove', 'set', 'tag', 'tail', 'text']
 
 # # 4) share items
 # feat_layer_list = mcmjac_gis.content.search(query = 'owner: uhlmann@mcmjac.com', item_type = 'Feature Layer Collection', max_items = 50)

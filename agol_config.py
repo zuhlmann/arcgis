@@ -31,8 +31,12 @@ import spyder_arcgis_oop as agolZ
 # 2) Example of adding new metadata
 # agol_obj = agolZ.metaData()
 agol_obj = agolZ.AgolAccess('something')
-agol_obj.selection_idx(target_tag = ['ferc'])
-
+# agol_obj.selection_idx(indices = [21,22])
+# # agol_obj.zip_agol_upload()
+# snips = ['FERC boundaries from 2017.  Still valid as of Aug 2020. However will' +
+#         'be edited soon', 'Limit of Work 60Design for KRRP']
+# agol_obj.add_agol_upload(snippets = snips)
+agol_obj.email_group()
 
 
 

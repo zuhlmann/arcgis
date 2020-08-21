@@ -23,10 +23,10 @@ class metaData(object):
         fp_csv = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv'
         self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
 
-    def zip_agol_upload(self, inDir):
+    def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
 
-        inDir = copy.copy(inDir)
+        inDir = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()[0]
         outDir = '{}_zip'.format(inDir)
         if os.path.exists(outDir):
             pass
@@ -240,7 +240,7 @@ class AgolAccess(metaData):
         u_name2 = 'zuhlmann@mcmjac.com'
         p_word = 'Gebretekle24!'
         p_word2 = 'Mcmjac081'
-        setattr(self, 'mcmjac_gis',  GIS(username = u_name2, password = p_word2))
+        setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
         self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
@@ -279,22 +279,22 @@ class AgolAccess(metaData):
         csv in future.  shapefiles need to be zipped and in file structure
         before using this.
         '''
-        # try:
-        #     title = kwargs['rename_files']
-        # except KeyError:
-        #     title = [dir[:-4] for dir in os.listdir(self.outDir)]
-        # base_paths = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
-        # file_names = self.indices
-        # fp_items = [os.path.join(base_path, file_name) for base_path, file_name in zip(base_paths, file_names)]
+
         titles = self.indices
 
         # tags
+        # try except grabs all parsed_tags in df
+        # tags_temp will pull those selected in index
         try:
-            tags = self.tags_parsed
+            tags = self.tags_from_df
         except AttributeError:
             self.parse_tags()
             tags= self.tags_from_df
-
+        # subset tags in index
+        tags_temp = []
+        for iloc in self.indices_iloc:
+            tags_temp.append(tags[iloc])
+        tags = tags_temp
         # consider adding snippets to item_description.csv
         try:
             snippets = kwargs['snippets']
@@ -317,6 +317,7 @@ class AgolAccess(metaData):
             snippets =[None] * len(titles)
 
         # need indices from self.selection_idx
+        # YES this is correct.  Each shapefile gets its OWN zip folder
         upload_folders = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
         parent_zip_folder = ['{}_zip'.format(upload_folder) for upload_folder in upload_folders]
         zipped_folders = [os.path.join(zip_folder, title) for zip_folder, title in zip(parent_zip_folder, titles)]
@@ -337,6 +338,43 @@ class AgolAccess(metaData):
             fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
+
+    def email_group(self):
+        signature = 'Zach Uhlmann\nGIS Specialist\n(206) 920-2478\tuhlmann@mcmjac.com'
+        #
+        # Group User Info: dict with keys - owner, admins, users
+        try:
+            members_dict = krrp_geospatial.get_members()
+        except NameError:
+            self.get_group('krrp_geospatial')
+            members_dict = self.krrp_geospatial.get_members()
+        # create list of lists
+        list_list = [members_dict[key] for key in members_dict.keys()]
+        # flatten list
+        all_members = [member for members in list_list for member in members]
+        zach = members_dict['owner']
+        subject = 'Klamath River Renewal ArcGIS Online Reorganizing'
+        email_body = '''Hi everybody,\n\nWe have changed some content and protocol
+                        with our project ArcGIS Online Group "KRRP_Geospatial"
+                        I updated and added metadata to the existing datasets -
+                        feature layers and shapefiles - to ensure basic metadata
+                        exists within the xml file and subsequently the Item
+                        Description in ArcGIS products.  Info that will help
+                        users determine the data origins, status (current or
+                        archival), file location, type, etc.\n\nIn this process
+                        I also will be splitting the existing geodatabases (gdb)
+                        already posted into individual shapefils and REMOVING the
+                        gdbs.  The only data this pertains to is the Wetlands.gdb
+                        and "requested_layers_working.gdb" which contain FERC bdrs
+                        and LoW_60Design.  The exact contents of those gdbs are
+                        now available as individual shapefiles.  I have yet to
+                        remove them, so if anybody objects please let me know.
+                        I wanted to give everyone a heads up in case those files
+                        slated for replacement are used in personal maps online.
+                        \n\nFeel free to contact me if you have questions.
+                        \n\n'''.format(signature)
+        print(email_body)
+        self.krrp_geospatial.notify([zach], subject, email_body, 'email')
 
 
     # # used to remove subelements made messing arounc

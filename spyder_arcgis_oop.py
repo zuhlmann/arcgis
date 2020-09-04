@@ -19,8 +19,7 @@ import xml.etree.ElementTree as ET
 
 
 class metaData(object):
-    def __init__(self):
-        fp_csv = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\item_descriptions.csv'
+    def __init__(self, fp_csv):
         self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
 
     def zip_agol_upload(self):
@@ -42,6 +41,9 @@ class metaData(object):
         ARGS:
         target_tags (kwarg)         item or list of strings with desired tags
         indices (kwargs)            integer zero based indices - iloc. list of int
+        alternative_select_col      dictionary with one key and val.  Created for
+                                    management plan data candidates csv where diff
+                                    groups want different layers uploaded.
         '''
         # SELECT BY TAGS
         try:
@@ -101,7 +103,28 @@ class metaData(object):
             # there should be a a key either tags or indices so delete or resoovle code somehow
             pass
 
-    def parse_tags(self):
+        # if using column other than tags to select rows.  Note: it is a dict
+        try:
+            indices_dict = kwargs['alternative_select_col']
+            col_title = list(indices_dict.keys())[0]
+            target_val = list(indices_dict.values())[0]
+            # note a1), despite df.loc[] with just [], since subsetting we get a dataframe
+            self.indices = self.df.loc[self.df[col_title] == target_val].index.tolist()
+            # get iloc vals TURN INTO FUNCTION SOMETIME
+            iloc_temp = []
+            ct = 0
+            try:
+                # note a2) even though [] like a1) this yields a series
+                for alternative_val in self.df[col_title].to_list():
+                    if target_val == alternative_val:
+                        iloc_temp.append(ct)
+                    ct += 1
+            except TypeError:
+                ct += 1
+            self.indices_iloc = iloc_temp
+        except KeyError:
+            pass
+    def parse_tags(self, ):
         '''
         takes string from tags column and parse into list of strings
         '''
@@ -121,6 +144,11 @@ class metaData(object):
         self.tags_from_df = tags_temp
 
     def assemble_metadata(self):
+        '''
+        Create new metadata formatted in csv for updating element tree elements
+        in write_xml.  If metadata already exists and we just want to append
+        more data to idPurp then skip this step.
+        '''
         # index of last column bracketing Purpose statement items
         idx_purpose = self.df.columns.get_loc('PURPOSE') -1
         # create string from columns with \\n delimeters
@@ -162,7 +190,15 @@ class metaData(object):
                             columns = ['index', 'purpose_new', 'credits_new', 'abstract'],
                             index = index_df)
 
-    def write_xml(self):
+    def write_xml(self, **kwargs):
+        '''
+        Update metadata to include assemble_metadata() statement or skip that
+        step and add lines to existing Item Description.  This can be fleshed
+        out to include add_credits, add_abstract too.
+        ARGUMENTS
+        add_lines_purp (kwargs):    dictionary where key is item and val is val
+                                    i.e. ORIGINAL_LOCATION: path/to/file
+        '''
 
         # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
         fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
@@ -172,12 +208,16 @@ class metaData(object):
         # uses th *xml wildcard to pull JUST the xml files from shapefile folder
         glob_strings = ['{}\\{}*.xml'.format(fp_base, item_name) for fp_base, item_name in zip(fp_base, item_names)]
         # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
+        # for item in glob_strings:
+        #     print('NAME {}\nTYPE: {}'.format(item, type(item)))
         fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
-
+        for item in fp_xml_orig:
+            print(item)
         ct = 0
         for idx, fp_xml in enumerate(fp_xml_orig):
             print('count {}. path {}'.format(ct, fp_xml))# refer to notes below for diff betw trees and elements
             ct+=1
+
             tree = ET.parse(fp_xml)
             # root is the root ELEMENT of a tree
             root = tree.getroot()
@@ -191,22 +231,47 @@ class metaData(object):
             abstract = dataIdInfo.find('idAbs')
             credits = dataIdInfo.find('idCredit')
 
-            element_list = [purp, abstract, credits]
-            element_title = ['idPurp', 'idAbs', 'idCredit']
-            item_name = item_names[idx]
-            purpose_new = self.df_meta_add.loc[item_name]['purpose_new']
-            credits_new = self.df_meta_add.loc[item_name]['credits_new']
-            abstract_new = self.df_meta_add.loc[item_name]['abstract']
-            element_text_list = [purpose_new, abstract_new, credits_new]
+            # the try block will add new lines to existing idPurp element
+            # if specified.  Thus far used when adding a McMillen_Path : path/to/file
+            # to Item Description when idPurp exists.
+            try:
+                new_purp_lines = kwargs['add_lines_purp']
+                purp_item = list(new_purp_lines.keys())
+                purp_value = list(new_purp_lines.values())
+
+                # If add_purp but no purp exists(blank item desc)this will add location
+                item_name = item_names[idx]
+                if self.df.loc[item_name]['ITEM_DESCRIPTION'].lower() == 'no':
+                    for item, val in zip(purp_item, purp_value):
+                        purpose_new = '\n{0}: {1}'.format(item, val)
+                else:
+                    # gets text from purpose element i.e. ORIGINAL_SOURCE: bla bla
+                    purpose_new = copy.copy(purp.text)
+                    for item, val in zip(purp_item, purp_value):
+                        purpose_new = purpose_new + '\n{0}: {1}'.format(item, val)
+                element_text_list = [purpose_new]
+                element_list = [purp]
+                element_title = ['idPurp']
+            except KeyError:
+                # get new element text
+                item_name = item_names[idx]
+                credits_new = self.df_meta_add.loc[item_name]['credits_new']
+                abstract_new = self.df_meta_add.loc[item_name]['abstract']
+                purpose_new = self.df_meta_add.loc[item_name]['purpose_new']
+                element_text_list = [purpose_new, abstract_new, credits_new]
+                element_list = [purp, abstract, credits]
+                element_title = ['idPurp', 'idAbs', 'idCredit']
+
             for el, el_title, el_text in zip(element_list, element_title, element_text_list):
                 # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
                 # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
                 if el is not None:
-                    print(el.text)
+                    print(el_text)
                     el.text = el_text
                     el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
                     # tree.write(fp_xml)
                     print('if\n')
+
                 # if the element does not exist yet
                 elif (el is None):
                     # wierd if/else but if string means it exists
@@ -226,13 +291,12 @@ class metaData(object):
 
             tree.write(fp_xml)
 
-
 class AgolAccess(metaData):
     '''
     Basic init for AGOL access
     '''
 
-    def __init__(self, credentials):
+    def __init__(self, credentials, fp_csv):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
@@ -244,7 +308,7 @@ class AgolAccess(metaData):
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
         self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
-        super(AgolAccess, self).__init__()
+        super(AgolAccess, self).__init__(fp_csv)
 
     def get_group(self, group_key):
         '''
@@ -340,7 +404,7 @@ class AgolAccess(metaData):
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
 
     def email_group(self):
-        signature = 'Zach Uhlmann\nGIS Specialist\n(206) 920-2478\tuhlmann@mcmjac.com'
+        signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmjac.com'
         #
         # Group User Info: dict with keys - owner, admins, users
         try:
@@ -351,30 +415,35 @@ class AgolAccess(metaData):
         # create list of lists
         list_list = [members_dict[key] for key in members_dict.keys()]
         # flatten list
-        all_members = [member for members in list_list for member in members]
+        all_members = [member for members in list_list for member in members if isinstance(members, list)]
+
         zach = members_dict['owner']
         subject = 'Klamath River Renewal ArcGIS Online Reorganizing'
-        email_body = '''Hi everybody,\n\nWe have changed some content and protocol
-                        with our project ArcGIS Online Group "KRRP_Geospatial"
+        email_body = '''Hi everybody,\n\nApologies on the formatting of this
+                        message but I have limited communication functionality
+                        in Groups for ArcGIS Online, particularly formatting text.
+                        I wanted to let everyone know that we have rearranged
+                        some content on our ArcGIS Online Group "KRRP_Geospatial".
                         I updated and added metadata to the existing datasets -
-                        feature layers and shapefiles - to ensure basic metadata
-                        exists within the xml file and subsequently the Item
-                        Description in ArcGIS products.  Info that will help
-                        users determine the data origins, status (current or
-                        archival), file location, type, etc.\n\nIn this process
-                        I also will be splitting the existing geodatabases (gdb)
-                        already posted into individual shapefils and REMOVING the
+                        feature layers and shapefiles - to ensure that Item
+                        Descriptions in ArcGIS products are informative and
+                        archival.  This includes metadata describing
+                        data origins, status (current or
+                        archival), file location, type, etc.\n\n
+                        I also parsed the existing geodatabases (gdb)
+                        into individual shapefiles and will REMOVE the
                         gdbs.  The only data this pertains to is the Wetlands.gdb
-                        and "requested_layers_working.gdb" which contain FERC bdrs
-                        and LoW_60Design.  The exact contents of those gdbs are
+                        and requested_layers_working.gdb (FERC bdrs
+                        and LoW_60Design).  The exact contents of those gdbs are
                         now available as individual shapefiles.  I have yet to
                         remove them, so if anybody objects please let me know.
                         I wanted to give everyone a heads up in case those files
                         slated for replacement are used in personal maps online.
-                        \n\nFeel free to contact me if you have questions.
+                        \n\nFeel free to contact me if you have questions.  Also,
+                        please RESPOND WITH YOUR EMAIL ADDRESS FOR FUTURE COMMUNICATION.
+                        That way I can format e-mails properly.   {}.
                         \n\n'''.format(signature)
-        print(email_body)
-        self.krrp_geospatial.notify([zach], subject, email_body, 'email')
+        self.krrp_geospatial.notify(all_members, subject, email_body, 'email')
 
 
     # # used to remove subelements made messing arounc

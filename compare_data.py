@@ -5,8 +5,11 @@ import os
 import numpy as np
 import sys
 sys.path = [p for p in sys.path if '86' not in p]
-for item in sys.path:
-    print(item)
+# sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcPy')
+# sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcToolBox\Scripts')
+sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
+for p in sys.path:
+    print(p)
 import arcpy
 
 def path_create(data1, data2):

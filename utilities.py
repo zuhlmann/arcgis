@@ -399,7 +399,7 @@ def parse_dir(obj, substr):
     methods_match = [methods[idx] for idx in indices_match]
     return(indices_match, methods_match)
 
-def zipShapefilesInDir(inDir, outDir):
+def zipShapefilesInDir(inDir, outDir, **kwarg):
     '''
     Should be part of class when reorganizing.  Used and canabilized from
     spyder_arcgis.py to shapefile a gdb, zip and add to AGOL Content.  This
@@ -432,13 +432,33 @@ def zipShapefilesInDir(inDir, outDir):
 
     print("Zipping shapefile(s)in folder {} to output folder {}".format(inDir, outDir))
 
+    try:
+        exclude_files = kwarg['exclude_files']
+        if isinstance(exclude_files, str):
+            exclude_files = [exclude_files]
+        # will be file name with .shp
+        all_files_shp = glob.glob(os.path.join(inDir, "*.shp"))
+        # will be base file name w/out .shp
+        all_files_basename = [os.path.splitext(os.path.basename(shp))[0] for shp in all_files_shp]
+        # basenames of shapefiles to attack and zip
+        filtered_basenames = list(set(all_files_basename) - set(exclude_files))
+        filtered_basenames.sort()
+        # Creates filepath for filtered shapefiles
+        fp_shapefiles = [os.path.join(inDir, '{}.shp'.format(basename)) for basename in filtered_basenames]
+    except KeyError:
+        fp_shapefiles = [fp_shp for fp_shp in glob.glob(os.path.join(inDir, "*.shp"))]
     # Loop through shapefiles in input directory
-    for inShp in glob.glob(os.path.join(inDir, "*.shp")):
+    for inShp in fp_shapefiles:
         # Build the filename of the output zip file
-        outZip = os.path.join(outDir, os.path.splitext(os.path.basename(inShp))[0] + ".zip")
-
-        # Zip the shapefile
-        zipShapefile(inShp, outZip)
+        # os.basename will give file basename. os.path.splitext splits file name and extension ZRU
+        subfolder_zip = os.path.splitext(os.path.basename(inShp))[0] + ".zip"
+        outZip = os.path.join(outDir, subfolder_zip)
+        # skip if zipfile exists already
+        if os.path.exists(outZip):
+            print('This folder exists: {}\nIt will be NOT be zipped'.format(subfolder_zip))
+        # if shp not yet zipped, zip it.
+        else:
+            zipShapefile(inShp, outZip)
     return True
 
 def zipShapefile(inShapefile, newZipFN):
@@ -460,8 +480,10 @@ def zipShapefile(inShapefile, newZipFN):
 
     import zipfile
     import glob
+    import time
 
     print('Starting to Zip '+ inShapefile +' to '+ newZipFN)
+    start = time.time()
 
     # Check that input shapefile exists
     if not (os.path.exists(inShapefile)):
@@ -488,7 +510,8 @@ def zipShapefile(inShapefile, newZipFN):
             print("Zipping {}".format(infile))
             # Zip the shapefile component
             zipobj.write(infile, os.path.basename(infile), zipfile.ZIP_DEFLATED)
-
+    end = time.time()
+    print('elapsed time: {} seconds'.format(round(end-start,1)))
     # Close the zip file object
     zipobj.close()
     return True

@@ -52,7 +52,8 @@ class metaData(object):
             if not isinstance(target_tag, list):
                 target_tag = [target_tag]
             # pull tags column from df (list)
-            self.parse_tags()
+            parsed_list = self.parse_comma_sep_list(col_to_parse = 'TAGS')
+            self.tags_from_df = parsed_list
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_tag if (isinstance(tags, list)) and (val_targ in tags)]
             iloc_temp = []
@@ -124,24 +125,25 @@ class metaData(object):
             self.indices_iloc = iloc_temp
         except KeyError:
             pass
-    def parse_tags(self, ):
+    def parse_comma_sep_list(self, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
         '''
-        tags_column = self.df.TAGS.values.tolist()
-        tags_temp = []
-        for tags in tags_column:
+        csl = self.df[col_to_parse].values.tolist()
+        parsed_csl_temp = []
+        for items in csl:
             try:
                 # i.e. tags = 'wetlands, krrc'
                 # tags.split(',') == ['wetlands', ' krrc']
                 # tag.strip(' ') removes leading space for tags after position 1 (idx 0)
                 # hence string to list
-                tags_temp.append([tag.strip(' ') for tag in tags.split(',')])
+                parsed_csl_temp.append([item.strip(' ') for item in items.split(',')])
             except AttributeError:
                 # nans from pd.read_csv(...) are saved as floats which have
-                # no .split attribute
-                tags_temp.append(tags)
-        self.tags_from_df = tags_temp
+                parsed_csl_temp.append(items)
+        # for idx, item in enumerate(parsed_csl_temp):
+        #     print(idx, ' ', item)
+        return(parsed_csl_temp)
 
     def assemble_metadata(self):
         '''
@@ -202,20 +204,26 @@ class metaData(object):
 
         # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
         fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
-        item_names = self.df.loc[self.indices].index.to_list()
-        print(item_names)
+        index_names = self.df.loc[self.indices].index.to_list()
+        print(index_names)
         # glob strings will create the string to pass to  glob.glob which
         # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-        glob_strings = ['{}\\{}*.xml'.format(fp_base, item_name) for fp_base, item_name in zip(fp_base, item_names)]
+        glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
         # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
         # for item in glob_strings:
         #     print('NAME {}\nTYPE: {}'.format(item, type(item)))
+        for glob_string in glob_strings:
+            print('GLOBBING: {}'.format(glob_string))
+            glob.glob(glob_string)[0]
+
         fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+
         for item in fp_xml_orig:
             print(item)
         ct = 0
+        add_new_purp_list = self.parse_comma_sep_list(col_to_parse = 'ADD_LINES_PURP')
         for idx, fp_xml in enumerate(fp_xml_orig):
-            print('count {}. path {}'.format(ct, fp_xml))# refer to notes below for diff betw trees and elements
+            print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
             ct+=1
 
             tree = ET.parse(fp_xml)
@@ -231,33 +239,41 @@ class metaData(object):
             abstract = dataIdInfo.find('idAbs')
             credits = dataIdInfo.find('idCredit')
 
+            index_name = index_names[idx]
             # the try block will add new lines to existing idPurp element
             # if specified.  Thus far used when adding a McMillen_Path : path/to/file
             # to Item Description when idPurp exists.
-            try:
-                new_purp_lines = kwargs['add_lines_purp']
-                purp_item = list(new_purp_lines.keys())
-                purp_value = list(new_purp_lines.values())
+            new_purp_items = add_new_purp_list[self.indices_iloc[idx]]
+            print('iloc {} new purp: {}'.format(self.indices_iloc[idx], new_purp_items))
+            # if is a string this means there is a value.  if empty value it will be
+            # a float for dumb reason.
+            if isinstance(new_purp_items[0], str):
+                purp_item, purp_value = [], []
+                for item in new_purp_items:
+                    purp_item.append(item)
+                    purp_value.append(self.df.loc[index_name][item])
 
-                # If add_purp but no purp exists(blank item desc)this will add location
-                item_name = item_names[idx]
-                if self.df.loc[item_name]['ITEM_DESCRIPTION'].lower() == 'no':
-                    for item, val in zip(purp_item, purp_value):
-                        purpose_new = '\n{0}: {1}'.format(item, val)
+                # assemble new purpose items
+                for item, val in zip(purp_item, purp_value):
+                    purpose_new = '\n{0}: {1}'.format(item, val)
+
+                # If add_purp but no purp exists(blank item desc) no action
+                if purp is None:
+                    pass
+                # add new purp to existing
                 else:
-                    # gets text from purpose element i.e. ORIGINAL_SOURCE: bla bla
-                    purpose_new = copy.copy(purp.text)
-                    for item, val in zip(purp_item, purp_value):
-                        purpose_new = purpose_new + '\n{0}: {1}'.format(item, val)
+                    purpose_new = purp.text + purpose_new
+
                 element_text_list = [purpose_new]
                 element_list = [purp]
                 element_title = ['idPurp']
-            except KeyError:
+            # If not adding lines to purp, etc.
+            else:
                 # get new element text
-                item_name = item_names[idx]
-                credits_new = self.df_meta_add.loc[item_name]['credits_new']
-                abstract_new = self.df_meta_add.loc[item_name]['abstract']
-                purpose_new = self.df_meta_add.loc[item_name]['purpose_new']
+                index_name = index_names[idx]
+                credits_new = self.df_meta_add.loc[index_name]['credits_new']
+                abstract_new = self.df_meta_add.loc[index_name]['abstract']
+                purpose_new = self.df_meta_add.loc[index_name]['purpose_new']
                 element_text_list = [purpose_new, abstract_new, credits_new]
                 element_list = [purp, abstract, credits]
                 element_title = ['idPurp', 'idAbs', 'idCredit']
@@ -266,11 +282,9 @@ class metaData(object):
                 # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
                 # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
                 if el is not None:
-                    print(el_text)
                     el.text = el_text
                     el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
                     # tree.write(fp_xml)
-                    print('if\n')
 
                 # if the element does not exist yet
                 elif (el is None):
@@ -282,7 +296,7 @@ class metaData(object):
                         ET.dump(dataIdInfo)
                         # OPTIONAL: this adds an attribute - a key, val pair
                         el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
-                        print('elif\n')
+
                     # when csv has no value - i.e. nan, str becomes a float to signify nan
                     # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
                     elif math.isnan(el_text):
@@ -352,8 +366,7 @@ class AgolAccess(metaData):
         try:
             tags = self.tags_from_df
         except AttributeError:
-            self.parse_tags()
-            tags= self.tags_from_df
+            tags = self.parse_comma_sep_list('TAGS')
         # subset tags in index
         tags_temp = []
         for iloc in self.indices_iloc:

@@ -8,8 +8,6 @@ sys.path = [p for p in sys.path if '86' not in p]
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcPy')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcToolBox\Scripts')
 sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
-for p in sys.path:
-    print(p)
 import arcpy
 
 def path_create(data1, data2):
@@ -139,32 +137,34 @@ def file_paths_arc(folder_or_gdb, want_df):
     RETURNS:
     path_to_dset_feats          list of paths/to/dataset/feature
     '''
-    # get current workspace
-    current_workspace = arcpy.env.workspace
     # change to specified folder
     arcpy.env.workspace = folder_or_gdb
     # find standalone features within folder, if they exist
     # NOTE have not done anything yet with standalone_feats
-    standalone_feats = arcpy.ListFeatureClasses()
-    dsets = [dset.encode('utf-8') for dset in arcpy.ListDatasets()]
-    path_to_dset_feats = []
+    # standalone_feats = arcpy.ListFeatureClasses()
+    # dsets = [dset.decode('utf-8') for dset in arcpy.ListDatasets()]
+    # # note python 2.7 likes:
+    dsets = [dset for dset in arcpy.ListDatasets()]
+    path_to_dset = []
     feats_df = []
     dsets_df =[]
     for dset in dsets:
         feats = arcpy.ListFeatureClasses(feature_dataset = dset)
         for feat in feats:
-            feat = feat.encode('utf-8')
-            path_to_dset_feats.append('{}/{}/{}'.format(folder_or_gdb, dset, feat))
+            print(feat)
+            path_to_dset.append('{}//{}'.format(folder_or_gdb, dset))
             if want_df:
                 # append feat name
                 feats_df.append(feat)
                 # repeat dset name for every feature layer within it
                 dsets_df.append(dset)
                 # returns a dataframe for manually comparing tables with changed feature names
-                df = pd.DataFrame({'dataset':dsets_df, 'feature':feats_df})
             else:
                 df = 'FIX LATER'
-    return(path_to_dset_feats, df)
+    if want_df:
+        df = pd.DataFrame(np.column_stack([path_to_dset, dsets_df, feats_df]), columns = ['path_dset', 'dset', 'feat'])
+    return(df)
+    print(df)
 
 def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):
     '''

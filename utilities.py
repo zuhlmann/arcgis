@@ -1,6 +1,11 @@
 import os
 import pandas as pd
 import math
+import sys
+# sys.path = [p for p in sys.path if '86' not in p]
+import arcpy
+import numpy as np
+import datetime
 # from compare_data import *
 
 def show_table(display_preference):
@@ -223,11 +228,27 @@ def custom_select(fp_or_feat, field, target_vals):
     df = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
     df = df[df.val.isin(target_vals)]
     return(df)
-def new_unpack_cursor(fp_in):
-    # from stack exchange Q I posted
-    with arcpy.da.SearchCursor(fp_in, ['OBJECTID', 'name']) as cursor:
-        rows = [row for row in cursor]    # I don't know if zip() works with cursor (can't test)
-        objectid, name = zip(*rows) # If it does work, use objectid, name = list(zip(*cursor))
+def feature_table_as_csv(fp_in, fp_csv, field_names):
+    '''
+    feed it field names in a list of strings and returns csv of attributes
+    table. Updated ZRU 10/9/2020
+    ARGS:
+    fp_in       yeah
+    fp_csv      the csv path for table
+    field_name  field names - list of strings
+    '''
+    # hack
+    field_names_objid = ['OBJECTID']
+    for item in field_names:
+        field_names_objid.append(item)
+    with arcpy.da.SearchCursor(fp_in, field_names_objid) as cursor:
+        # rows creates a list of tuples where len of each tuple = number of field names + 1 (objectid)
+        # zip transects pos 1,2...n for number of fields + 1 yielding a list of size n = n rows
+        # for each of the fields + objectid
+        rows = [row for row in cursor]
+        field_tuple = zip(*rows)
+        df = pd.DataFrame(np.column_stack(field_tuple), columns = field_names_objid)
+        pd.DataFrame.to_csv(df, fp_csv)
 def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     '''
     Fix hacky if/else to be vararg or something better.  Also should be a class
@@ -615,3 +636,79 @@ def get_overlap(ds1, ds2, **kwarg):
         return(arr1, arr2)
     except KeyError:
         pass
+def export_ddp(fp_mxd, fp_pdf, range_str, **kwargs):
+    '''
+    20201022  perhaps futile attempt to print maps from CL.  Wrapper for this
+    function essentially https://desktop.arcgis.com/en/arcmap/10.3/analyze/arcpy-mapping/datadrivenpages-class.htm
+    ARGS:
+    fp_mxd      self-explanatory
+    fp_pdf      self-explanatory
+    range_str   either 'ALL' or 'RANGE'
+    kwargs      one option = 'multiple_files' for kw with THREE value options =
+                'PDF_SINGLE_FILE', 'PDF_MULTIPLE_FILE_PAGE_NAME',
+                 'PDF_MULTIPLE_FILE_PAGE_INDEX'
+    '''
+    mxd_doc = arcpy.mapping.MapDocument(fp_mxd)
+    ddp = mxd_doc.dataDrivenPages
+    if range_str == 'RANGE':
+        try:
+            pages = kwargs['RANGE']
+        except KeyError:
+            print('pass a range string.  DID NOT EXPORT MAP')
+        try:
+            multiple_files = kwargs['multiple_files']
+            ddp.exportToPDF(fp_pdf, 'RANGE', pages, multiple_files)
+        except:
+            ddp.exportToPDF(fp_pdf, 'RANGE', pages)
+    else:
+        try:
+            multiple_files = kwargs['multiple_files']
+            ddp.exportToPDF(fp_pdf, 'ALL', multiple_files)
+        except KeyError:
+            ddp.exportToPDF(fp_pdf, 'ALL')
+
+def mxd_inventory(fp_mxd, figure_name, fp_inventory, dir_out):
+    '''
+    typical half-ass zach function to output logfile essentially.  Except this
+    log file is the inventory for file layers in mxd file.  Takes file path
+    to mxd and directory to save text file to. ZRU 20201025
+
+    ARGS
+    which_csv       string with name for inventory as prompted
+    fp_mxd          file path to mxd to take inventory of
+    figure_name     name of figure created by mxd
+    dir_out          folder to save inventory text file to
+    '''
+    mxd = arcpy.mapping.MapDocument(fp_mxd)
+    lyr_inventory = []
+    for lyr in arcpy.mapping.ListLayers(mxd):
+        # supports(DATASOURCE) is a convenient method to determine if layer
+        # has value for that attribute essentially
+        # visibile obviously if checked on map
+        if (lyr.supports("DATASOURCE")) & (lyr.visible):
+            lyr_inventory.append(lyr)
+        else:
+            pass
+    # basename of mxd without extension
+    fname_out = os.path.basename(fp_mxd).split('.')[0]
+    # name of inventory
+    fname_out = fname_out + '_layer_inventory.txt'
+    # full path to inventory text file
+    fp_out = os.path.join(dir_out, fname_out)
+    lyr_string = []
+    for idx, lyr in enumerate(lyr_inventory):
+        lyr_name = lyr.name
+        lyr_path = lyr.dataSource
+        lyr_string.append('{0}.\nLAYER NAME: {1}\nDATA SOURCE: {2}\n'.format(idx + 1, lyr_name, lyr_path))
+    lyr_string_all = '\n'.join(lyr_string)
+    mxd_basename = os.path.basename(fp_mxd)
+    todays_date = datetime.datetime.today().strftime('%B %d %Y')
+    intro =('Figure Name: {}\n'
+            'Map Document: {}\n'
+            'Date: {}\n'
+            'LAYER NAME = layer name in Table of Contents in map document (mxd)\n'
+            'DATA SOURCE  = path to data on McMillen-Jacobs file system').format(figure_name, mxd_basename, todays_date)
+
+    txt = '{}\n\n{}'.format(intro, lyr_string_all)
+    with open(fp_out, 'w') as out_file:
+        out_file.write(txt)

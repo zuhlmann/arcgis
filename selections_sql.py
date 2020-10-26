@@ -246,35 +246,35 @@ fp_McmJac = get_path('fp_McmJac_KRRP_GIS_data')
 # from cProfile import run
  # replace code with your code or function
 # run("code")
-import time
-
-fp_working = get_path('fp_working')
-fp_ROW = os.path.join(fp_working, 'ROW/ROW_SECDIV_Q_FRSTDIV_selected_index')
-fp_location = get_path('fp_translines_2019_11_recategorized')
-str_search = 'pacific'
-fields = ['OBJECTID', 'Act_Dt','Cust_NM', 'Serial_Nr_Full']
-t1 = time.time()
-df = list_unique_fields(fp_ROW, fields, 'feature_layer', name = 'ROW_lyr')
-print(time.time() - t1)
-# Turns out Cust_NM does not need to be specified
-cond1 = df['Cust_NM'].str.contains(str_search, case = False)
-cond2 = df['Act_Dt'] > datetime.datetime.today()
-objid = df['OBJECTID'][cond1 & cond2].tolist()
-
-# now add a location based selection
-# vals = ['kiewit_transmission_lines_demo', 'pacific_power_transmission_demo', 'proposed_transmission_lines']
-# field = 'layer_camas'
-vals = [700]
-field = 'Shape_Length'
-# Note need to test new where_clause_create_p1
-where_clause_location = where_clause_create_p1(field, vals, operator = 'gt')
-where_clause_location = ' OR '.join(where_clause_location)
-print(where_clause_location)
-arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr', where_clause_location)
-arcpy.SelectLayerByLocation_management('ROW_lyr', 'intersect', 'location_lyr')
-with arcpy.da.SearchCursor('ROW_lyr', ['OBJECTID']) as cursor:
-    row = [row[0] for row in cursor]
-    print(row)
+# import time
+#
+# fp_working = get_path('fp_working')
+# fp_ROW = os.path.join(fp_working, 'ROW/ROW_SECDIV_Q_FRSTDIV_selected_index')
+# fp_location = get_path('fp_translines_2019_11_recategorized')
+# str_search = 'pacific'
+# fields = ['OBJECTID', 'Act_Dt','Cust_NM', 'Serial_Nr_Full']
+# t1 = time.time()
+# df = list_unique_fields(fp_ROW, fields, 'feature_layer', name = 'ROW_lyr')
+# print(time.time() - t1)
+# # Turns out Cust_NM does not need to be specified
+# cond1 = df['Cust_NM'].str.contains(str_search, case = False)
+# cond2 = df['Act_Dt'] > datetime.datetime.today()
+# objid = df['OBJECTID'][cond1 & cond2].tolist()
+#
+# # now add a location based selection
+# # vals = ['kiewit_transmission_lines_demo', 'pacific_power_transmission_demo', 'proposed_transmission_lines']
+# # field = 'layer_camas'
+# vals = [700]
+# field = 'Shape_Length'
+# # Note need to test new where_clause_create_p1
+# where_clause_location = where_clause_create_p1(field, vals, operator = 'gt')
+# where_clause_location = ' OR '.join(where_clause_location)
+# print(where_clause_location)
+# arcpy.MakeFeatureLayer_management(fp_location, 'location_lyr', where_clause_location)
+# arcpy.SelectLayerByLocation_management('ROW_lyr', 'intersect', 'location_lyr')
+# with arcpy.da.SearchCursor('ROW_lyr', ['OBJECTID']) as cursor:
+#     row = [row[0] for row in cursor]
+#     print(row)
 
 # # why do this?
 # # Because OBJECTID is a long data type which makes [2L, 3L, 6L] lists
@@ -342,4 +342,8 @@ with arcpy.da.SearchCursor('ROW_lyr', ['OBJECTID']) as cursor:
 #     whereclause = buildWhereClause(inputfc, fieldname, fieldvalue)
 #     arcpy.Select_analysis(inputfc, outputfc, whereclause)
 #
-#
+with arcpy.da.SearchCursor('Stream Selection', ['GNIS_name']) as cursor:
+    row = [row[0] for row in cursor]
+unique_vals = set(row)
+for item in unique_vals:
+    print("label = '{}'".format(item))

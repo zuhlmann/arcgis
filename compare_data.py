@@ -7,7 +7,7 @@ import sys
 sys.path = [p for p in sys.path if '86' not in p]
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcPy')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcToolBox\Scripts')
-sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
+# sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
 import arcpy
 
 def path_create(data1, data2):
@@ -99,7 +99,8 @@ def summary_data(feat_path1, feat_path2):
 
 def unpack_list(list_in, arcobj):
     '''
-    ZRU 5/6/2020
+    ZRU 5/6/2020. Updated (shittilly) on 10/13/2020.  Jerry rigged for my purposes
+    not very robust
     unpacks lists
     ARGS:
     arcobj:    bullshit because can't check custom types. Bool = True if list_in is arcobject
@@ -111,11 +112,11 @@ def unpack_list(list_in, arcobj):
         for field in list_in:
             # if an arcpy featlist object
             if arcobj:
-                fields_temp.append(field.name.encode('utf-8'))
+                fields_temp.append(field.name)
             # Needs work.  If not string don't encode
             else:
-                if isinstance(field, basestring):
-                    fields_temp.append(field.encode('utf-8'))
+                if isinstance(field, str):
+                    fields_temp.append(field)
             # isinstance does not work on int
                 else:
                     fields_temp.append(str(field))

@@ -221,6 +221,10 @@ class metaData(object):
         for item in fp_xml_orig:
             print(item)
         ct = 0
+        # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
+        # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
+        # need to fix all columns in this regard when writing xml
+        # FIX THIS it is not prepared to handle other cases. 
         add_new_purp_list = self.parse_comma_sep_list(col_to_parse = 'ADD_LINES_PURP')
         for idx, fp_xml in enumerate(fp_xml_orig):
             print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
@@ -321,7 +325,7 @@ class AgolAccess(metaData):
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
-        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection'}
+        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
         super(AgolAccess, self).__init__(fp_csv)
 
     def get_group(self, group_key):
@@ -341,13 +345,15 @@ class AgolAccess(metaData):
         # item_type_dict created in __init__
         itemType = self.item_type_dict[itemType]
         items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
-                                        item_type = itemType, max_items = 300)
+                                        item_type = itemType, max_items = 900)
         setattr(self, 'user_content_{}'.format(itemType), items)
         # filtered tags attribute
         try:
             tags = kwargs['tags']
             items_filtered = [item for item in items if tags in item.tags]
-            setattr(self, 'user_content_{}_{}'.format(tags, itemType), items_filtered)
+            # format text for attribute to replace spaces with underSc
+            itemType_text = itemType.replace(' ', '_')
+            setattr(self, 'user_content_{}_{}'.format(tags, itemType_text), items_filtered)
         except KeyError:
             pass
 
@@ -358,7 +364,12 @@ class AgolAccess(metaData):
         before using this.
         '''
 
-        titles = self.indices
+        # grab tags of iloc ONLY if they were zipped  CONSIDER MOVING TO def indices
+        # OR ABSTRACT as function with values and column names to ignore
+        ignore_upload = ['not_zipped', 'shapefile_failed', 'not_uploaded']
+        indices_loc = [idx for idx in self.indices_iloc if self.df.iloc[idx].DATA_LOCATION_MCMILLEN_JACOBS not in ignore_upload]
+
+        titles = self.df.iloc[indices_loc].index.values.tolist()
 
         # tags
         # try except grabs all parsed_tags in df
@@ -369,9 +380,11 @@ class AgolAccess(metaData):
             tags = self.parse_comma_sep_list('TAGS')
         # subset tags in index
         tags_temp = []
-        for iloc in self.indices_iloc:
+        for iloc in indices_loc:
             tags_temp.append(tags[iloc])
         tags = tags_temp
+
+
         # consider adding snippets to item_description.csv
         try:
             snippets = kwargs['snippets']
@@ -395,7 +408,7 @@ class AgolAccess(metaData):
 
         # need indices from self.selection_idx
         # YES this is correct.  Each shapefile gets its OWN zip folder
-        upload_folders = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
+        upload_folders = self.df.loc[titles]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
         parent_zip_folder = ['{}_zip'.format(upload_folder) for upload_folder in upload_folders]
         zipped_folders = [os.path.join(zip_folder, title) for zip_folder, title in zip(parent_zip_folder, titles)]
         zipped_folders = ['{}.zip'.format(zip_folder) for zip_folder in zipped_folders]

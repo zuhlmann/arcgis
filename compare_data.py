@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import numpy as np
 import sys
-sys.path = [p for p in sys.path if '86' not in p]
+# sys.path = [p for p in sys.path if '86' not in p]
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcPy')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcToolBox\Scripts')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
@@ -147,6 +147,7 @@ def file_paths_arc(folder_or_gdb, want_df):
     # # note python 2.7 likes:
     dsets = [dset for dset in arcpy.ListDatasets()]
     path_to_dset = []
+    path_to_feat = []
     feats_df = []
     dsets_df =[]
     for dset in dsets:
@@ -160,10 +161,12 @@ def file_paths_arc(folder_or_gdb, want_df):
                 # repeat dset name for every feature layer within it
                 dsets_df.append(dset)
                 # returns a dataframe for manually comparing tables with changed feature names
+                path_to_feat.append(os.path.join(folder_or_gdb, dset, feat))
             else:
                 df = 'FIX LATER'
     if want_df:
-        df = pd.DataFrame(np.column_stack([path_to_dset, dsets_df, feats_df]), columns = ['path_dset', 'dset', 'feat'])
+        df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat]),
+                            columns = ['feature_name', 'feature_dataset', 'fp_feat'])
     return(df)
     print(df)
 

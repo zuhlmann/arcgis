@@ -15,6 +15,7 @@ fp_orders = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_
 fp_GIS_data = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data'
 fp_request_mp = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Request_Tracking//GIS_Requests_Management_Plans'
 fp_agol = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//AGOL_DataUploads'
+fp_new_data_dl = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//new_data_downloads//'
 
 # # # 1) RAMP and Tributary Connectivity for Management Plans
 # # # a)  Appendix D1.
@@ -206,31 +207,100 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # fp_camas_MP = os.path.join(fp_working, 'MP_Camas')
 # arcpy.FeatureClassToFeatureClass_conversion(fp_in, fp_camas_MP, 'WPT_habitat_OR_indices')
 
-# CAMAS Maps
-# Inventories for mxd
-# file path to mxds
-fp_camas_requests = os.path.join(fp_request_mp, 'Camas_MPs')
-mxd_list = ['GBH Colony.mxd', \
-            'Spotted Owl.mxd', 'Swallows_v2_MP.mxd', 'Wetland Buffer.mxd', \
-            'WFC_MP.mxd', 'WPT Habitat_MP_v2_CA.mxd', 'WPT Habitat_MP_v2_OR.mxd', \
-            'WPT_Relocation_MP_8_5_11_final.mxd']
-fp_mxds = [os.path.join(fp_camas_requests, mxd) for mxd in mxd_list]
-fig_names = ['GBH_Colony_MP_draft2', 'Spotted_Owl_MP_draft1', 'Swallows_v2_MP_draft2', \
-            'wetland_buffer_<reservoir_name>_MP_draft1', \
-            'WFC_MP_draft1', 'WPT Habitat_MP_v2_CA', 'WPT Habitat_MP_v2_OR', \
-            'WPT_Relocation_MP_8_5_11']
-fig_names = [fig_name + '.pdf' for fig_name in fig_names]
+# # 5) mxd INVENTORIES
+# # file path to mxds
 
-# path to inventory lists for easy functionality
-fp_dict = {'camas': 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA' \
-                    '//GIS_Request_Tracking//GIS_Requests_Management_Plans//Camas_MPs//' \
-                    'figure_inventory_camas_MP.csv'}
-# df = pd.DataFrame(np.column_stack([fig_names, mxd_list, fp_mxds]), columns = ['figure names', 'mxd filename', 'fp mxd'])
-fp_out = os.path.join(fp_camas_requests, 'figure_inventory_camas_MP.csv')
-pd.DataFrame.to_csv(df, fp_out)
-for fp_mxd, fig_name in zip(fp_mxds, fig_names):
-    utilities.mxd_inventory(fp_mxd, fig_name, fp_camas_requests)
+# # 5a) Camas
+# # inventories for Camas
+# fp_camas_requests = os.path.join(fp_request_mp, 'Camas_MPs')
+# mxd_list_camas = ['GBH Colony.mxd', \
+#             'Spotted Owl.mxd', 'Swallows_v2_MP.mxd', 'Wetland Buffer.mxd', \
+#             'WFC_MP.mxd', 'WPT Habitat_MP_v2_CA.mxd', 'WPT Habitat_MP_v2_OR.mxd', \
+#             'WPT_Relocation_MP_8_5_11_final.mxd', 'Special_Status_Plants.mxd']
+# fp_mxds_camas = [os.path.join(fp_camas_requests, mxd) for mxd in mxd_list_camas]
+# fig_names = ['GBH_Colony_MP_draft2', 'Spotted_Owl_MP_draft1', 'Swallows_v2_MP_draft2', \
+#             'wetland_buffer_<reservoir_name>_MP_draft1', \
+#             'WFC_MP_draft1', 'WPT Habitat_MP_v2_CA', 'WPT Habitat_MP_v2_OR', \
+#             'WPT_Relocation_MP_8_5_11', 'special_status_plants_MP_draft1']
+# fig_names_camas = [fig_name + '.pdf' for fig_name in fig_names]
+#
+# # path to inventory lists for easy functionality
+# fp_dict = {'camas': 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA' \
+#                     '//GIS_Request_Tracking//GIS_Requests_Management_Plans//Camas_MPs//' \
+#                     'figure_inventory_camas_MP.csv'}
+
+# # 5b) KP
+# # inventories for KP
+# fp_kp_requests = os.path.join(fp_request_mp, 'KnightPiesold_MPs')
+#
+# mxd_list_kp = ['Security_MP_KP_v2.mxd', 'Access_MP_KP_v2.mxd', 'Security_Overview_MP_KP.mxd']
+# fp_mxds_kp = [os.path.join(fp_kp_requests, mxd) for mxd in mxd_list_kp]
+# fig_names_kp = ['Security_MP_KP_v2.pdf', 'Access_MP_KP_v2.pdf', 'Security_Overview_MP_KP_v2.pdf']
+
+# # GENERAL
+# # Provide specific variables for respective MP
+# idx = [3, -1]
+#
+# mxd_list = [mxd_list_camas[id] for id in idx]
+# fig_names = [fig_names_camas[id] for id in idx]
+# fp_mxds = [fp_mxds_camas[id] for id in idx]
+# fp_MP_base = fp_camas_requests
+# current_date = [datetime.datetime.today().strftime('%B %d %Y')] * len(fig_names)
+# MP_prepend = 'camas2'
+#
+#
+# fp_out = os.path.join(fp_camas_requests, 'figure_inventory_{}_MP.csv'.format(MP_prepend))
+# # if path exists, keep adding
+# if os.path.exists(fp_out):
+#     df = pd.read_csv(fp_out, index_col = 'figure_names')
+#     for fp_mxd, fig_name in zip(fp_mxds, fig_names):
+#         df.loc[fig_name]
+# else:
+#     df = pd.DataFrame(np.column_stack([fig_names, mxd_list, fp_mxds, current_date]),
+#                         columns = ['fig_name''mxd_filename', 'fp_mxd', 'current_date'])
+#     pd.DataFrame.to_csv(df, fp_out)
+# for fp_mxd, fig_name in zip(fp_mxds, fig_names):
+#     utilities.mxd_inventory(fp_mxd, fig_name, fp_MP_base)
+
+# # 5c) One file inventory - KRRC Feasibility
+# fp_krrc_requests = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Request_Tracking//GIS_Requests_KRRC'
+# krrc_mxd = os.path.join(fp_krrc_requests, 'Feasibility_RFP.mxd')
+# krrc_pdf = os.path.join(fp_krrc_requests, 'Feasibility_RFP_v2')
+# utilities.mxd_inventory(krrc_mxd, krrc_pdf, fp_krrc_requests)
+
+
+# 6) Merge multiple files
+# Juvenile Salmanoid
+# attrocious folder setup.  within p12 are gdbs one or two per loc
+fp_salmon = os.path.join(fp_new_data_dl, 'juvenille_salmamoid_RES_MP//p12')
+# then a feature database
+fp_salmon = [os.path.join(fp_salmon, gdb, 'Placemarks') for gdb in os.listdir(fp_salmon)]
+monitoring_point_list = []
+poly_list = []
+line_list = []
+loc_list = []
+for loc in fp_salmon:
+    walk = arcpy.da.Walk(loc)
+    for fp, _, feat_name in walk:
+        if 'monitoring_area' in fp:
+            # # normalize for operating system
+            # fp_norm = os.path.normpath(fp)
+            # # split by os separatory
+            # fp_norm_components = loc_name.split(os.sep)
+            # # get gdb base name
+            # loc_name = [component[:-3] for component in fp_norm_components if 'gdb' in component]
+            # loc_list.append(loc_name)
+            # if 'Points' in feat_name:
+            #     point_list.append(os.path.join(fp, 'Points'))
+            if 'Polygons' in feat_name:
+                poly_list.append(os.path.join(fp, 'Polygons'))
+            # if 'Polylines' in feat_name:
+            #     line_list.append(os.path.join(fp, 'Polylines'))
+fp_merged_pts = os.path.join(fp_working, 'monitoring_areas_poly_salmanoid_MP')
+arcpy.Merge_management(poly_list, fp_merged_pts)
+
 
 # COMMAND LINE TRICKS
 # reload
 # utilities = imp.load_source('utilities', 'C:/Users/uhlmann/code/utilities.py')
+    

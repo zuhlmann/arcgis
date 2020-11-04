@@ -667,7 +667,7 @@ def export_ddp(fp_mxd, fp_pdf, range_str, **kwargs):
         except KeyError:
             ddp.exportToPDF(fp_pdf, 'ALL')
 
-def mxd_inventory(fp_mxd, figure_name, fp_inventory, dir_out):
+def mxd_inventory(fp_mxd, figure_name, dir_out):
     '''
     typical half-ass zach function to output logfile essentially.  Except this
     log file is the inventory for file layers in mxd file.  Takes file path
@@ -712,3 +712,75 @@ def mxd_inventory(fp_mxd, figure_name, fp_inventory, dir_out):
     txt = '{}\n\n{}'.format(intro, lyr_string_all)
     with open(fp_out, 'w') as out_file:
         out_file.write(txt)
+def write_folder_contents(fp):
+    '''
+    simple readme that lists all items and files in fp argument.  Filename will
+    be README_<folder_name>_<date>.txt.  Will indicate date in file
+    ARGS
+    fp          file path for folder to README
+    '''
+    folder_name = os.path.split(fp)[-1]
+    fname_readme = 'README_{}.txt'.format(folder_name)
+    fp_out = os.path.join(fp, fname_readme)
+    files = os.listdir(fp)
+    basic_str = '\n'.join(files)
+    todays_date = datetime.datetime.today().strftime('%B %d %Y')
+    signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
+    file_name = 'README_{}'.format(folder_name)
+    basic_str = file_name + '\n' + signature + '\n\nContents\n' + basic_str
+    with open(fp_out, 'w') as out_file:
+        out_file.write(basic_str)
+def enum_fp_list(fp_base, return_full_path, **kwargs):
+    '''
+    will this print
+
+    ARGS:
+    fp_base             file path to listdir
+    return_full_path    True or False
+    kwargs              filter_ftype (option1) = whatever file type endswith i.e. str.endswith(filter_ftype)
+    '''
+
+    lst = os.listdir(fp_base)
+    idx = 0
+    try:
+        filter_ftype = kwargs['filter_ftype']
+        print('Files that end with: {}'.format(filter_ftype))
+        if return_full_path:
+            full_path_list = []
+            for item in lst:
+                if item.endswith(filter_ftype):
+                    str = '{}. {}'.format(idx, item)
+                    print(str)
+                    full_path_list.append(os.path.join(fp_base, item))
+                    idx += 1
+        else:
+            for item in lst:
+                if item.endswith(filter_ftype):
+                    str = '{}. {}'.format(idx, item)
+                    print(str)
+                    idx += 1
+    except:
+        if return_full_path:
+            full_path_list = []
+            for item in lst:
+                str = '{}. {}'.format(idx, item)
+                print(str)
+                full_path_list.append(os.path.join(fp_base, item))
+                idx += 1
+        else:
+            for item in lst:
+                str = '{}. {}'.format(idx, item)
+                print(str)
+                idx += 1
+    try:
+        return(full_path_list)
+    except NameError:
+        pass
+
+def return_mxd_obj(fp_mxd):
+    '''
+    helpful methods and such to add to mapping doc
+    arcpy.mapping.ListDataFrames
+    '''
+    mxd = arcpy.mapping.MapDocument(fp_mxd)
+    return(mxd)

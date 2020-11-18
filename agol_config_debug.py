@@ -18,7 +18,7 @@ agol_obj = agolZ.AgolAccess('something', fp_csv)
 
 # # b) Select data layers
 # # agol_obj.selection_idx(alternative_select_col = {'MANAGEMENT_PLAN':'a_team'})
-idx_to_stage = [265, 266]
+idx_to_stage = [274, 275]
 # index_remove = list(range(126, 147))
 # index_remove = [51,52]
  # idx_remove = [212,213]
@@ -29,7 +29,7 @@ agol_obj.selection_idx(indices = idx_to_stage)
 
 # consider removing NHD, contour, Parcels **all, Protected AReas, PublicLand
 # # c) Copy feature class from Original Location to AGOL_DataUpload folder
-fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_10_12\\2020_10_12'
+fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_11_17\\2020_11_17'
 
 # for indice in agol_obj.indices:
 #     # NOTE - grabbing SERIES (single []) then a string is produced (.DATA_LOC...)
@@ -42,7 +42,7 @@ fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA
 #     fp_agol_staging = agol_obj.df.loc[indice].DATA_LOCATION_MCMILLEN_JACOBS
 #     print('beginning FeatureClassToFeatureClass_conversion on: {}'.format(indice))
 #     start = time.time()
-#     arcpy.FeatureClassToFeatureClass_conversion(fp_original, fp_agol_staging, feat_name)
+#     arcpy.FeatureClassToFeatureClass_conversion(fp_original + '.shp', fp_agol_staging, feat_name)
 #     end = time.time()
 #     print('{0} took {1}'.format(indice, end-start))
 
@@ -51,16 +51,19 @@ fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA
 
 
 # e) After checking the metadata, ZIP
-# utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out))
+utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out))
 # # example of excluding problematic files
 # utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out), exclude_files = 'Streets_StateOR')
 
 #f) ADD SHP TO CONTENT AGOL
 # ADD same protocol for checking if already published as in g1)
 # NOTE: this will only add those in indice, therefore run selection_idx()
-snips = ['Indices/Extents used to create figures for Management Plans']
+snips = ['Digitized from pdfs by CDM']
+snip1 = ['Provided by CDM - unknown provenance']
+# snip2 = ['River Alignments for post-dam Klamath, current as of Aug 2020'] * 3
+snips.extend(snip1)
 agol_obj.add_agol_upload(snippets = snips)
-#
+# #
 # # #g) PUBLISH
 # # g1)
 # # creates list of items adds as attribute --> user_content_<tag name>_<file type>
@@ -76,7 +79,7 @@ agol_obj.add_agol_upload(snippets = snips)
 # shapefiles_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'shapefile'))
 # features_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer'))
 # features_services_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer_Collection'))
-#
+
 # # g2)
 # # FIND content already published. ADD same protocol for adding shapefiles
 # # get index of shapefiles already uploaded to feat
@@ -95,7 +98,7 @@ agol_obj.add_agol_upload(snippets = snips)
 #
 # shapefiles_filtered = [i for j, i in enumerate(shapefiles_filtered) if j not in idx_remove]
 #
-# # g3)
+# g3)
 # # finally publish
 # for content_item in shapefiles_filtered:
 #     print(content_item.name)

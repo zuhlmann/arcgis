@@ -7,6 +7,7 @@ import sys
 import utilities
 import pandas as pd
 import numpy as np
+import pandas as pd
 
 # file paths for Item Desciption
 fp_aecom = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//new_data_downloads//AECOM_dump//KlamathDamRemoval_Data_20200605//KlamathDamRemoval_Data_20200605.gdb'
@@ -231,16 +232,31 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 
 # # 5b) KP
 # # inventories for KP
-# fp_kp_requests = os.path.join(fp_request_mp, 'KnightPiesold_MPs')
-#
-# mxd_list_kp = ['Security_MP_KP_v2.mxd', 'Access_MP_KP_v2.mxd', 'Security_Overview_MP_KP.mxd']
+# fp_kp_requests = os.path.join(fp_request_mp, 'KnightPiesold_MPs//traffic_MP')
+# fp_kp_mp_v3 = os.path.join(fp_kp_requests, 'traffic_MP_v3')
+# #
+# mxd_list_kp = ['traffic_MP_draft2//Security_MP_KP_v2.mxd', 'traffic_MP_draft2//Access_MP_KP_v2.mxd', 'traffic_MP_v3/Security_Overview_MP_KP_v3.mxd']
 # fp_mxds_kp = [os.path.join(fp_kp_requests, mxd) for mxd in mxd_list_kp]
-# fig_names_kp = ['Security_MP_KP_v2.pdf', 'Access_MP_KP_v2.pdf', 'Security_Overview_MP_KP_v2.pdf']
+# fp_pdfs_kp = ['Security_MP_KP_v3.pdf', 'Access_MP_KP_v3.pdf', 'Security_Overview_MP_KP_v3.pdf']
+# for mxd, pdf in zip(fp_mxds_kp, fp_pdfs_kp):
+#     utilities.mxd_inventory(mxd, pdf, fp_kp_mp_v3)
 
-# # GENERAL
-# # Provide specific variables for respective MP
-# idx = [3, -1]
-#
+# # RAMP Stantec
+# fp_ramp = os.path.join(fp_request_mp, 'Stantec_RAMP_Trib_MP')
+# fp_mxd_ramp = fp_ramp + '//Protected Areas.mxd'
+# utilities.mxd_inventory(fp_mxd_ramp, 'Protected Areas future fig', fp_ramp)
+
+# # RES salmonid
+# fp_res_mp = os.path.join(utilities.get_path(26), 'RES_MPs')
+# dir_out = os.path.join(fp_res_mp, 'v2')
+# fp_mxd_list = utilities.enum_fp_list(fp_res_mp, True, filter_ftype = 'mxd')
+# pdf_name_list = [os.path.split(fp_mxd)[-1] for fp_mxd in fp_mxd_list]
+# pdf_name_list = ['{}.pdf'.format(fname[:-4]) for fname in pdf_name_list]
+# for mxd, pdf in zip(fp_mxd_list, pdf_name_list):
+#     utilities.mxd_inventory(mxd, pdf, dir_out)
+
+# GENERAL
+# Provide specific variables for respective MP
 # mxd_list = [mxd_list_camas[id] for id in idx]
 # fig_names = [fig_names_camas[id] for id in idx]
 # fp_mxds = [fp_mxds_camas[id] for id in idx]
@@ -269,38 +285,118 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # utilities.mxd_inventory(krrc_mxd, krrc_pdf, fp_krrc_requests)
 
 
-# 6) Merge multiple files
-# Juvenile Salmanoid
-# attrocious folder setup.  within p12 are gdbs one or two per loc
-fp_salmon = os.path.join(fp_new_data_dl, 'juvenille_salmamoid_RES_MP//p12')
-# then a feature database
-fp_salmon = [os.path.join(fp_salmon, gdb, 'Placemarks') for gdb in os.listdir(fp_salmon)]
-monitoring_point_list = []
-poly_list = []
-line_list = []
-loc_list = []
-for loc in fp_salmon:
-    walk = arcpy.da.Walk(loc)
-    for fp, _, feat_name in walk:
-        if 'monitoring_area' in fp:
-            # # normalize for operating system
-            # fp_norm = os.path.normpath(fp)
-            # # split by os separatory
-            # fp_norm_components = loc_name.split(os.sep)
-            # # get gdb base name
-            # loc_name = [component[:-3] for component in fp_norm_components if 'gdb' in component]
-            # loc_list.append(loc_name)
-            # if 'Points' in feat_name:
-            #     point_list.append(os.path.join(fp, 'Points'))
-            if 'Polygons' in feat_name:
-                poly_list.append(os.path.join(fp, 'Polygons'))
-            # if 'Polylines' in feat_name:
-            #     line_list.append(os.path.join(fp, 'Polylines'))
-fp_merged_pts = os.path.join(fp_working, 'monitoring_areas_poly_salmanoid_MP')
-arcpy.Merge_management(poly_list, fp_merged_pts)
+# # 6) Merge multiple files
+# # Juvenile Salmanoid
+# # attrocious folder setup.  within p12 are gdbs one or two per loc
+# fp_salmon = os.path.join(fp_new_data_dl, 'juvenille_salmamoid_RES_MP//p12')
+# # then a feature database
+# fp_salmon = [os.path.join(fp_salmon, gdb, 'Placemarks') for gdb in os.listdir(fp_salmon)]
+# monitoring_point_list = []
+# poly_list = []
+# line_list = []
+# loc_list = []
+# for loc in fp_salmon:
+#     walk = arcpy.da.Walk(loc)
+#     for fp, _, feat_name in walk:
+#         if 'monitoring_area' in fp:
+#             # # normalize for operating system
+#             # fp_norm = os.path.normpath(fp)
+#             # # split by os separatory
+#             # fp_norm_components = loc_name.split(os.sep)
+#             # # get gdb base name
+#             # loc_name = [component[:-3] for component in fp_norm_components if 'gdb' in component]
+#             # loc_list.append(loc_name)
+#             # if 'Points' in feat_name:
+#             #     point_list.append(os.path.join(fp, 'Points'))
+#             if 'Polygons' in feat_name:
+#                 poly_list.append(os.path.join(fp, 'Polygons'))
+#             # if 'Polylines' in feat_name:
+#             #     line_list.append(os.path.join(fp, 'Polylines'))
+# fp_merged_pts = os.path.join(fp_working, 'monitoring_areas_poly_salmanoid_MP')
+# arcpy.Merge_management(poly_list, fp_merged_pts)
 
+# # 6) cont...
+# # young of the year copy over feats
+# creek_dset = ['horse_creek_relocation_sites.gdb', 'horse_creek_relocation_sites.gdb','seiad_creek_relocation_sites.gdb', 'beaver_creek_relocation_site.gdb']
+# postpend = ['Points', 'Polylines', 'Points', 'Polylines']
+# postpend = [os.path.join('Placemarks', item) for item in postpend]
+# creek_dset = [os.path.join(creek, postP) for creek, postP in zip(creek_dset, postpend)]
+# feat_lst = [os.path.join(fp_salmon, creek) for creek in creek_dset]
+# fp_mp_salmon = os.path.join(fp_orders, 'MP_Juvenile_Salmon')
+# feat_out_lst = ['horse_creek_relocation_site_pts', 'horse_creek_relocation_sites_line','seid_creek_relocation_sites_pts', 'beaver_creek_relocation_site_line']
+# # for feat, feat_out in zip(feat_lst, feat_out_lst):
+# #     arcpy.FeatureClassToFeatureClass_conversion(feat, fp_mp_salmon, feat_out)
+
+
+# # 7) LABELSETS
+# Field amalgomate  11/16/2020
+# import copy
+fp_cdm = utilities.get_path(6)
+arcpy.env.workspace = fp_cdm
+feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
+# fields = []
+# feat_names = []
+# fp_full = []
+# temp2 = set([])
+# for feat in feats:
+#     temp = [ft.name for ft in arcpy.ListFields(feat)]
+#     for item in temp:
+#         print('{}: FIELDS: {}'.format(feat, item))
+#     if 'temp2' not in locals():
+#         temp2 = copy.copy(temp)
+#     temp2 = set(temp).intersection(temp2)
+#     fields.extend(temp)
+#     feat_names.extend(len(temp) * [feat])
+#     fp_full.extend([os.path.join(fp_cdm, 'Places_of_Interest//{}'.format(feat))] * len(temp))
+# set(fields)
+# print('are we here?')
+# df = pd.DataFrame(np.column_stack([feat_names, fields, fp_full]),
+#                     columns= ['feature_names', 'fields', 'fp_dataset'])
+# fp_out = os.path.join(utilities.get_path(5), 'cdm20200428_places_of_interest_fields.csv')
+# pd.DataFrame.to_csv(df, fp_out)
+
+# #7b)
+
+# # FROM HERE: https://gis.stackexchange.com/questions/130588/python-script-to-add-fields-to-feature-classes
+# arcpy.env.workspace = os.path.join(fp_working, 'labels')
+# fcl = [item for item in arcpy.ListFeatureClasses()]
+# for fc in fcl[2:]:
+#     arcpy.AddField_management(fc, 'orig_fc_name', 'TEXT', field_length = 50)
+#     with arcpy.da.UpdateCursor(fc, 'orig_fc_name') as cursor:
+#         for row in cursor:
+#             row[0] = fc
+#             cursor.updateRow(row)
+
+# fp_all_labels = os.path.join(fp_working, 'labels//all_labels_cdm')
+# arcpy.Merge_management(fcl, fp_all_labels)
+
+
+# # RAMP
+# # DELETE after 11/16/20
+#     rec = 0
+# def incr():
+#   global rec
+#   pnl = [1,3,4,5,6,2]
+#   pn = pnl[rec]
+#   namelist = ['Spencer Creek', 'Shovel Creek', 'Beaver Creek', 'Fall Creek', 'Jenny Creek', 'Dutch-Camp Complex']
+#   name = namelist[pn - 1]
+#   rec += 1
+#   return(name)
+
+# add data sources to working
+# coho_and_mykis_trib_relo_sites_v2_layer_inventory
+# 8.
+# LAYER NAME: Mainstem Confluence Relocation Sites
+# DATA SOURCE: C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\new_data_downloads\juvenille_salmamoid_RES_MP\p12\coho_young-of-the-year_tributary_relocation_sites.gdb\Placemarks\Points
+
+# mainstem_trib_water_qual_monitoring...
+# 3.
+# LAYER NAME: Klamath River and Tributaries
+# DATA SOURCE: C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\new_data_downloads\juvenille_salmamoid_RES_MP\p12\klamath_river_full.gdb\Placemarks\Polylines
+
+# joining csv
+# from https://gis.stackexchange.com/questions/233262/import-csv-file-into-table-with-arcpy
 
 # COMMAND LINE TRICKS
 # reload
 # utilities = imp.load_source('utilities', 'C:/Users/uhlmann/code/utilities.py')
-    

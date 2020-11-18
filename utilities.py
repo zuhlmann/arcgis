@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import math
 import sys
-# sys.path = [p for p in sys.path if '86' not in p]
+sys.path = [p for p in sys.path if '86' not in p]
 import arcpy
 import numpy as np
 import datetime
@@ -674,7 +674,6 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
     to mxd and directory to save text file to. ZRU 20201025
 
     ARGS
-    which_csv       string with name for inventory as prompted
     fp_mxd          file path to mxd to take inventory of
     figure_name     name of figure created by mxd
     dir_out          folder to save inventory text file to
@@ -685,7 +684,8 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
         # supports(DATASOURCE) is a convenient method to determine if layer
         # has value for that attribute essentially
         # visibile obviously if checked on map
-        if (lyr.supports("DATASOURCE")) & (lyr.visible):
+        # if (lyr.supports("DATASOURCE")) & (lyr.visible):
+        if lyr.supports("DATASOURCE"):
             lyr_inventory.append(lyr)
         else:
             pass
@@ -712,6 +712,46 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
     txt = '{}\n\n{}'.format(intro, lyr_string_all)
     with open(fp_out, 'w') as out_file:
         out_file.write(txt)
+def mxd_inventory_csv(fp_base, **kwargs):
+    '''
+    wrap both these functions into a obj oriented class
+
+    ARGS
+    fp_base          file path to mxd to take inventory of
+    kwarg               thus far just select_mxds which will narrow down fp_base
+                        to just specific mxds.  List
+    '''
+    try:
+        mxd_list = kwargs['select_mxds']
+        if not isinstance(mxd_list, list):
+            mxd_list = list(mxd_list)
+    except KeyError:
+        mxd_list = [item for item in os.listdir(fp_base) if '.mxd' in item]
+    fp_mxd_list = [os.path.join(fp_base, fname_mxd) for fname_mxd in mxd_list]
+    lyr_list = []
+    lyr_name = []
+    lyr_source = []
+    mxd_name = []
+    for idx, fp_mxd in enumerate(fp_mxd_list):
+        mxd = arcpy.mapping.MapDocument(fp_mxd)
+        mxd_name_temp = mxd_list[idx]
+        for lyr in arcpy.mapping.ListLayers(mxd):
+            # supports(DATASOURCE) is a convenient method to determine if layer
+            # has value for that attribute essentially
+            # visibile obviously if checked on map
+            # if (lyr.supports("DATASOURCE")) & (lyr.visible):
+            if lyr.supports("DATASOURCE"):
+                lyr_name.append(lyr.name)
+                lyr_source.append(lyr.dataSource)
+                mxd_name.append(mxd_name_temp)
+            else:
+                pass
+
+        # plane old mxd name
+    df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, lyr_source]), columns = ['map_name', 'layer_name', 'layer_source'])
+    fp_out = os.path.join(fp_base, 'RAMP_layer_inventory.csv')
+    pd.DataFrame.to_csv(df, fp_out)
+
 def write_folder_contents(fp):
     '''
     simple readme that lists all items and files in fp argument.  Filename will
@@ -784,3 +824,69 @@ def return_mxd_obj(fp_mxd):
     '''
     mxd = arcpy.mapping.MapDocument(fp_mxd)
     return(mxd)
+
+def parse_item_desc(sub_item_list, target_key, target_val):
+    '''
+    Quick utility used for adding and updating Item Description metadata via
+    xml files.  ZRU 11/15/2020
+    ARGS:
+    sub_item_list = pass list from idPurp of xml for shapefiles.  The list will be
+                    the item_desc_str.splitlines() which splits at /n - essentially
+                    splitting each key:val pair into one item in list i.e.
+                    ['DATA_LOCATION_MCMILLEN_JACOBS: <file path',
+                    'DATE_ADDED_AGOL: 20201115']
+    target_key      list of target keys i.e. [DATA_LOCATION_MCMILLEN_JACOBS,
+                                                DATE_ADDED_AGOL]
+    target_val      list of vals to pair with each target.  len(target_key) == len(target_list)
+    RETURNS
+    New Item Description list with strings per sub item
+    '''
+    # initiate as false
+    replaced_sub_item = False
+    idx_offset = 0
+    for idx, sub_item in enumerate(sub_item_list):
+        # if empty sub_items shrunk the list, idx will be notched back one at a time
+        idx_adjusted = idx - idx_offset
+        # if empty string need to remove
+        if sub_item != '':
+            temp_idx = sub_item.index(':')
+            # get exact sub_item_key i.e. SOURCE_CONTACT_MCMILEN
+            sub_item_key = sub_item[:temp_idx]
+            # if already present, then replace and return new list
+            if target_key == sub_item_key:
+                print('replacing subitem')
+                sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
+                replaced_sub_item = True
+        # if empty string in sub items, remove
+        else:
+            idx_adjusted = idx - idx_offset
+            sub_item_list = [item for idx2, item in enumerate(sub_item_list) if idx_adjusted != idx2]
+            idx_offset += 1
+    # if no matched sub items were found, then simply add to list
+    if not replaced_sub_item:
+        sub_item_list.append('{}: {}'.format(target_key, target_val))
+    # if no matches are found, then return original list
+    return(sub_item_list)
+
+def create_poly_from_pts(table_in, fp_out, offsets):
+    '''
+    Takes points and offsets by specified e,w,s,n into polygon feat class
+    ZRU 20201116
+
+    table_in        point feature from arc.  can be adapted for csv
+    fp_out          full path name to gdb or with .shp
+    offsets         list in [w,e,n,s] units of projection system
+    '''
+    w, e, n, s = offsets[0], offsets[1], offsets[2], offsets[3]
+    poly = []
+    with arcpy.da.Cursor(table_in, ['SHAPE@XY']) as cursor:
+        for row in cursor:
+            x = row[0][0]
+            y = row[0][1]
+            ul = arcpy.Point(x - w, y + n)
+            ur = arcpy.Point(x + e, y + n)
+            ll = arcpy.Point(x - w, y - s)
+            lr = arcpy.POint(x + e, y - s)
+            extent = arcpy.Array([ul,ur,lr,ll])
+            poly.append(arcpy.Polygon(extent))
+    arcpy.CopyFeatures_management(poly, fp_out)

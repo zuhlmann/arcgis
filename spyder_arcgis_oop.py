@@ -198,8 +198,9 @@ class metaData(object):
         step and add lines to existing Item Description.  This can be fleshed
         out to include add_credits, add_abstract too.
         ARGUMENTS
-        add_lines_purp (kwargs):    dictionary where key is item and val is val
-                                    i.e. ORIGINAL_LOCATION: path/to/file
+        add_lines_purp (kwargs):    comma separated entry from item_desc with items
+                                    being column titles from item_desc.
+                                    i.e. DATA_LOCATION_MCMILLEN_JACOBS
         '''
 
         # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
@@ -224,7 +225,7 @@ class metaData(object):
         # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
         # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
         # need to fix all columns in this regard when writing xml
-        # FIX THIS it is not prepared to handle other cases. 
+        # FIX THIS it is not prepared to handle other cases.
         add_new_purp_list = self.parse_comma_sep_list(col_to_parse = 'ADD_LINES_PURP')
         for idx, fp_xml in enumerate(fp_xml_orig):
             print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
@@ -257,16 +258,23 @@ class metaData(object):
                     purp_item.append(item)
                     purp_value.append(self.df.loc[index_name][item])
 
-                # assemble new purpose items
-                for item, val in zip(purp_item, purp_value):
-                    purpose_new = '\n{0}: {1}'.format(item, val)
-
-                # If add_purp but no purp exists(blank item desc) no action
+                # If add_purp but no purp exists(blank item desc) add new sub items
                 if purp is None:
-                    pass
+                    purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
+                    purpose_new = '\n'.join(purpose_new)
+                    print('new purp will be this:\n{}'.format(purpose_new))
                 # add new purp to existing
                 else:
-                    purpose_new = purp.text + purpose_new
+                    # assemble new purpose items
+                    sub_item_lst = purp.text.splitlines()
+                    for key, val in zip(purp_item, purp_value):
+                        sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, val)
+
+                    # once the list is scoured and new items are either added or replaced
+                    # join into one big string
+                    purpose_new = '\n'.join(sub_item_lst)
+                    print('should be adding this to EXISTING purp:\n{}'.format(purpose_new))
+                    # purpose_new = purp.text + purpose_new
 
                 element_text_list = [purpose_new]
                 element_list = [purp]

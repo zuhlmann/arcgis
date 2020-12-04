@@ -247,9 +247,9 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # utilities.mxd_inventory(fp_mxd_ramp, 'Protected Areas future fig', fp_ramp)
 
 # # RES salmonid
-# fp_res_mp = os.path.join(utilities.get_path(26), 'RES_MPs')
-# dir_out = os.path.join(fp_res_mp, 'v2')
-# fp_mxd_list = utilities.enum_fp_list(fp_res_mp, True, filter_ftype = 'mxd')
+# fp_fish_presence_mp = os.path.join(utilities.get_path(26), 'RES_MPs//fish_presence_MP')
+# dir_out = os.path.join(fp_fish_presence_mp, 'v1')
+# fp_mxd_list = utilities.enum_fp_list(fp_fish_presence_mp, True, filter_ftype = 'mxd')
 # pdf_name_list = [os.path.split(fp_mxd)[-1] for fp_mxd in fp_mxd_list]
 # pdf_name_list = ['{}.pdf'.format(fname[:-4]) for fname in pdf_name_list]
 # for mxd, pdf in zip(fp_mxd_list, pdf_name_list):
@@ -327,13 +327,24 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # # for feat, feat_out in zip(feat_lst, feat_out_lst):
 # #     arcpy.FeatureClassToFeatureClass_conversion(feat, fp_mp_salmon, feat_out)
 
+# Create function
+import glob
+fp_dir = os.path.join(fp_new_data_dl, 'CAM_MP')
+shp_feats = glob.glob(fp_dir + '//*.shp')
+fp_out = os.path.join(fp_orders, 'MP_CAM')
+for feat in shp_feats:
+    feat_name = os.path.split(feat)[-1][:-4]
+    if feat_name[0] == '2':
+        feat_name = 'Fig_{}'.format(feat_name)
+    arcpy.FeatureClassToFeatureClass_conversion(feat, fp_out, feat_name)
+
 
 # # 7) LABELSETS
 # Field amalgomate  11/16/2020
 # import copy
 fp_cdm = utilities.get_path(6)
-arcpy.env.workspace = fp_cdm
-feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
+# arcpy.env.workspace = fp_cdm
+# feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
 # fields = []
 # feat_names = []
 # fp_full = []
@@ -355,9 +366,9 @@ feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
 # fp_out = os.path.join(utilities.get_path(5), 'cdm20200428_places_of_interest_fields.csv')
 # pd.DataFrame.to_csv(df, fp_out)
 
-# #7b)
+#7b)
 
-# # FROM HERE: https://gis.stackexchange.com/questions/130588/python-script-to-add-fields-to-feature-classes
+# FROM HERE: https://gis.stackexchange.com/questions/130588/python-script-to-add-fields-to-feature-classes
 # arcpy.env.workspace = os.path.join(fp_working, 'labels')
 # fcl = [item for item in arcpy.ListFeatureClasses()]
 # for fc in fcl[2:]:
@@ -366,10 +377,9 @@ feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
 #         for row in cursor:
 #             row[0] = fc
 #             cursor.updateRow(row)
-
+#
 # fp_all_labels = os.path.join(fp_working, 'labels//all_labels_cdm')
 # arcpy.Merge_management(fcl, fp_all_labels)
-
 
 # # RAMP
 # # DELETE after 11/16/20
@@ -400,3 +410,7 @@ feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
 # COMMAND LINE TRICKS
 # reload
 # utilities = imp.load_source('utilities', 'C:/Users/uhlmann/code/utilities.py')
+
+ # SETTING environmental variables in qgis
+ # go to python console
+ # os.environ['PROJ_LIB'] = 'C:\\Users\\uhlmann\\Miniconda3\\envs\\qgis_ltr\\Library\\share\\proj'

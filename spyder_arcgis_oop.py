@@ -46,6 +46,7 @@ class metaData(object):
                                     groups want different layers uploaded.
         '''
         # SELECT BY TAGS
+        print('did this add')
         try:
             target_tag = kwargs['target_tag']
             # list will be passed for multiple target tags
@@ -73,8 +74,44 @@ class metaData(object):
             # get index names from iloc vals
             self.indices_iloc = copy.copy(iloc_tag)
             self.indices = self.df.iloc[iloc_tag].index.tolist()
+        # see if another target keyword is passed
         except KeyError:
+            pass
+
+        try:
+            target_action = kwargs['target_action']
+            # list will be passed for multiple target tags
+            print('now we are in target action')
+            if not isinstance(target_action, list):
+                target_action = [target_action]
+            # pull tags column from df (list)
+            parsed_list = self.parse_comma_sep_list(col_to_parse = 'ACTION')
+            print(parsed_list)
+            # find index if tags are present in col (list) and if tag matches target
+            # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
+            iloc_temp = []
+            for target in target_action:
+                # the count will be index of dataframe rows.  It will repeat with
+                # multiple target_actions but duplicates removed with set(iloc_temp)
+                ct = 0
+                for actions in copy.copy(parsed_list):
+                    # check for nan vals
+                    try:
+                        if target in actions:
+                            print(ct)
+                            iloc_temp.append(ct)
+                    # type error with nans in parsed list
+                    except TypeError:
+                        pass
+                    ct += 1
+                ct += 1
+            # if multiple target_actions using set will slim down duplicate indices
+            iloc_action = list(set(iloc_temp))
+            # get index names from iloc vals
+            self.indices_iloc = copy.copy(iloc_action)
+            self.indices = self.df.iloc[iloc_action].index.tolist()
             # if not tags selection then indices will be     passed
+        except KeyError:
             pass
 
         # SELECT BY ROW INDICES
@@ -192,6 +229,8 @@ class metaData(object):
                             columns = ['index', 'purpose_new', 'credits_new', 'abstract'],
                             index = index_df)
 
+
+
     def write_xml(self, **kwargs):
         '''
         Update metadata to include assemble_metadata() statement or skip that
@@ -268,6 +307,7 @@ class metaData(object):
                     # assemble new purpose items
                     sub_item_lst = purp.text.splitlines()
                     for key, val in zip(purp_item, purp_value):
+                        print(purp_item, purp_values)
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, val)
 
                     # once the list is scoured and new items are either added or replaced
@@ -279,6 +319,13 @@ class metaData(object):
                 element_text_list = [purpose_new]
                 element_list = [purp]
                 element_title = ['idPurp']
+
+                # try:
+                #     credits = kwargs['abstract']
+                #     if credits.lower() == 'replace':
+                #         credits_new = self.df.iloc[self.indices_iloc[ct]]['CREDITS']
+
+
             # If not adding lines to purp, etc.
             else:
                 # get new element text
@@ -354,6 +401,7 @@ class AgolAccess(metaData):
         itemType = self.item_type_dict[itemType]
         items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
                                         item_type = itemType, max_items = 900)
+        itemType = itemType.replace(' ', '_')
         setattr(self, 'user_content_{}'.format(itemType), items)
         # filtered tags attribute
         try:
@@ -364,6 +412,7 @@ class AgolAccess(metaData):
             setattr(self, 'user_content_{}_{}'.format(tags, itemType_text), items_filtered)
         except KeyError:
             pass
+
 
     def add_agol_upload(self, **kwargs):
         '''
@@ -405,9 +454,9 @@ class AgolAccess(metaData):
             # DETERMINE snippet creation based on what was pased
             # same snippet for all
             if len(indices) == 1:
-                snippets = snippets * len(title)
+                snippets = snippets * len(titles)
             # custom snippets
-            elif len(snippets) == len(title):
+            elif len(snippets) == len(titles):
                 pass
             else:
                 sys.exit('len(snippet) != len(indices)')

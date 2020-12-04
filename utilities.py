@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import math
 import sys
-sys.path = [p for p in sys.path if '86' not in p]
+# sys.path = [p for p in sys.path if '86' not in p]
 import arcpy
 import numpy as np
 import datetime
@@ -684,8 +684,8 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
         # supports(DATASOURCE) is a convenient method to determine if layer
         # has value for that attribute essentially
         # visibile obviously if checked on map
-        # if (lyr.supports("DATASOURCE")) & (lyr.visible):
-        if lyr.supports("DATASOURCE"):
+        if (lyr.supports("DATASOURCE")) & (lyr.visible):
+        # if lyr.supports("DATASOURCE"):
             lyr_inventory.append(lyr)
         else:
             pass
@@ -712,7 +712,7 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
     txt = '{}\n\n{}'.format(intro, lyr_string_all)
     with open(fp_out, 'w') as out_file:
         out_file.write(txt)
-def mxd_inventory_csv(fp_base, **kwargs):
+def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     '''
     wrap both these functions into a obj oriented class
 
@@ -732,9 +732,11 @@ def mxd_inventory_csv(fp_base, **kwargs):
     lyr_name = []
     lyr_source = []
     mxd_name = []
+    visible = []
     for idx, fp_mxd in enumerate(fp_mxd_list):
         mxd = arcpy.mapping.MapDocument(fp_mxd)
         mxd_name_temp = mxd_list[idx]
+        print('Inentorying: {}'.format(os.path.split(fp_mxd)[-1]))
         for lyr in arcpy.mapping.ListLayers(mxd):
             # supports(DATASOURCE) is a convenient method to determine if layer
             # has value for that attribute essentially
@@ -744,12 +746,17 @@ def mxd_inventory_csv(fp_base, **kwargs):
                 lyr_name.append(lyr.name)
                 lyr_source.append(lyr.dataSource)
                 mxd_name.append(mxd_name_temp)
+                if lyr.visible:
+                    visible.append('TRUE')
+                else:
+                    visible.append('FALSE')
             else:
                 pass
 
         # plane old mxd name
-    df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, lyr_source]), columns = ['map_name', 'layer_name', 'layer_source'])
-    fp_out = os.path.join(fp_base, 'RAMP_layer_inventory.csv')
+    df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, visible, lyr_source]),
+                    columns = ['map_name', 'layer_name', 'visible', 'layer_source'])
+    fp_out = os.path.join(fp_base, fname_csv)
     pd.DataFrame.to_csv(df, fp_out)
 
 def write_folder_contents(fp):
@@ -868,7 +875,7 @@ def parse_item_desc(sub_item_list, target_key, target_val):
     # if no matches are found, then return original list
     return(sub_item_list)
 
-def create_poly_from_pts(table_in, fp_out, offsets):
+def create_poly_from_pts(table_in, fp_out, offsets, **kwargs):
     '''
     Takes points and offsets by specified e,w,s,n into polygon feat class
     ZRU 20201116
@@ -879,14 +886,111 @@ def create_poly_from_pts(table_in, fp_out, offsets):
     '''
     w, e, n, s = offsets[0], offsets[1], offsets[2], offsets[3]
     poly = []
-    with arcpy.da.Cursor(table_in, ['SHAPE@XY']) as cursor:
+    try:
+        num_pts = kwargs['num_pts']
+    except KeyError:
+        num_pts = None
+    with arcpy.da.SearchCursor(table_in, ['SHAPE@XY']) as cursor:
         for row in cursor:
             x = row[0][0]
             y = row[0][1]
             ul = arcpy.Point(x - w, y + n)
             ur = arcpy.Point(x + e, y + n)
             ll = arcpy.Point(x - w, y - s)
-            lr = arcpy.POint(x + e, y - s)
+            lr = arcpy.Point(x + e, y - s)
             extent = arcpy.Array([ul,ur,lr,ll])
             poly.append(arcpy.Polygon(extent))
-    arcpy.CopyFeatures_management(poly, fp_out)
+    arcpy.CopyFeatures_management(poly[:num_pts], fp_out)
+
+# def figure_units_to_scale(width_fig, len_fig, width_map, offsets):
+#     ew = (width_map * 12) / width_map
+#     ns = ew * (len_fig / width_fig)
+#     try:
+#         offsets = kwargs['unequal_offsets']
+#         w, e, n, s = offsets[0], offsets[1], offsets[2], offsets[3]
+#         w = w * ew
+#         e = e * ew
+#         n = n * ns
+#         s = s * ns
+#     except KeyError:
+#         w = w * 0.5
+#         e = e * 0.5
+#         n = n * 0.5
+#         s = s * 0.5
+#     offsets = [w, e, n, s]
+#     return(offfsets)
+
+def clean_fp(fp_in, **kwargs):
+    '''
+    takes full paths of files and removes spaces and replaces characters base
+    on kwargs.  Also option to change extentsion
+    ARGS
+    fp_in           file path in
+    kwarg['replace_w_underscore']      character wanting to replace i.e. '.' == '_'
+    kwarg['replace_space']              finds spaces and replaces with value
+    kwargs['ext_new']       replaces old extension with this value
+    '''
+    # yields list w len(fp_components) == 2.  [fp without extentsion, .<ext>]
+    fp_components = os.path.splitext(fp_in)
+    fp_no_ext = fp_components[0]
+    ext_orig = fp_components[1]
+    # kwargs if want to remove vals from file name
+    # replace specified value with an underscore
+    try:
+        val_orig = kwargs['replace_w_underscore']
+        fp_no_ext = fp_no_ext.replace(val_orig, '_')
+    except:
+        pass
+    # replace space with new value
+    try:
+        val_new = kwargs['replace_space']
+        fp_no_ext = fp_no_ext.replace(' ', val_new)
+    except:
+        pass
+    # change extension
+    try:
+        ext_new = kwargs['ext_new']
+        fp_new = '{}.{}'.format(fp_no_ext, ext_new)
+    except:
+        print('NO NEW EXTENSION was specified')
+        fp_new = os.path.normpath(os.path.join(fp_no_ext, ext_orig))
+    return(fp_new)
+def merge_basic(fp_csv, indices, dir_out, name_out):
+    '''
+    utility to merge features and shapefiles.  Add field mappings stripping capabilities
+    ZRU 12/04/2020.  To help with creating and merging buffers. Add ability to buffer
+    input to temp lyr and then merge
+    fp_csv:         Type = String i.e. 'path/to/file.csv'
+                    path/to/csv with datasets
+    indices:        Type = List i.e. [1,4,5]
+                    indice of feats you want to merge.  indice begins counting at zero!
+    dir_out:        Type = String
+                    directory to save data i.e. path/to/working.gdb
+    name_out:       Type = String
+                    name of FEATURE to save out
+    '''
+    df = pd.read_csv(fp_csv)
+    # make sure indices are passed as list = [0,1,2] for example
+    if isinstance(indices, list):
+        print('list')
+        if isinstance(indices[0], int):
+            pass
+        else:
+            sys.exit()
+    elif isinstance(indices, int):
+        print('int')
+        indices = int(indices)
+    else:
+        print('neither')
+        sys.exit()
+    feats_to_merge = [df.iloc[idx].feature_name for idx in indices]
+    fp_out = os.path.join(dir_out, name_out)
+    fieldMappings = arcpy.FieldMappings()
+    for item in fieldMappings.fields:
+        print(item.name)
+    arcpy.Merge_management(feats_to_merge, fp_out, fieldMappings)
+
+
+
+
+    feats_to_merge = df.iloc[indices]

@@ -2,8 +2,8 @@ import spyder_arcgis_oop as agolZ
 import utilities
 import os
 import sys
-# sys.path = [p for p in sys.path if '86' not in p]
-# import arcpy
+sys.path = [p for p in sys.path if '86' not in p]
+import arcpy
 import glob
 import copy
 import time
@@ -18,7 +18,7 @@ agol_obj = agolZ.AgolAccess('something', fp_csv)
 
 # # b) Select data layers
 # # agol_obj.selection_idx(alternative_select_col = {'MANAGEMENT_PLAN':'a_team'})
-idx_to_stage = [274, 275]
+idx_to_stage = [282, 283, 284]
 # index_remove = list(range(126, 147))
 # index_remove = [51,52]
  # idx_remove = [212,213]
@@ -27,10 +27,10 @@ idx_to_stage = [274, 275]
 
 agol_obj.selection_idx(indices = idx_to_stage)
 
-# consider removing NHD, contour, Parcels **all, Protected AReas, PublicLand
-# # c) Copy feature class from Original Location to AGOL_DataUpload folder
-fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_11_17\\2020_11_17'
-
+# # # consider removing NHD, contour, Parcels **all, Protected AReas, PublicLand
+# # # # c) Copy feature class from Original Location to AGOL_DataUpload folder
+fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_12_03\\2020_12_03'
+# #
 # for indice in agol_obj.indices:
 #     # NOTE - grabbing SERIES (single []) then a string is produced (.DATA_LOC...)
 #     fp_original = agol_obj.df.loc[indice].DATA_LOCATION_MCM_ORIGINAL
@@ -38,30 +38,34 @@ fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA
 #     # since this is a pd.Series, name is equivalent to index but returns a string
 #     print('indice ', indice)
 #     feat_name = copy.copy(indice)
-#     fp_original = os.path.join(fp_original, feat_name)
-#     fp_agol_staging = agol_obj.df.loc[indice].DATA_LOCATION_MCMILLEN_JACOBS
+#
+#     # fp_agol_staging = fp_out
+#     fp_staging = agol_obj.df.loc[indice].DATA_LOCATION_MCM_STAGING
+#     fp_staging = os.path.join(fp_staging, feat_name)
+#     fp_agol_upload = agol_obj.df.loc[indice].DATA_LOCATION_MCMILLEN_JACOBS
 #     print('beginning FeatureClassToFeatureClass_conversion on: {}'.format(indice))
 #     start = time.time()
-#     arcpy.FeatureClassToFeatureClass_conversion(fp_original + '.shp', fp_agol_staging, feat_name)
+#     # arcpy.FeatureClassToFeatureClass_conversion(fp_original + '.shp', fp_agol_staging, feat_name)
+#     arcpy.FeatureClassToFeatureClass_conversion(fp_staging, fp_agol_upload, feat_name + '.shp')
 #     end = time.time()
 #     print('{0} took {1}'.format(indice, end-start))
-
+#
 # # ONCE IS ENOUGH!  Appending to Item D cannot be undone!
 # agol_obj.write_xml()
 
 
-# e) After checking the metadata, ZIP
-utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out))
+# # e) After checking the metadata, ZIP
+# utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out))
 # # example of excluding problematic files
 # utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out), exclude_files = 'Streets_StateOR')
 
 #f) ADD SHP TO CONTENT AGOL
 # ADD same protocol for checking if already published as in g1)
 # NOTE: this will only add those in indice, therefore run selection_idx()
-snips = ['Digitized from pdfs by CDM']
-snip1 = ['Provided by CDM - unknown provenance']
+snips = ['Select Invasive Species data provided by BLM July 2020']
+# snip1 = ['Project Features from 100 Design Package CAD'] * 2
 # snip2 = ['River Alignments for post-dam Klamath, current as of Aug 2020'] * 3
-snips.extend(snip1)
+# snips.extend(snip1)
 agol_obj.add_agol_upload(snippets = snips)
 # #
 # # #g) PUBLISH
@@ -103,3 +107,20 @@ agol_obj.add_agol_upload(snippets = snips)
 # for content_item in shapefiles_filtered:
 #     print(content_item.name)
 #     content_item.publish(output_type = 'Feature Layer')
+
+# h)
+# remove data
+# #
+# agol_obj.selection_idx(target_action = 'remove')
+# # This will find all Feature Layer Collections
+# agol_obj.identify_items_online('feature')
+# # list of feature items from online
+# feat_layers = agol_obj.user_content_Feature_Layer_Collection
+# for feat_layer in feat_layers:
+#     for feat_to_remove in agol_obj.indices:
+#         if feat_to_remove == feat_layer.title:
+#             feat_layer.delete()
+#
+#
+#
+#     agol_obj[idx].delete

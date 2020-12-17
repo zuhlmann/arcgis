@@ -364,6 +364,68 @@ class metaData(object):
 
             tree.write(fp_xml)
 
+    def quickie_inventory(self, **kwargs):
+        '''
+        quick grab item description to add to new csv for the gang.  ZRU 20201207
+        '''
+
+        # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
+        fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
+        index_names = self.df.loc[self.indices].index.to_list()
+        print(index_names)
+        # glob strings will create the string to pass to  glob.glob which
+        # uses th *xml wildcard to pull JUST the xml files from shapefile folder
+        glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
+        # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
+        for item in glob_strings:
+            print('NAME {}\nTYPE: {}'.format(item, type(item)))
+
+        fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+
+        ct = 0
+        # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
+        # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
+        # need to fix all columns in this regard when writing xml
+        # FIX THIS it is not prepared to handle other cases.
+        purp_list = []
+        abstract_list = []
+        credits_list = []
+        for idx, fp_xml in enumerate(fp_xml_orig):
+            print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
+            ct+=1
+
+            tree = ET.parse(fp_xml)
+            # root is the root ELEMENT of a tree
+            root = tree.getroot()
+            # remove the mess in root
+            # Parent for idPurp
+            dataIdInfo = root.find('dataIdInfo')
+            # search for element <idPurp> - consult python doc for more methods. find
+            # stops at first DIRECT child.  use root.iter for recursive search
+            # if doesn't exist.  Add else statements for if does exist and update with dict
+            purp = dataIdInfo.find('idPurp')
+            abstract = dataIdInfo.find('idAbs')
+            credits = dataIdInfo.find('idCredit')
+            try:
+                purp_list.append(purp.text)
+            except AttributeError:
+                purp_list.append(None)
+            try:
+                abstract_list.append(abstract.text)
+            except AttributeError:
+                abstract_list.append(None)
+            try:
+                credits_list.append(credits.text)
+            except AttributeError:
+                credits_list.append(None)
+        # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
+
+        df_quick_inventory = pd.DataFrame(np.column_stack(
+                                [index_names, purp_list, abstract_list, credits_list]),
+                                columns = ['feature_name', 'purpose', 'abstract', 'credits'])
+        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\data_hunting_and_inventory\camas_krrp_data2.csv'
+        pd.DataFrame.to_csv(df_quick_inventory, fp_out)
+
 class AgolAccess(metaData):
     '''
     Basic init for AGOL access

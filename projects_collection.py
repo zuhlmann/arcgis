@@ -3,7 +3,7 @@
 import os
 import sys
 # sys.path = [p for p in sys.path if '86' not in p]
-# import arcpy
+import arcpy
 import utilities
 import pandas as pd
 import numpy as np
@@ -17,6 +17,7 @@ fp_GIS_data = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewa
 fp_request_mp = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Request_Tracking//GIS_Requests_Management_Plans'
 fp_agol = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//AGOL_DataUploads'
 fp_new_data_dl = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//new_data_downloads//'
+fp_cdm = utilities.get_path(6)
 
 # # # 1) RAMP and Tributary Connectivity for Management Plans
 # # # a)  Appendix D1.
@@ -119,8 +120,8 @@ fp_new_data_dl = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Ren
 # # select from fields
 # # 1a) bats
 #
-fp_bats = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/McmJac_KRRP_GIS_data/working.gdb/MP_Camas/Bat_Roosts_Active_2019'
-fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
+# fp_bats = 'C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/McmJac_KRRP_GIS_data/working.gdb/MP_Camas/Bat_Roosts_Active_2019'
+# fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # fp_aecom = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Data//new_data_downloads//AECOM_dump//KlamathDamRemoval_Data_20200605//KlamathDamRemoval_Data_20200605.gdb'
 # fp_wpt = os.path.join(fp_aecom, 'Biology_CDM_RDG//WPT_Historical_Habitat')
 # fp_access = os.path.join(fp_working, 'Project_Data\\Access_Routes\\')
@@ -231,6 +232,7 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 #                     'figure_inventory_camas_MP.csv'}
 
 # # 5b) KP
+fp_ramp = os.path.join(fp_request_mp, 'Stantec_RAMP_Trib_MP')
 # # inventories for KP
 # fp_kp_requests = os.path.join(fp_request_mp, 'KnightPiesold_MPs//traffic_MP')
 # fp_kp_mp_v3 = os.path.join(fp_kp_requests, 'traffic_MP_v3')
@@ -242,7 +244,6 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 #     utilities.mxd_inventory(mxd, pdf, fp_kp_mp_v3)
 
 # # RAMP Stantec
-# fp_ramp = os.path.join(fp_request_mp, 'Stantec_RAMP_Trib_MP')
 # fp_mxd_ramp = fp_ramp + '//Protected Areas.mxd'
 # utilities.mxd_inventory(fp_mxd_ramp, 'Protected Areas future fig', fp_ramp)
 
@@ -278,11 +279,11 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # for fp_mxd, fig_name in zip(fp_mxds, fig_names):
 #     utilities.mxd_inventory(fp_mxd, fig_name, fp_MP_base)
 
-# # 5c) One file inventory - KRRC Feasibility
-# fp_krrc_requests = 'C://Users//uhlmann//Box//GIS//Project_Based//Klamath_River_Renewal_MJA//GIS_Request_Tracking//GIS_Requests_KRRC'
-# krrc_mxd = os.path.join(fp_krrc_requests, 'Feasibility_RFP.mxd')
-# krrc_pdf = os.path.join(fp_krrc_requests, 'Feasibility_RFP_v2')
-# utilities.mxd_inventory(krrc_mxd, krrc_pdf, fp_krrc_requests)
+# 5c) One file inventory - KRRC Feasibility
+fp_mxd = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP1\Osprey_Nests_12_15_2020.mxd'
+fp_pdf = 'Osprey_Nests_12_15_2020_version_final.pdf'
+fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP1\camas_figures_delivered\draft3_20201211'
+utilities.mxd_inventory(fp_mxd, fp_pdf, fp_out)
 
 
 # # 6) Merge multiple files
@@ -327,22 +328,10 @@ fp_out_csv = os.path.join(fp_request_mp, 'Camas_MPs\\Bat_Roosts_Active.csv')
 # # for feat, feat_out in zip(feat_lst, feat_out_lst):
 # #     arcpy.FeatureClassToFeatureClass_conversion(feat, fp_mp_salmon, feat_out)
 
-# Create function
-import glob
-fp_dir = os.path.join(fp_new_data_dl, 'CAM_MP')
-shp_feats = glob.glob(fp_dir + '//*.shp')
-fp_out = os.path.join(fp_orders, 'MP_CAM')
-for feat in shp_feats:
-    feat_name = os.path.split(feat)[-1][:-4]
-    if feat_name[0] == '2':
-        feat_name = 'Fig_{}'.format(feat_name)
-    arcpy.FeatureClassToFeatureClass_conversion(feat, fp_out, feat_name)
-
 
 # # 7) LABELSETS
 # Field amalgomate  11/16/2020
 # import copy
-fp_cdm = utilities.get_path(6)
 # arcpy.env.workspace = fp_cdm
 # feats = arcpy.ListFeatureClasses(feature_dataset = 'Places_of_Interest')
 # fields = []
@@ -392,6 +381,22 @@ fp_cdm = utilities.get_path(6)
 #   name = namelist[pn - 1]
 #   rec += 1
 #   return(name)
+
+# # sql selections
+# fp_labels = os.path.join(utilities.get_path(8), 'labelset_creation_MPs')
+# fp_working = utilities.get_path(18)
+# fp_labels_feat = os.path.join(fp_working, 'labels//labels_low_90des_ga')
+# fp_out = os.path.join(fp_working, 'MP_RAMP//labels_project_activities_ramp')
+# field = 'OBJECTID'
+# # # object id low
+# # objectid = [3,4,10,13,17,26,33,36,45,50,56,59,61,62]
+# # object id overiew activieites ramp
+# objectid = [3,4,13,19,21,23,26,29,33,35,50,58,62,63]
+# where_clause_list = ["({0}={1})".format(field, val) for val in objectid]
+# where_clause = 'OR'.join(where_clause_list)
+# arcpy.MakeFeatureLayer_management(fp_labels_feat, 'feat_lyr')
+# arcpy.SelectLayerByAttribute_management('feat_lyr', 'ADD_TO_SELECTION', where_clause)
+# arcpy.CopyFeatures_management('feat_lyr', fp_out)
 
 # add data sources to working
 # coho_and_mykis_trib_relo_sites_v2_layer_inventory

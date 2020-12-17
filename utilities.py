@@ -6,6 +6,8 @@ import sys
 import arcpy
 import numpy as np
 import datetime
+import time
+import glob
 # from compare_data import *
 
 def show_table(display_preference):
@@ -649,23 +651,34 @@ def export_ddp(fp_mxd, fp_pdf, range_str, **kwargs):
                  'PDF_MULTIPLE_FILE_PAGE_INDEX'
     '''
     mxd_doc = arcpy.mapping.MapDocument(fp_mxd)
-    ddp = mxd_doc.dataDrivenPages
-    if range_str == 'RANGE':
-        try:
-            pages = kwargs['RANGE']
-        except KeyError:
-            print('pass a range string.  DID NOT EXPORT MAP')
-        try:
-            multiple_files = kwargs['multiple_files']
-            ddp.exportToPDF(fp_pdf, 'RANGE', pages, multiple_files)
-        except:
-            ddp.exportToPDF(fp_pdf, 'RANGE', pages)
+
+    # Determine if document has dataDrivenPages enabled and/or multi page doc
+    try:
+        ddp = mxd_doc.dataDrivenPages
+    # No DDP capabailities, export simple pdf
+        create_mxd = True
+    except AttributeError:
+        create_mxd = False
+    if create_mxd:
+        if range_str == 'RANGE':
+            try:
+                pages = kwargs['RANGE']
+            except KeyError:
+                print('pass a range string.  DID NOT EXPORT MAP')
+            try:
+                multiple_files = kwargs['multiple_files']
+                ddp.exportToPDF(fp_pdf, 'RANGE', pages, multiple_files)
+            except:
+                ddp.exportToPDF(fp_pdf, 'RANGE', pages)
+        else:
+            try:
+                multiple_files = kwargs['multiple_files']
+                ddp.exportToPDF(fp_pdf, 'ALL', multiple_files)
+            except KeyError:
+                ddp.exportToPDF(fp_pdf, 'ALL')
+    # export normal map doc, not DDP
     else:
-        try:
-            multiple_files = kwargs['multiple_files']
-            ddp.exportToPDF(fp_pdf, 'ALL', multiple_files)
-        except KeyError:
-            ddp.exportToPDF(fp_pdf, 'ALL')
+        arcpy.mapping.ExportToPDF(mxd_doc, fp_pdf)
 
 def mxd_inventory(fp_mxd, figure_name, dir_out):
     '''
@@ -824,6 +837,22 @@ def enum_fp_list(fp_base, return_full_path, **kwargs):
     except NameError:
         pass
 
+def create_df_inventory(fp_base, fp_csv, version = 1):
+    '''
+    utility to create a list of mxds and pdfs to keep track of multiple maps
+    in a project.  This will be drawn upon to create an inventory list
+    ZU 20201213
+    fp_base             directory containing mxds
+    fp_out              where to save inventory
+    fp_inventory        full name of file path including .csv for inventory
+    '''
+    mxd_list = [fname for fname in os.listdir(fp_base) if 'mxd' in fname]
+    pdf_append = '_version_{}.pdf'.format(version)
+    fname_pdf = [os.path.splitext(fname_mxd)[0] + pdf_append for fname_mxd in mxd_list]
+    df = pd.DataFrame(np.column_stack(
+                        [mxd_list, fname_pdf, [fp_base] * len(fname_pdf)]),
+                        columns = ['mxd_filename', 'pdf_filename', 'base_dir'])
+    pd.DataFrame.to_csv(df, fp_csv)
 def return_mxd_obj(fp_mxd):
     '''
     helpful methods and such to add to mapping doc
@@ -955,11 +984,17 @@ def clean_fp(fp_in, **kwargs):
         print('NO NEW EXTENSION was specified')
         fp_new = os.path.normpath(os.path.join(fp_no_ext, ext_orig))
     return(fp_new)
-def merge_basic(fp_csv, indices, dir_out, name_out):
+
+def merge_basic(fp_csv, indices, dir_out, name_out, in_memory=True):
     '''
-    utility to merge features and shapefiles.  Add field mappings stripping capabilities
+    utility to buffer multile features and line out to merge.
+    Add field mappings stripping capabilities
     ZRU 12/04/2020.  To help with creating and merging buffers. Add ability to buffer
     input to temp lyr and then merge
+    !!IMPORTANT:  Strings for buffer units from csv must be EXACTLY as:
+     Centimeters, Decimal degrees, Decimeters, Feet, Inches, Kilometers, Meters,
+     Miles, Millimeters, Nautical Miles, Yards - to name a few.
+     ex) 100 Feet not 100 feet or 100 ft
     fp_csv:         Type = String i.e. 'path/to/file.csv'
                     path/to/csv with datasets
     indices:        Type = List i.e. [1,4,5]
@@ -968,8 +1003,18 @@ def merge_basic(fp_csv, indices, dir_out, name_out):
                     directory to save data i.e. path/to/working.gdb
     name_out:       Type = String
                     name of FEATURE to save out
+    in_memory:      Type = Boolean
+                    default is True.  If set to false individual buffered features
+                    will be output to dir_out (argument passed)
     '''
+
+    # this reads the csv into a dataframe
     df = pd.read_csv(fp_csv)
+    # set workspace
+    workspace = arcpy.env.workspace
+    print('you are in this workspace: If failing, change to workspace of inputs using:\narcpy.env.workspace = path/to/workspace')
+    # will use later...
+    workspace_trunc = '/'.join(workspace.split('/')[-3:])
     # make sure indices are passed as list = [0,1,2] for example
     if isinstance(indices, list):
         print('list')
@@ -983,14 +1028,104 @@ def merge_basic(fp_csv, indices, dir_out, name_out):
     else:
         print('neither')
         sys.exit()
+
+    # grab feature names from dataframe
     feats_to_merge = [df.iloc[idx].feature_name for idx in indices]
+
+    # create buffer string - ex) '105 Feet'
+    buffer_strings = []
+    name_field = []
+    buffer_unit = []
+    for idx in indices:
+        buffer_val = df.iloc[idx].buffer_val
+        buffer_unit = df.iloc[idx].buffer_unit
+        buffer_strings.append('{} {}'.format(buffer_val, buffer_unit))
+        name_field.append(df.iloc[idx].name_field)
+
+    # Set fp out for buffered feats - in_memory is default
+    if in_memory:
+        feats_buffered = ['in_memory//{}'.format(feat) for feat in feats_to_merge]
+    else:
+        feats_buffered = [os.path.join(dir_out, feat) for feat in feats_to_merge]
+
+    # create buffered features
+    # added count after the zip in for loop once extra iterator derived vals needed. UGLY
+    start = time.time()
+    ct = 0
+    for feat, feat_buff, buff_str in zip(feats_to_merge, feats_buffered, buffer_strings):
+        print('feat: {}\nfeat_buff: {}\nbuff_str: {}'.format(feat, feat_buff, buff_str))
+        # if it exists AND we did the in_memory_route
+        if (in_memory) & (arcpy.Exists(feat_buff)):
+            arcpy.Delete_management(feat_buff)
+        arcpy.Buffer_analysis(feat, feat_buff, buff_str, dissolve_option = 'ALL')
+        # get buffer size field name and add to feature table
+        # ex) buff_size_Feet
+        temp = buff_str.split(' ')
+        buff_val = temp[0]
+        buff_units = temp[1].lower()
+        buff_size_field = 'buff_size_{}'.format(buff_units)
+        arcpy.AddField_management(feat_buff, 'feature_name', 'TEXT', field_length = 50)
+        arcpy.AddField_management(feat_buff, buff_size_field, 'FLOAT')
+        arcpy.AddField_management(feat_buff, 'filepath_source', 'TEXT', field_length = 254)
+        name_val = name_field[ct]
+        # short filepath for attribute table reference.  relative to 3 dirs back
+        filepath_source = os.path.join(workspace_trunc, feat)
+        # what is the buffer unit
+        with arcpy.da.UpdateCursor(feat_buff, ['feature_name', buff_size_field, 'filepath_source']) as cursor:
+            for row in cursor:
+                row[0] = name_val
+                row[1] = buff_val
+                row[2] = filepath_source
+                cursor.updateRow(row)
+        ct += 1
     fp_out = os.path.join(dir_out, name_out)
-    fieldMappings = arcpy.FieldMappings()
-    for item in fieldMappings.fields:
-        print(item.name)
-    arcpy.Merge_management(feats_to_merge, fp_out, fieldMappings)
+    arcpy.Merge_management(feats_buffered, fp_out)
+    end = time.time()
+    print('Tool took {} seconds'.format(end-start))
 
+def copy_all_feats(fp_in, fp_out):
+    # full path of all shapefiles in fp_in
+    all_files_shp = glob.glob(os.path.join(fp_in, "*.shp"))
+    # feature names
+    feat_name = [os.path.splitext(os.path.split(fp_shp)[-1])[0] for fp_shp in all_files_shp]
+    for fp_shp, feat_name in zip(all_files_shp, feat_name):
+        # print('ZIPPING: {}\nTO: {}\nAS: {}'.format(fp_shp,fp_out, feat_name))
+        arcpy.FeatureClassToFeatureClass_conversion(fp_shp, fp_out, feat_name)
 
+# def update_labels(rows_idx_start):
+#     # main dirs
+#     fp_labels = os.path.join(get_path(8), 'labelset_creation_MPs')
+#     fp_working = get_path(18)
+#     # hardcoded for now
+#     fp_csv = os.path.join(fp_labels, 'labelset_inventory_90Des_ga.csv')
+#     # master feat class
+#     fp_labels_feat = os.path.join(fp_working, '//working.gdb//labels//labels_low_90des_ga')
+#     todays_date = datetime.datetime.today().strftime('%B %d %Y')
+#     fp_backup = os.path.join(fp_labels, 'labelset_backup_{}.csv'.format(todays_date)
+#     df_orig = pd.read_csv(fp_csv)
+#     col_names = df_orig.column_names.tolist()
+#     ct = 0
+#     with arpy.da.UpdateCursor(fp_labels_feat, col_names) as cursor:
+#         if ct >= rows_idx_start:
+#             for idx, name in enumerate(col_names):
+#                 # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
+#                 if ct == 0:
+#                     val = df_orig.iloc[ct][name].tolist()
+#                 row[idx] = val[ct]
+#             cursor.updateRow(row)
+#             pd.DataFrame.to_csv(df, os.path.join(fp_out, '{}_{}.csv'.format(feat_name, field)))
+#         else:
+#             pass
 
+def sql_str(val_list, field, logic_str = 'Or'):
+    where_clause_list = ["({0}={1})".format(field, val) for val in val_list]
+    where_clause = logic_str.join(where_clause_list)
+    fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\new_data_downloads\labelset_creation_MPs\sql_temp.txt'
+    with open(fp_out, 'w') as out_file:
+        out_file.write(where_clause)
 
-    feats_to_merge = df.iloc[indices]
+def return_fields(fp_in, fp_out):
+    fields_obj = arcpy.ListFields(fp_in)
+    fields = [field.name.encode('utf-8') for field in fields_obj]
+    df = pd.DataFrame(fields, columns = ['attributes'])
+    pd.DataFrame.to_csv(df, fp_out)

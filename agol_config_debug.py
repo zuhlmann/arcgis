@@ -18,40 +18,46 @@ agol_obj = agolZ.AgolAccess('something', fp_csv)
 
 # # b) Select data layers
 # # agol_obj.selection_idx(alternative_select_col = {'MANAGEMENT_PLAN':'a_team'})
-idx_to_stage = [282, 283, 284]
-# index_remove = list(range(126, 147))
-# index_remove = [51,52]
- # idx_remove = [212,213]
+
+idx_to_stage = [290]
+# idx_to_stage = [birds.append(id) for id in special_status_plants]
+
+# indices for camas review KEEP until review over 12072020
+# idx_to_stage = list(range(187,199))
+# index_remove = [188,190,196,198]
+# idx_to_stage = list(range(215,226))
+# index_remove = [220,223, 216]
 # for idx in index_remove:
-#     idx_to_stage.remove(idx)
+    # idx_to_stage.remove(idx)
 
 agol_obj.selection_idx(indices = idx_to_stage)
 
 # # # consider removing NHD, contour, Parcels **all, Protected AReas, PublicLand
 # # # # c) Copy feature class from Original Location to AGOL_DataUpload folder
-fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_12_03\\2020_12_03'
+# fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA\\GIS_Data\\AGOL_DataUploads\\2020_12_03\\2020_12_03'
 # #
-# for indice in agol_obj.indices:
-#     # NOTE - grabbing SERIES (single []) then a string is produced (.DATA_LOC...)
-#     fp_original = agol_obj.df.loc[indice].DATA_LOCATION_MCM_ORIGINAL
-#     # print('count: {} \n{}'.format(indice, fp_original))
-#     # since this is a pd.Series, name is equivalent to index but returns a string
-#     print('indice ', indice)
-#     feat_name = copy.copy(indice)
-#
-#     # fp_agol_staging = fp_out
-#     fp_staging = agol_obj.df.loc[indice].DATA_LOCATION_MCM_STAGING
-#     fp_staging = os.path.join(fp_staging, feat_name)
-#     fp_agol_upload = agol_obj.df.loc[indice].DATA_LOCATION_MCMILLEN_JACOBS
-#     print('beginning FeatureClassToFeatureClass_conversion on: {}'.format(indice))
-#     start = time.time()
-#     # arcpy.FeatureClassToFeatureClass_conversion(fp_original + '.shp', fp_agol_staging, feat_name)
-#     arcpy.FeatureClassToFeatureClass_conversion(fp_staging, fp_agol_upload, feat_name + '.shp')
-#     end = time.time()
-#     print('{0} took {1}'.format(indice, end-start))
-#
+for indice in agol_obj.indices:
+    # NOTE - grabbing SERIES (single []) then a string is produced (.DATA_LOC...)
+    fp_original = agol_obj.df.loc[indice].DATA_LOCATION_MCM_ORIGINAL
+    # print('count: {} \n{}'.format(indice, fp_original))
+    # since this is a pd.Series, name is equivalent to index but returns a string
+    print('indice ', indice)
+    feat_name = copy.copy(indice)
+
+    # fp_agol_staging = fp_out
+    fp_staging = agol_obj.df.loc[indice].DATA_LOCATION_MCM_STAGING
+    fp_agol_upload = agol_obj.df.loc[indice].DATA_LOCATION_MCMILLEN_JACOBS
+    feat_to_copy = os.path.join(fp_original, feat_name)
+    print('beginning FeatureClassToFeatureClass_conversion on: {}'.format(indice))
+    start = time.time()
+    # arcpy.FeatureClassToFeatureClass_conversion(fp_original + '.shp', fp_agol_staging, feat_name)
+    arcpy.FeatureClassToFeatureClass_conversion(feat_to_copy, fp_staging, feat_name)
+    end = time.time()
+    print('{0} took {1}'.format(indice, end-start))
+
 # # ONCE IS ENOUGH!  Appending to Item D cannot be undone!
 # agol_obj.write_xml()
+# agol_obj.quickie_inventory()
 
 
 # # e) After checking the metadata, ZIP
@@ -62,11 +68,11 @@ fp_out = 'C:\\Users\\uhlmann\\Box\\GIS\\Project_Based\\Klamath_River_Renewal_MJA
 #f) ADD SHP TO CONTENT AGOL
 # ADD same protocol for checking if already published as in g1)
 # NOTE: this will only add those in indice, therefore run selection_idx()
-snips = ['Select Invasive Species data provided by BLM July 2020']
+# snips = ['Select Invasive Species data provided by BLM July 2020']
 # snip1 = ['Project Features from 100 Design Package CAD'] * 2
 # snip2 = ['River Alignments for post-dam Klamath, current as of Aug 2020'] * 3
 # snips.extend(snip1)
-agol_obj.add_agol_upload(snippets = snips)
+# agol_obj.add_agol_upload(snippets = snips)
 # #
 # # #g) PUBLISH
 # # g1)

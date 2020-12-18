@@ -1127,5 +1127,13 @@ def sql_str(val_list, field, logic_str = 'Or'):
 def return_fields(fp_in, fp_out):
     fields_obj = arcpy.ListFields(fp_in)
     fields = [field.name.encode('utf-8') for field in fields_obj]
-    df = pd.DataFrame(fields, columns = ['attributes'])
+    dtype = [field.type for field in fields_obj]
+    df = pd.DataFrame(np.column_stack([fields, dtype]), columns = ['attributes', 'dtype'])
     pd.DataFrame.to_csv(df, fp_out)
+
+def cursor_merge(fp_csv, fp_list, add_fp_source_field = True):
+    df = pd.read_csv(mapping_csv, dtype = {'feature_id':int})
+    feature_id = list(df.feature_id)
+    feature_id_unique = set(feature_id)
+    num_features = len(feature_id_unique)
+    target_df = df[df.feature_id == feature_id_unique[0]]

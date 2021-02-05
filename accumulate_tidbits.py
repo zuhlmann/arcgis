@@ -1,7 +1,8 @@
-import arcpy
-from arcpy import env
-import sys
+# SCROUNGING DELETED SCRIPTS
+# ZRU 1/29/21
+# Add to this overtime to grab useful tidbits
 
+# 1) PRINT EXCEPTION
 arcpy.overwriteOutput = True
 
 input1 = 'KauiRoads'
@@ -21,5 +22,3 @@ try:
 except Exception:
     e = sys.exc_info()[1]
     print(e.args[0])
-
-    

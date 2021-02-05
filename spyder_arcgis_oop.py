@@ -21,6 +21,8 @@ import xml.etree.ElementTree as ET
 class metaData(object):
     def __init__(self, fp_csv):
         self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
+        # scratch copy to add working data NOT intended for retainingin updated csv/database
+        self.df_working = self.df.copy(deep = True)
 
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
@@ -86,7 +88,9 @@ class metaData(object):
                 target_action = [target_action]
             # pull tags column from df (list)
             parsed_list = self.parse_comma_sep_list(col_to_parse = 'ACTION')
-            print(parsed_list)
+            # add actions to working dataframe
+            self.df_working.assign(target_action = parsed_list)
+
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
             iloc_temp = []
@@ -373,15 +377,20 @@ class metaData(object):
         fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
         index_names = self.df.loc[self.indices].index.to_list()
         print(index_names)
+
         # glob strings will create the string to pass to  glob.glob which
         # uses th *xml wildcard to pull JUST the xml files from shapefile folder
         glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
-        # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
-        for item in glob_strings:
-            print('NAME {}\nTYPE: {}'.format(item, type(item)))
-
-        fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
-
+        fp_xml_orig = []
+        for idx, glob_string in enumerate(glob_strings):
+            try:
+                # ...[0] because it is a list of list - [[path/to/file]]
+                temp = glob.glob(glob_string)[0]
+                print(temp)
+                fp_xml_orig.append(temp)
+            # if file not_uploaded, credit_crush, etc.  ZU 20210122
+            except IndexError:
+                fp_xml_orig.append(fp_base[idx])
         ct = 0
         # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
         # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
@@ -391,39 +400,43 @@ class metaData(object):
         abstract_list = []
         credits_list = []
         for idx, fp_xml in enumerate(fp_xml_orig):
-            print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
-            ct+=1
-
-            tree = ET.parse(fp_xml)
-            # root is the root ELEMENT of a tree
-            root = tree.getroot()
-            # remove the mess in root
-            # Parent for idPurp
-            dataIdInfo = root.find('dataIdInfo')
-            # search for element <idPurp> - consult python doc for more methods. find
-            # stops at first DIRECT child.  use root.iter for recursive search
-            # if doesn't exist.  Add else statements for if does exist and update with dict
-            purp = dataIdInfo.find('idPurp')
-            abstract = dataIdInfo.find('idAbs')
-            credits = dataIdInfo.find('idCredit')
+            print('indice {}. path {}'.format(self.indices_iloc[idx], fp_xml))# refer to notes below for diff betw trees and elements
             try:
-                purp_list.append(purp.text)
-            except AttributeError:
-                purp_list.append(None)
-            try:
-                abstract_list.append(abstract.text)
-            except AttributeError:
+                tree = ET.parse(fp_xml)
+                # root is the root ELEMENT of a tree
+                root = tree.getroot()
+                # remove the mess in root
+                # Parent for idPurp
+                dataIdInfo = root.find('dataIdInfo')
+                # search for element <idPurp> - consult python doc for more methods. find
+                # stops at first DIRECT child.  use root.iter for recursive search
+                # if doesn't exist.  Add else statements for if does exist and update with dict
+                purp = dataIdInfo.find('idPurp')
+                abstract = dataIdInfo.find('idAbs')
+                credits = dataIdInfo.find('idCredit')
+                try:
+                    purp_list.append(purp.text)
+                except AttributeError:
+                    purp_list.append(None)
+                try:
+                    abstract_list.append(abstract.text)
+                except AttributeError:
+                    abstract_list.append(None)
+                try:
+                    credits_list.append(credits.text)
+                except AttributeError:
+                    credits_list.append(None)
+            except FileNotFoundError:
+                str = 'AGOL upload status: {}'.format(fp_base[idx])
+                purp_list.append(str)
                 abstract_list.append(None)
-            try:
-                credits_list.append(credits.text)
-            except AttributeError:
                 credits_list.append(None)
         # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
 
         df_quick_inventory = pd.DataFrame(np.column_stack(
                                 [index_names, purp_list, abstract_list, credits_list]),
                                 columns = ['feature_name', 'purpose', 'abstract', 'credits'])
-        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\data_hunting_and_inventory\camas_krrp_data2.csv'
+        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\data_hunting_and_inventory\agol_klamath_data_assessment_2021b.csv'
         pd.DataFrame.to_csv(df_quick_inventory, fp_out)
 
 class AgolAccess(metaData):
@@ -455,17 +468,22 @@ class AgolAccess(metaData):
         krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
         setattr(self, group_key, krrp_geospatial)
 
-    def identify_items_online(self, itemType, **kwargs):
+    def identify_items_online(self, itemType=['shapefile', 'feature'], **kwargs):
         '''
         find items already online
         '''
+        if isinstance(itemType, list):
+            pass
+        else:
+            itemType = [itemType]
         # item_type_dict created in __init__
-        itemType = self.item_type_dict[itemType]
-        items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
-                                        item_type = itemType, max_items = 900)
-        itemType = itemType.replace(' ', '_')
-        setattr(self, 'user_content_{}'.format(itemType), items)
-        # filtered tags attribute
+        for item in itemType:
+            itemType = self.item_type_dict[item]
+            items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
+                                            item_type = itemType, max_items = 900)
+            itemType = itemType.replace(' ', '_').lower()
+            setattr(self, 'user_content_{}'.format(itemType), items)
+            # filtered tags attribute
         try:
             tags = kwargs['tags']
             items_filtered = [item for item in items if tags in item.tags]
@@ -475,7 +493,56 @@ class AgolAccess(metaData):
         except KeyError:
             pass
 
-
+    def take_action(self, action_type, itemType = ['feature','shapefile']):
+        '''
+        perform applicable actions from action column. ZU 202102025.  Thus far
+        only for remove.  will add others and perhaps a log for each run.
+        ARGS
+        itemType       same as identify_items_online method. pass as list of
+                        strings or one string.  i.e 'shapefile'.  Default =
+                        ['shapefile', 'feature']
+        action_type     thus far just 'remove' but need to add 'tags', publish
+                        and 'share'
+        '''
+        ct = 1
+        for item in itemType:
+            item = self.item_type_dict[item]
+            item = item.replace(' ', '_').lower()
+            str = 'user_content_{}'.format(item)
+            user_content = getattr(self, str)
+            if action_type == 'remove':
+                for content_item in user_content:
+                    title = content_item.title
+                    if title in self.indices:
+                        content_item.delete()
+                        # Only need update csv once! Not both for shapefile and feature
+                        if ct == 1:
+                            # gets idx in df; assumes just ONE item with exact name -NOT > 1
+                            # this is for useing ALTERNATE column - not INDEX
+                            # idloc = (self.df_working.ITEM == title).idxmax()
+                            # fancy method to value for action at idloc
+                            initial_vals = self.df_working.at[title, 'ACTION']
+                            updated_vals = [vals.strip(' ') for vals in initial_vals.split(',')]
+                            updated_vals.remove('remove')
+                            # if no actions remain, then set to nan
+                            # seems to work without converting NoneType to math.nan, but just in case
+                            # upon import None and NaN = NaN (df = pd.read_csv(fp_csv))
+                            # checking for None - interesting post:
+                            # https://stackoverflow.com/questions/23086383/how-to-test-nonetype-in-python
+                            if updated_vals is None:
+                                updated_vals = math.nan
+                            # otherwise, join back into comma separated string
+                            else:
+                                updated_vals = ', '.join(updated_vals)
+                            print('updating vals for {}'.format(content_item))
+                            self.df_working.at[title, 'ACTION'] = updated_vals
+                            # set status to offline
+                            self.df_working.at[title, 'AGOL_STATUS'] = 'offline'
+            # keep count going
+            ct += 1
+        fp_out = r'C:\Users\uhlmann\code\item_description_updated_test.csv'
+        pd.DataFrame.to_csv(self.df_working, fp_out)
+        
     def add_agol_upload(self, **kwargs):
         '''
         currently passing snippets as kwarg but could be drawn from column in

@@ -2,8 +2,11 @@ import os
 import pandas as pd
 import math
 import sys
-# sys.path = [p for p in sys.path if '86' not in p]
-import arcpy
+try:
+    sys.path = [p for p in sys.path if '86' not in p]
+    import arcpy
+except ModuleNotFoundError:
+    print('Running utilities without Arcpy')
 import numpy as np
 import datetime
 import time
@@ -627,7 +630,7 @@ def get_overlap(ds1, ds2, **kwarg):
     # if you want to return intersections include this
     try:
         reservoir_name = kwarg['reservoir_name']
-        with open('C:/Users/uhlmann/box_offline/bathymetry_project/overlap_extents_{}.txt'.format(reservoir_name), 'w') as text_file:
+        with open('D:/box_offline/bathymetry_project/bathymetry_project/overlap_extents_{}.txt'.format(reservoir_name), 'w') as text_file:
             text_file.write('intersection: {}'.format(intersection))
     except KeyError:
         pass
@@ -1128,7 +1131,7 @@ def return_fields(fp_in, fp_out):
     fields_obj = arcpy.ListFields(fp_in)
     fields = [field.name.encode('utf-8') for field in fields_obj]
     dtype = [field.type for field in fields_obj]
-    df = pd.DataFrame(np.column_stack([fields, dtype]), columns = ['attributes', 'dtype'])
+    df = pd.DataFrame(np.column_stack([fields, dtype]), columns = ['original_fields', 'dtype'])
     pd.DataFrame.to_csv(df, fp_out)
 
 def cursor_merge(fp_csv, fp_list, add_fp_source_field = True):
@@ -1137,3 +1140,49 @@ def cursor_merge(fp_csv, fp_list, add_fp_source_field = True):
     feature_id_unique = set(feature_id)
     num_features = len(feature_id_unique)
     target_df = df[df.feature_id == feature_id_unique[0]]
+
+def mxd_inventory_temp(mxd_dir):
+    '''
+    Possibly redundant function.  inventory for management plans - Camas MP2
+    20210104
+    '''
+    mxd_list = [item for item in os.listdir(mxd_dir) if os.path.splitext(item)[-1] == '.mxd']
+    fp_mxd_list = [os.path.join(mxd_dir, item) for item in mxd_list]
+    visible_lyr = []
+    visible_lyr_source = []
+    mxd_list_csv = []
+    ct = 1
+    for idx, mxd in enumerate(fp_mxd_list):
+        mxd_obj = arcpy.mapping.MapDocument(mxd)
+        lyr_list = arcpy.mapping.ListLayers(mxd_obj)
+        temp1 = []
+        temp2 = []
+        ct+=1
+        for lyr in lyr_list:
+            if (lyr.supports("DATASOURCE")) & (lyr.visible):
+                temp1.append(lyr.name)
+                temp2.append(lyr.dataSource)
+        visible_lyr.extend(temp1)
+        visible_lyr_source.extend(temp2)
+        temp_name = [mxd_list[idx]] * len(temp1)
+        mxd_list_csv.extend(temp_name)
+    df = pd.DataFrame(np.column_stack([mxd_list_csv, visible_lyr, visible_lyr_source]), columns = ['filename', 'layer_name', 'layer_source'])
+    fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP2\mp2_inventory.csv'
+    pd.DataFrame.to_csv(df, fp_out)
+
+
+def delete_features(fp_csv):
+    '''
+    pass a csv and delete indicated features from gdb
+    csv should include:
+    fp_feat                 file path to feature
+    remove_feature          Boolean
+    feature_name            name of feature
+    '''
+    df = pd.DataFrame.from_csv(fp_csv)
+    df_selection = df[df.remove_feature == True]
+    fp_feat = df_selection.fp_feat.tolist()
+    feat_name = df_selection.feature_name.tolist()
+    for feat, feat_name in zip(fp_feat, feat_name):
+        print('DELETING: {}'.format(feat_name))
+        arcpy.Delete_management(feat)

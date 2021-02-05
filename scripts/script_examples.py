@@ -1,16 +1,65 @@
 import os
 import arcpy
+import numpy as np
+import sys
+sys.path.append('C:/Users/uhlmann/code')
+import utilities
 
-# merge example 12/6/2020
-fp_restoration = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\working.gdb\restoration'
-# Note - pound signs turn lines into comments that are for notes NOT executing
-# os.path.join will create a file path by adding the CESO_KRC_Interim21_2019 string to the restoration dataset path:
-# i.e.  fp_ceso = ...\working.gdb\restoration\CESO_KRC_Interim21_2019'
-fp_ceso = os.path.join(fp_restoration, 'CESO_KRC_Interim21_2019')
-fp_taca = os.path.join(fp_restoration, 'TACA_KRC_Interim21_2019')
-fp_weeds_misc = os.path.join(fp_restoration, 'MISC_Weeds_KRC_Interim21_2019')
-fp_out = os.path.join(fp_restoration, 'select_klamath_invasive_weeds_NISIMS')
-arcpy.Merge_management([fp_ceso, fp_taca, fp_weeds_misc], fp_out)
+#https://gis.stackexchange.com/questions/26369/get-all-the-points-of-a-polyline
+#Inputs from user parameters
+# InFc  = arcpy.GetParameterAsText(0) # input feature class
+fp_orders = utilities.get_path(27)
+InFc = os.path.join(fp_orders, 'MP_CAM_g_anno_vfrm//c2410_vfrm')
+
+# Spatial reference of input feature class
+SR = arcpy.Describe(InFc).spatialReference
+
+# Create NumPy array from input feature class
+arr = arcpy.da.FeatureClassToNumPyArray(InFc,["SHAPE@XY"], spatial_reference=SR, explode_to_points=True)
+e1 = arr[0][0][0]
+e2 = arr[1][0][0]
+e3 = arr[2][0][0]
+e4 = arr[3][0][0]
+
+n1 = arr[0][0][1]
+n2 = arr[1][0][1]
+n3 = arr[2][0][1]
+n4 = arr[3][0][1]
+
+def get_hypotenuse(opp_len, adj_len):
+    rad = np.arctan(opp_len/adj_len)
+    return(rad)
+
+delt_e1 = abs(e1 - e2)
+delt_n1 = abs(n1 - n2)
+rad1 = get_hypotenuse(delt_e1, delt_n1)
+
+delt_e2 = abs(e2 - e3)
+delt_n2 = abs(n2 - n3)
+rad2 = get_hypotenuse(delt_e2, delt_n2)
+
+len1_e = delt_e1 / np.sin(rad1)
+len2_e = delt_e2 / np.sin(rad2)
+len1_n = delt_n1 / np.cos(rad1)
+len2_n = delt_n2 / np.cos(rad2)
+
+print(len1_e, len2_e, len1_n, len2_n)
+for vert in arr[:-1]:
+    if 'min_e' not in locals():
+         min_e = vert[0][0]
+         max_e = vert[0][0]
+         min_n = vert[0][1]
+         max_n = vert[0][1]
+    else:
+        min_e = min(min_e, vert[0][0])
+        max_e = max(max_e, vert[0][0])
+        min_n = min(min_n, vert[0][1])
+        max_n = max(max_n, vert[0][1])
 
 
-# copy all shapefiles
+extents = [min_e - len2_e / 2, max_e - len2_e / 2,min_n - (len1_n /2) / 0.8, max_n - (len1_n/2) / 0.8]
+rotate = np.degrees(rad1)
+
+print('{}\n{}\n{}\n{}\n'.format(min_e, max_e, min_n, max_n))
+print(extents)
+print(rotate)

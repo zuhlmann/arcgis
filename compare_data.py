@@ -127,7 +127,7 @@ def unpack_list(list_in, arcobj):
     return(fields_out)
 
 
-def file_paths_arc(folder_or_gdb, want_df):
+def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
     '''
     ZRU 5/6/2020
     returns list of all paths to feature classes including path/to/featureDataset/features
@@ -145,7 +145,11 @@ def file_paths_arc(folder_or_gdb, want_df):
     # standalone_feats = arcpy.ListFeatureClasses()
     # dsets = [dset.decode('utf-8') for dset in arcpy.ListDatasets()]
     # # note python 2.7 likes:
-    dsets = [dset for dset in arcpy.ListDatasets()]
+
+    if dset_desired.lower() != 'All':
+        dsets = [dsets_desired]
+    else:
+        dsets = [dset for dset in arcpy.ListDatasets()]
     path_to_dset = []
     path_to_feat = []
     feats_df = []
@@ -168,7 +172,6 @@ def file_paths_arc(folder_or_gdb, want_df):
         df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat]),
                             columns = ['feature_name', 'feature_dataset', 'fp_feat'])
     return(df)
-    print(df)
 
 def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):
     '''

@@ -244,8 +244,8 @@ fp_ramp = os.path.join(fp_request_mp, 'Stantec_RAMP_Trib_MP')
 #     utilities.mxd_inventory(mxd, pdf, fp_kp_mp_v3)
 
 # # RAMP Stantec
-# fp_mxd_ramp = fp_ramp + '//Protected Areas.mxd'
-# utilities.mxd_inventory(fp_mxd_ramp, 'Protected Areas future fig', fp_ramp)
+# fp_mxd_yreka = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP2\CA_PWMP_3_0_1_yreka.mxd'
+# utilities.mxd_inventory(fp_mxd_yreka, 'yreka_waterline_fig', os.path.split(fp_mxd_yreka)[0])
 
 # # RES salmonid
 # fp_fish_presence_mp = os.path.join(utilities.get_path(26), 'RES_MPs//fish_presence_MP')
@@ -278,13 +278,6 @@ fp_ramp = os.path.join(fp_request_mp, 'Stantec_RAMP_Trib_MP')
 #     pd.DataFrame.to_csv(df, fp_out)
 # for fp_mxd, fig_name in zip(fp_mxds, fig_names):
 #     utilities.mxd_inventory(fp_mxd, fig_name, fp_MP_base)
-
-# 5c) One file inventory - KRRC Feasibility
-fp_mxd = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP1\Osprey_Nests_12_15_2020.mxd'
-fp_pdf = 'Osprey_Nests_12_15_2020_version_final.pdf'
-fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP1\camas_figures_delivered\draft3_20201211'
-utilities.mxd_inventory(fp_mxd, fp_pdf, fp_out)
-
 
 # # 6) Merge multiple files
 # # Juvenile Salmanoid
@@ -408,6 +401,25 @@ utilities.mxd_inventory(fp_mxd, fp_pdf, fp_out)
 # 3.
 # LAYER NAME: Klamath River and Tributaries
 # DATA SOURCE: C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\new_data_downloads\juvenille_salmamoid_RES_MP\p12\klamath_river_full.gdb\Placemarks\Polylines
+
+# # 100 DELETE FEATURES
+# # A) Create csv and set True those feats to remove
+# fp = 'C://Users//uhlmann//Documents//ArcGIS//Default1.gdb'
+# fp_out = os.path.join(utilities.get_path(26), 'low100_components_default_gdb.csv')
+# # arcpy.env.workspace = fp
+# # feats = arcpy.ListFeatureClasses()
+# # fp_list = [os.path.join(fp, feat) for feat in feats]
+# # remove_list = [False] * len(feats)
+# # df = pd.DataFrame(np.column_stack([feats, fp_list, remove_list]), columns = ['feature_name', 'fp_feat', 'remove_feature'])
+# # pd.DataFrame.to_csv(df, fp_out)
+# # # B) Delete unwanted feats
+# utilities.delete_features(fp_out)
+
+fp_camas_waste = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_Management_Plans\Camas_MPs\MP3\Maps'
+fp_out = os.path.join(fp_camas_waste, 'waste_disposal_MP_inventory.csv')
+pdfs = os.listdir(fp_camas_waste)
+df = pd.DataFrame(pdfs, columns = ['filenames'])
+pd.DataFrame.to_csv(df, fp_out)
 
 # joining csv
 # from https://gis.stackexchange.com/questions/233262/import-csv-file-into-table-with-arcpy

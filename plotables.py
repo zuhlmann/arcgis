@@ -45,7 +45,7 @@ class Plotables(object):
         cbar.ax.tick_params(labelsize = 8)
         h.set_clim(minC, maxC)
         fig.suptitle(suptitle_string)
-        plt.savefig(file_path_out, dpi = 180)
+        plt.savefig(file_path_out, dpi = 300)
 
     def cb_readable(self, list_or_array, flag, num_ticks):
         ''' this just gives tick marks plotting '''
@@ -55,40 +55,48 @@ class Plotables(object):
         # tkmn, tkmx = colormap min, max scalers
         # cbmn, cbmx = colorbar tick min, max scalers
         # NOTE: tkmx HARDCODED. Just change this to desired clipping value
-
         if flag.upper() == 'A':
             mn = np.nanmin(list_or_array)
             mx = np.nanmax(list_or_array)
         elif flag.upper() == 'L':
             mn = list_or_array[0]
             mx = list_or_array[1]
+            print('mn {} mx {} within elif'.format(mn,mx))
 
 
         val_range = mx - mn
+        print('val range {}'.format(val_range))
 
-        shift_multiplier = 0.1
-        if mn < 0:
-            mn -= mn * shift_multiplier
-        else:
-            mn += mn * shift_multiplier
-        if mx < 0:
-            mx += mx * shift_multiplier
-        else:
-            mx -= mx * shift_multiplier
+        # shift_multiplier = 0.1
+        # if mn < 0:
+        #     mn -= mn * shift_multiplier
+        # else:
+        #     mn += mn * shift_multiplier
+        # if mx < 0:
+        #     mx += mx * shift_multiplier
+        # else:
+        #     mx -= mx * shift_multiplier
 
         # Go through val range scenarios
         if val_range < 0.1:
             self.cb_range = np.array([mn, mx])
         else:
+            print('mn {} mx {} num_ticks {}'.format(mn,mx,num_ticks))
             cb_range = np.linspace(mn, mx, num_ticks)
-            if val_range < 100*.5:
-                self.cb_range = self.range_cust(cb_range, 1)
-            elif val_range < 100*1:
-                self.cb_range = self.range_cust(cb_range, 0)
-            elif val_range < 100*10:
-                self.cb_range = self.range_cust(cb_range, -1)
-            elif val_range < 1000*10:
-                self.cb_range = self.range_cust(cb_range, -2)
+            print('cb_range in function {}'.format(cb_range))
+            cb_range = cb_range.tolist()
+            cb_range = [int(item) for item in cb_range]
+            # cb_range = [round(item, 1) for item in cb_range]
+            self.cb_range = cb_range
+
+        #     if val_range < 100*.5:
+        #         self.cb_range = self.range_cust(cb_range, 1)
+        #     elif val_range < 100*1:
+        #         self.cb_range = self.range_cust(cb_range, 0)
+        #     elif val_range < 100*10:
+        #         self.cb_range = self.range_cust(cb_range, -1)
+        #     elif val_range < 1000*10:
+        #         self.cb_range = self.range_cust(cb_range, -2)
         # rd = input('min = {:.2} max = {:2}  \n enter rounding precision as integer  \n ex) -1 = nearest 10, 2 = two decimal places: \n '.format(mn,mx))
 
     def dist_subP(self, num_subP):
@@ -135,9 +143,13 @@ class Plotables(object):
         # np.linspace will pull just one value in this case
         # colorsbad = plt.cm.Set1_r(np.linspace(0., 1, 1))
         colorsbad = np.array([0.9, 0.9, 0.9, 1]).reshape((1, 4))
-        colors1 = cmocean.cm.matter_r(np.linspace(0., 1, 126))
-        colors2 = plt.cm.Blues(np.linspace(0, 1, 126))
-        colors = np.vstack((colorsbad, colors1, colorsbad, colorsbad, colors2, colorsbad))
+        colors1 = cmocean.cm.matter_r(np.linspace(0., 1, 127))
+        colors2 = plt.cm.Blues(np.linspace(0, 1, 127))
+        colors = np.vstack((colors1, colorsbad, colorsbad, colors2))
+        # note was originally:
+        # colors1 = cmocean.cm.matter_r(np.linspace(0., 1, 126))
+        # colors2 = plt.cm.Blues(np.linspace(0, 1, 126))
+        # colors = np.vstack((colorsbad, colors1, colorsbad, colorsbad, colors2, colorsbad))
         mymap = mcolors.LinearSegmentedColormap.from_list('my_colormap', colors)
         mymap.set_bad('white', 1)
         cmap = copy.copy(mymap)

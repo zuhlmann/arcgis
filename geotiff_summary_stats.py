@@ -6,7 +6,7 @@ import gdal
 import matplotlib.pyplot as plt
 import copy
 import plotables as pltz
-import math
+from math import floor, ceil, log10
 
 fp_box_offline_d = utilities.get_path(28)
 fp_JCB_10 = os.path.join(fp_box_offline_d, 'bathymetry_project\\JCB_1ft_2010_nad83.tif')
@@ -180,28 +180,52 @@ max_gain = 0
 hist_res_list = []
 edges_list = []
 reservoirs = ['J.C. Boyle', 'Copco', 'Iron Gate']
+# fig_num = ['a)', 'b)', 'c)']
+# from https://stackoverflow.com/questions/3410976/how-to-round-a-number-to-significant-figures-in-python
+round_to_n = lambda x, n: round(x, -int(floor(log10(x))) + (n - 1))
 for arr in arr_list:
     arr_nan = copy.copy(arr)
     arr_nan[arr_nan == np.min(arr_nan)] = np.nan
     arr_min = np.nanpercentile(arr_nan, 1)
     arr_max = np.nanpercentile(arr_nan, 99)
-    arr_range = math.ceil(arr_max) - math.floor(arr_min)
-    bin_edges = np.arange(math.floor(arr_min), math.ceil(arr_max) + 1, 0.25)
+    arr_range = ceil(arr_max) - floor(arr_min)
+    bin_edges = np.arange(floor(arr_min), ceil(arr_max) + 1, 0.25)
     max_loss = min(bin_edges[0], max_loss)
     max_gain = max(bin_edges[-1], max_gain)
-    hist_res, edges = np.histogram(arr_nan, bin_edges)
-    hist_res_list.append(hist_res)
-    edges_list.append(edges)
+    edges_list.append(bin_edges)
 
+fig, ax = plt.subplots(3)
 for idx in range(len(reservoirs)):
-    edges = edges_list[idx]
-    hist = hist_res_list[idx]
     reservoir = reservoirs[idx]
-    reservoir_formatted = reservoir.replace('.','').replace(' ', '_')
-    plt.bar(edges[:-1], hist, color = 'brown')
-    plt.xlim(max_loss, max_gain)
-    plt.title(reservoir)
-    # ig.suptitle(suptitle_string)
-    fname = 'histogram_{}_2002_to_2018_change.png'.format(reservoir_formatted)
-    fp_out = os.path.join(fp_box_offline_d, 'bathymetry_project\\for_matt_robart_20210128', fname)
-    plt.savefig(fp_out, dpi = 300)
+    # reservoir_formatted = reservoir.replace('.','').replace(' ', '_')
+    edges = edges_list[idx]
+    arr_nan = arr_list[idx]
+    # temp = object with temp[0] = bin values
+    temp = ax[idx].hist(arr_nan[~np.isnan(arr_nan)], edges[:-1], color = 'brown')
+    # get ytickmarks
+    # extract as function as some point
+    yticks = temp[0]
+    yticks = yticks.tolist()
+    yticks.sort()
+    middle_tick = yticks[-1]  * 0.5
+    # pull ~middle and last highest value
+    yticks = [middle_tick, yticks[-1]]
+    # buffer top of tick marks
+    yticks[-1] = yticks[-1] * 1.1
+    yticks = [round_to_n(item, 5) for item in yticks]
+    # value of 0 will create ValueError in log10(0)
+    # add first tick manually
+    yticks_final = [0]
+    yticks_final.extend(yticks)
+    ax[idx].set_yticks(yticks_final)
+    ax[idx].set_xlim(max_loss, max_gain)
+    ax[idx].set_xlabel('Difference in bathymetric surface (ft)')
+    # title_str = '{} {}'.format(fig_num[idx], reservoir)
+    ax[idx].set_title(reservoir, position = (0.85,0.7))
+    ax[idx].label_outer()
+
+fig.suptitle('Distribution of Bathymetric Change')
+fig.text(0.01, 0.5, 'Frequency', va = 'center', rotation = 'vertical')
+fname = 'histogram_2002_to_2018_change2.png'
+fp_out = os.path.join(fp_box_offline_d, 'bathymetry_project\\for_matt_robart_20210128', fname)
+plt.savefig(fp_out, dpi = 300)

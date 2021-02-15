@@ -740,7 +740,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     try:
         mxd_list = kwargs['select_mxds']
         if not isinstance(mxd_list, list):
-            mxd_list = list(mxd_list)
+            mxd_list = [mxd_list]
     except KeyError:
         mxd_list = [item for item in os.listdir(fp_base) if '.mxd' in item]
     fp_mxd_list = [os.path.join(fp_base, fname_mxd) for fname_mxd in mxd_list]

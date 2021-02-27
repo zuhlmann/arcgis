@@ -1186,3 +1186,27 @@ def delete_features(fp_csv):
     for feat, feat_name in zip(fp_feat, feat_name):
         print('DELETING: {}'.format(feat_name))
         arcpy.Delete_management(feat)
+
+def files_in_folder(fp_in, csv_name, ext = 'mxd', return_df = False):
+    '''
+    quick function could use improvement. Saves csv of files in fp_in matching
+    extentsion provided (mxd is default).  Pass return_df = True to return df
+    instead. ZU 20210226
+
+    fp_in           file path in
+    fp_out          path to csv with ext
+    ext             extentsion to hunt. default is .mxd
+    return_df       pass True if want to returen df INSTEAD of saving to csv
+    '''
+    from pathlib import Path
+
+    # https://stackoverflow.com/questions/168409/how-do-you-get-a-directory-listing-sorted-by-creation-date-in-python
+    paths = sorted(Path(fp_in).iterdir(), key=os.path.getmtime)
+    paths.reverse()
+    file_matching_ext =[f.name for f in paths if '.{}'.format(ext) == os.path.splitext(f.name)[-1]]
+    df = pd.DataFrame(file_matching_ext)
+    if not return_df:
+        fp_out = os.path.join(fp_in, csv_name)
+        pd.DataFrame.to_csv(df, fp_out)
+    else:
+        return(df)

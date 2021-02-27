@@ -135,6 +135,9 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
     ARGS:
     folder_or_gdb       Currently designed for a gdb
     want_df                  boolean - if True, output dataframe
+    dsets_desired           default to ALL.  Or pass list of dataset names.  Final
+                            option pass 'none' if just want standalone.  Note:
+                            'all' will include standalone.
     RETURNS:
     path_to_dset_feats          list of paths/to/dataset/feature
     '''
@@ -146,11 +149,12 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
     # dsets = [dset.decode('utf-8') for dset in arcpy.ListDatasets()]
     # # note python 2.7 likes:
 
-    if dset_desired.lower() != 'All':
+    if dsets_desired.lower() != 'all':
         dsets = [dsets_desired]
+    elif dsets_desired.lower() == 'none':
+        dsets = []
     else:
         dsets = [dset for dset in arcpy.ListDatasets()]
-    path_to_dset = []
     path_to_feat = []
     feats_df = []
     dsets_df =[]
@@ -158,7 +162,6 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
         feats = arcpy.ListFeatureClasses(feature_dataset = dset)
         for feat in feats:
             print(feat)
-            path_to_dset.append('{}//{}'.format(folder_or_gdb, dset))
             if want_df:
                 # append feat name
                 feats_df.append(feat)
@@ -168,6 +171,18 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
                 path_to_feat.append(os.path.join(folder_or_gdb, dset, feat))
             else:
                 df = 'FIX LATER'
+
+    # now for feats in gdb itself (NOT in a dset)
+    feats_standalone = arcpy.ListFeatureClasses()
+    for feat in feats_standalone:
+        print(feat)
+        # append feat name
+        feats_df.append(feat)
+        # repeat dset name for every feature layer within it
+        dsets_df.append(None)
+        # returns a dataframe for manually comparing tables with changed feature names
+        path_to_feat.append(os.path.join(folder_or_gdb, feat))
+
     if want_df:
         df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat]),
                             columns = ['feature_name', 'feature_dataset', 'fp_feat'])

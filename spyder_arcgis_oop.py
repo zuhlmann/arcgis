@@ -16,13 +16,18 @@ import utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
+sys.path = [p for p in sys.path if '86' not in p]
+import arcpy
 
 
 class metaData(object):
-    def __init__(self, fp_csv):
+    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
         self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
         # scratch copy to add working data NOT intended for retainingin updated csv/database
         self.df_working = self.df.copy(deep = True)
+        # fp_csv_archive creation.
+        todays_date = datetime.datetime.today().strftime('%B %d %Y')
+        self.fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], todays_date)
 
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
@@ -36,11 +41,14 @@ class metaData(object):
         utilities.zipShapefilesInDir(inDir, outDir)
         setattr(self, 'outDir', outDir)
 
-    def selection_idx(self, **kwargs):
+    def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
         indices.  Use kwargs to indicate type
         ARGS:
+        df_str:                     same as add_df and duplicate_column - string to
+                                    access dataframe assigned to self.  Allows
+                                    to select non item_descriptions.csv ZU march 2021
         target_tags (kwarg)         item or list of strings with desired tags
         indices (kwargs)            integer zero based indices - iloc. list of int
         alternative_select_col      dictionary with one key and val.  Created for
@@ -48,14 +56,14 @@ class metaData(object):
                                     groups want different layers uploaded.
         '''
         # SELECT BY TAGS
-        print('did this add')
+        df = getattr(self, df_str)
         try:
             target_tag = kwargs['target_tag']
             # list will be passed for multiple target tags
             if not isinstance(target_tag, list):
                 target_tag = [target_tag]
             # pull tags column from df (list)
-            parsed_list = self.parse_comma_sep_list(col_to_parse = 'TAGS')
+            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'TAGS')
             self.tags_from_df = parsed_list
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_tag if (isinstance(tags, list)) and (val_targ in tags)]
@@ -75,7 +83,7 @@ class metaData(object):
             iloc_tag = list(set(iloc_temp))
             # get index names from iloc vals
             self.indices_iloc = copy.copy(iloc_tag)
-            self.indices = self.df.iloc[iloc_tag].index.tolist()
+            self.indices = df.iloc[iloc_tag].index.tolist()
         # see if another target keyword is passed
         except KeyError:
             pass
@@ -87,9 +95,16 @@ class metaData(object):
             if not isinstance(target_action, list):
                 target_action = [target_action]
             # pull tags column from df (list)
-            parsed_list = self.parse_comma_sep_list(col_to_parse = 'ACTION')
+            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ACTION')
+            print(parsed_list)
+
+            # get proper df
+            df_working_str = '{}_working'.format(df_str)
+            df_working = getattr(self, df_working_str)
+
             # add actions to working dataframe
-            self.df_working.assign(target_action = parsed_list)
+            df_working.assign(target_action = parsed_list)
+            setattr(self, df_working_str, df_working)
 
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
@@ -113,7 +128,7 @@ class metaData(object):
             iloc_action = list(set(iloc_temp))
             # get index names from iloc vals
             self.indices_iloc = copy.copy(iloc_action)
-            self.indices = self.df.iloc[iloc_action].index.tolist()
+            self.indices = df.iloc[iloc_action].index.tolist()
             # if not tags selection then indices will be     passed
         except KeyError:
             pass
@@ -131,12 +146,12 @@ class metaData(object):
             try:
                 int(indices[0])
                 print('indices {}'.format(indices))
-                self.indices = self.df.iloc[indices].index.tolist()
+                self.indices = df.iloc[indices].index.tolist()
                 self.indices_iloc = copy.copy(indices)
             # If indices were index_column vals (stirng)
             except ValueError:
                 try:
-                    self.indices = self.df.loc[indices].index.tolist()
+                    self.indices = df.loc[indices].index.tolist()
                 #Check that the index_col vals passes EXIST
                 except KeyError:
                     print('index_col indices are not in index.  For examples\n'
@@ -151,7 +166,7 @@ class metaData(object):
             col_title = list(indices_dict.keys())[0]
             target_val = list(indices_dict.values())[0]
             # note a1), despite df.loc[] with just [], since subsetting we get a dataframe
-            self.indices = self.df.loc[self.df[col_title] == target_val].index.tolist()
+            self.indices = df.loc[self.df[col_title] == target_val].index.tolist()
             # get iloc vals TURN INTO FUNCTION SOMETIME
             iloc_temp = []
             ct = 0
@@ -166,11 +181,12 @@ class metaData(object):
             self.indices_iloc = iloc_temp
         except KeyError:
             pass
-    def parse_comma_sep_list(self, col_to_parse):
+    def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
         '''
-        csl = self.df[col_to_parse].values.tolist()
+        df = getattr(self, df_str)
+        csl = df[col_to_parse].values.tolist()
         parsed_csl_temp = []
         for items in csl:
             try:
@@ -235,12 +251,15 @@ class metaData(object):
 
 
 
-    def write_xml(self, **kwargs):
+    def write_xml(self, df_str, **kwargs):
         '''
         Update metadata to include assemble_metadata() statement or skip that
         step and add lines to existing Item Description.  This can be fleshed
         out to include add_credits, add_abstract too.
         ARGUMENTS
+        df_str:                     same as add_df and duplicate_column - string to
+                                    access dataframe assigned to self.  Allows
+                                    to select non item_descriptions.csv ZU march 2021
         add_lines_purp (kwargs):    comma separated entry from item_desc with items
                                     being column titles from item_desc.
                                     i.e. DATA_LOCATION_MCMILLEN_JACOBS
@@ -269,7 +288,7 @@ class metaData(object):
         # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
         # need to fix all columns in this regard when writing xml
         # FIX THIS it is not prepared to handle other cases.
-        add_new_purp_list = self.parse_comma_sep_list(col_to_parse = 'ADD_LINES_PURP')
+        add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
         for idx, fp_xml in enumerate(fp_xml_orig):
             print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
             ct+=1
@@ -439,15 +458,161 @@ class metaData(object):
         fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\data_hunting_and_inventory\agol_klamath_data_assessment_2021b.csv'
         pd.DataFrame.to_csv(df_quick_inventory, fp_out)
 
+    def add_df(self, fp_csv, df_str, index_field):
+        '''
+        for adding additional dataframes. ZU 20210302
+        fp_csv              path to new csv
+        df_str               i.e. df2 or mxd_inventory
+        index_field         for assigning index_col in DataFrame constructor
+        '''
+        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype='str')
+        setattr(self, df_str, df)
+        # create working copy
+        df_working_str = '{}_working'.format(df_str)
+        setattr(self, df_working_str, df.copy(deep = True))
+    def take_action_delete(self, action_type = 'delete'):
+        for index in self.indices:
+            fp_fcs = self.df.loc[index]['DATA_LOCATION_MCMILLEN_JACOBS']
+            if arcpy.Exists(fp_fcs):
+                print('deleting feature: {}'.format(index))
+                arcpy.Delete_management(fp_fcs)
+                self.df_working.drop(index, inplace = True)
+            else:
+                print('feature with ACTION == delete does not exist\n:{}'.format(index))
+        pd.DataFrame.to_csv(self.df_working, self.fp_csv_archive)
+            # pd.DataFrame.to_csv(self.df, self.fp_csv_archive)
+
+    def df_sets(self, df_list, col_list):
+        '''
+        utility to find overlapping and symmetric differences between different
+        dataframes and columns.  Can add more funcitonality.  ZU 20210301
+        Protocol: first agolZ.add_df (x2) for two csvs.  Then find overlapping
+        values in selected fields (col_list).
+        this was used to determine if a csv of inventories contained all mxds in another
+        csv for the ramp
+        ARGUMENTS
+        df_list         ['dataframe1', 'dataframe2']
+        col_list        ['col_dframe1', 'col_dframe2'] At this point, col_list items
+                        cannot be index fields
+        '''
+        df1_str = df_list[0]
+        df2_str = df_list[1]
+        df1 = getattr(self, df1_str)
+        df2 = getattr(self, df2_str)
+        col1 = col_list[0]
+        col2 = col_list[1]
+        set1 = set(df1[col1])
+        set2 = set(df2[col2])
+        df1_present_df2_absent = set1.difference(set2)
+        df2_present_df1_absent = set2.difference(set1)
+        df_names = [df1_str] * len(df1_present_df2_absent) + [df2_str] * len(df2_present_df1_absent)
+        symmetric_diff = list(df1_present_df2_absent) + list(df2_present_df1_absent)
+        df_symm_diff = pd.DataFrame(np.column_stack([df_names, symmetric_diff]),
+                    columns = ['field_name', 'data'])
+        df_name = '{}_{}_symmetric_difference'.format(df1_str, df2_str)
+        setattr(self, df_name, df_symm_diff)
+        print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
+    def mark_duplicate_rows(self, df_str, target_col):
+        '''
+        function for finding duplicates from "seen = set()" to "seen.add()"
+        should be decomposed into utilities and imported here.
+        This funciton was used when cleaning up the Klamath mess to find duplicate
+        files used so I would not delete a fc that was turned off (unnecessary)
+        in one map, but present in another 200 rows down.  ZU 20210302
+        ARGUMENTS
+        df_str                  string to access dataframe attribute.  Note: use
+                                self.add_df(fp_csv_target) to add dataframe to
+                                object
+        target_col              column in dataframe to find duplicates
+        '''
+        df = getattr(self, df_str)
+        # adapted from here:
+        # https://stackoverflow.com/questions/9835762/how-do-i-find-the-duplicates-in-a-list-and-create-another-list-with-them
+        seen = set()
+        dup = []
+        target_lst = df[target_col].to_list()
+        for x in target_lst:
+            if x in seen:
+                dup.append(x)
+            else:
+                seen.add(x)
+        # remove duplicate duplicates
+        dup = list(set(dup))
+        # initiate new column
+        df['duplicate'] = math.nan
+        for idx, item in enumerate(dup):
+            loc = df.index[df[target_col] == item]
+            df.loc[loc, 'duplicate'] = idx
+        # setattr to replace original dataframe with new df with added col
+        setattr(self, df_str, df)
+
+    def merge_feats(self, df_str, target_fc, action = 'merge', **kwargs):
+        '''
+        belongs in python 2 mxd_utilities with arcpy.Mapping module, but that shit's
+        broken.  ZU 3/3/2021.  updated 3/10/21
+        ARGUMENTS
+        kwargs[field_mappings]      list of fields to RETAIN.  Additionally, orig_fname
+                                    and orig_fpath will be added
+        df_str                      select dataframe from self
+        target_fc                   output fc
+        action                      just merge at this point
+        '''
+
+        arcpy.env.overwriteOutput = True
+        merge_lyrs = []
+        # if field mappings requested
+        try:
+            fields_to_map = kwargs['field_mappings']
+            if not isinstance(fields_to_map, list):
+                fields_to_map = [fields_to_map]
+            field_mappings = arcpy.FieldMappings()
+            field_mappings_true = True
+        except KeyError:
+            field_mappings_true = False
+
+        for i, index in enumerate(self.indices):
+            df = getattr(self, df_str)
+            # replace or else unicode error
+            fp_fcs = df.loc[index]['layer_source'].replace('\\','/')
+            fcs_name = os.path.basename(fp_fcs)
+            if arcpy.Exists(fp_fcs):
+                lyr_name = 'merge_lyr_{}'.format(i + 1)
+                fcs_obj = arcpy.FeatureClassToFeatureClass_conversion(fp_fcs, 'in_memory', lyr_name)
+                # get feature path
+                lyr_path = fcs_obj[0]
+                # add new field
+                print('adding fname {}'.format(fcs_name))
+                arcpy.AddField_management(lyr_path, 'orig_fname', 'text', field_length = 50)
+                arcpy.CalculateField_management(lyr_path, 'orig_fname', '"{}"'.format(fcs_name), "PYTHON")
+                arcpy.AddField_management(lyr_path, 'orig_fpath', 'text',field_length = 254)
+                arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"'+fp_fcs+'"', "PYTHON")
+                # arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"{}"'.format(fp_fcs), "PYTHON")
+                print('adding fcs to merge list:\n{}'.format(fcs_name))
+                merge_lyrs.append(lyr_path)  #list of feat names
+                if field_mappings_true:
+                    field_mappings.addTable(lyr_path)
+            else:
+                print('feature with ACTION == delete does not exist:\n{}'.format(fcs_name))
+        # direct from field mappings arc documentation
+        fields_to_map.extend(['orig_fname', 'orig_fpath'])
+        if field_mappings_true:
+            for field in field_mappings.fields:
+                if field.name not in fields_to_map:
+                    field_mappings.removeFieldMap(field_mappings.findFieldMapIndex(field.name))
+            arcpy.Merge_management(merge_lyrs, target_fc, field_mappings)
+        else:
+            arcpy.Merge_management(merge_lyrs, target_fc)
+
 class AgolAccess(metaData):
     '''
     Basic init for AGOL access
     '''
 
-    def __init__(self, credentials, fp_csv):
+    def __init__(self, fp_csv, credentials):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
+        super().__init__(fp_csv)
         u_name = 'uhlmann@mcmjac.com'
         u_name2 = 'zuhlmann@mcmjac.com'
         p_word = 'Gebretekle24!'
@@ -456,7 +621,6 @@ class AgolAccess(metaData):
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
         self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
-        super(AgolAccess, self).__init__(fp_csv)
 
     def get_group(self, group_key):
         '''
@@ -522,6 +686,7 @@ class AgolAccess(metaData):
                             # idloc = (self.df_working.ITEM == title).idxmax()
                             # fancy method to value for action at idloc
                             initial_vals = self.df_working.at[title, 'ACTION']
+                            # basically parse comma separated While removing spaces
                             updated_vals = [vals.strip(' ') for vals in initial_vals.split(',')]
                             updated_vals.remove('remove')
                             # if no actions remain, then set to nan
@@ -542,12 +707,16 @@ class AgolAccess(metaData):
             ct += 1
         fp_out = r'C:\Users\uhlmann\code\item_description_updated_test.csv'
         pd.DataFrame.to_csv(self.df_working, fp_out)
-        
+
+
     def add_agol_upload(self, **kwargs):
         '''
         currently passing snippets as kwarg but could be drawn from column in
         csv in future.  shapefiles need to be zipped and in file structure
         before using this.
+        df_str:                     same as add_df and duplicate_column - string to
+                                    access dataframe assigned to self.  Allows
+                                    to select non item_descriptions.csv ZU march 2021
         '''
 
         # grab tags of iloc ONLY if they were zipped  CONSIDER MOVING TO def indices
@@ -563,7 +732,7 @@ class AgolAccess(metaData):
         try:
             tags = self.tags_from_df
         except AttributeError:
-            tags = self.parse_comma_sep_list('TAGS')
+            tags = self.parse_comma_sep_list(df_str, 'TAGS')
         # subset tags in index
         tags_temp = []
         for iloc in indices_loc:

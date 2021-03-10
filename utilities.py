@@ -280,27 +280,46 @@ def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     except KeyError:
         print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
-def sequential_update_field(fp, field, incr):
+def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/csv'):
     '''
-    quick tool to add sequential numbers to field
+    Fixed up to include add list of text to new field as option 2.
+    the default is adding sequential numbers (for page_num) ZU 20210304
+    ARGUMENTS
+    fp_fcs              file path to feat class
+    field               field for da.searchCursor AND if adding text, set sequential
+                        to FALSE and pass a path to csv.  Field will need to match
+                        on csv and for attribute field in fc
+    incr                option to change
+    sequential          Set to False to use the csv updating protocol
+    fp_csv              pass this if adding text field to fp_fcs
     '''
-    if isinstance(field, list):
-        pass
+
+    if sequential:
+        if isinstance(field, list):
+            pass
+        else:
+            field = [field]
+        with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
+            ct = 1
+            for row in cursor:
+                row[0] = ct
+                cursor.updateRow(row)
+                ct += incr
     else:
+        df = pd.read_csv(fp_csv)
+        text_field = df[field].to_list()
+        arcpy.AddField_management(fp_fcs, field, 'TEXT')
         field = [field]
-    with arcpy.da.UpdateCursor(fp, field) as cursor:
-        ct = 1
-        for row in cursor:
-            row[0] = ct
-            cursor.updateRow(row)
-            ct += incr
+        with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
+            for row, text_val in zip(cursor, text_field):
+                row[0] = text_val
+                cursor.updateRow(row)
 
 def buffer_and_create_feat(fp_line, fp_out, buff_dist, line_end_type = 'ROUND', dissolve_option = 'NONE'):
     '''
     ZRU 6/24/2020
     buffer and output file
     ARGS:
-
     '''
     # Attrocious hack to account for my lack of fixing file path slash issue with windows and python
     # try except to handle both .shp and feat classes from gdb
@@ -772,6 +791,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
         # plane old mxd name
     df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, visible, lyr_source]),
                     columns = ['map_name', 'layer_name', 'visible', 'layer_source'])
+
     fp_out = os.path.join(fp_base, fname_csv)
     pd.DataFrame.to_csv(df, fp_out)
 
@@ -1210,3 +1230,24 @@ def files_in_folder(fp_in, csv_name, ext = 'mxd', return_df = False):
         pd.DataFrame.to_csv(df, fp_out)
     else:
         return(df)
+
+def feat_to_feat_provenance(fcs_in, fcs_path_out, fcs_name_out):
+    '''
+    saga in passing properly formatted strings to arcpy functions (windows).
+    Must use r-path using incorrect delimeters BUT prob doesnt work when
+    passing to funcitons with SQL addAttributes so use path/to/directly however
+    you can acheive.
+    Function to copy feat and add attribute with path of original feature
+    '''
+    arcpy.env.overwriteOutput = True
+    basename = os.path.basename(fcs_in)
+    if '.shp' in basename:
+        basename = os.path.splitext(basename)[0]
+    lyr_name = r'in_memory/{}_lyr2'.format(basename)
+    arcpy.MakeFeatureLayer_management(fcs_in, lyr_name)
+    arcpy.AddField_management(lyr_name, 'fp_fc_orig', 'text')
+    # cast into proper delimeters - followed links in accepted answer
+    # https://stackoverflow.com/questions/4415259/convert-regular-python-string-to-raw-string
+    fcs_in = fcs_in.replace('\\','/')
+    arcpy.CalculateField_management(lyr_name, 'fp_fc_orig', '"'+fcs_in+'"', "PYTHON")
+    arcpy.FeatureClassToFeatureClass_conversion(lyr_name, fcs_path_out, fcs_name_out)

@@ -512,7 +512,7 @@ class metaData(object):
         df_name = '{}_{}_symmetric_difference'.format(df1_str, df2_str)
         setattr(self, df_name, df_symm_diff)
         print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
-    def mark_duplicate_rows(self, df_str, target_col):
+    def mark_duplicate_rows(self, df_str, target_col, ispath = False):
         '''
         function for finding duplicates from "seen = set()" to "seen.add()"
         should be decomposed into utilities and imported here.
@@ -531,6 +531,8 @@ class metaData(object):
         seen = set()
         dup = []
         target_lst = df[target_col].to_list()
+        if ispath:
+            target_lst = [os.path.realpath(item) for item in target_lst]
         for x in target_lst:
             if x in seen:
                 dup.append(x)

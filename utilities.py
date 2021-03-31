@@ -11,6 +11,7 @@ import numpy as np
 import datetime
 import time
 import glob
+import copy
 # from compare_data import *
 
 def show_table(display_preference):
@@ -768,6 +769,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     lyr_source = []
     mxd_name = []
     visible = []
+    min_scale, max_scale, def_query, transparency, labels = [],[],[],[],[]
     for idx, fp_mxd in enumerate(fp_mxd_list):
         mxd = arcpy.mapping.MapDocument(fp_mxd)
         mxd_name_temp = mxd_list[idx]
@@ -785,15 +787,41 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
                     visible.append('TRUE')
                 else:
                     visible.append('FALSE')
+                try:
+                    min_scale.append(getattr(lyr, 'minScale'))
+                except NameError:
+                    min_scale.append('NA')
+                try:
+                    max_scale.append(getattr(lyr, 'maxScale'))
+                except NameError:
+                    max_scale.append('NA')
+                try:
+                    transparency.append(getattr(lyr, 'transparency'))
+                except NameError:
+                    transparency.append('NA')
+                try:
+                    def_query.append(getattr(lyr, 'definitionQuery'))
+                except NameError:
+                    #name errors occur with .tifs (thus far)
+                    def_query.append('NA')
+                try:
+                    labels.append(getattr(lyr, 'showLabels'))
+                except NameError:
+                    labels.append('NA')
             else:
                 pass
 
         # plane old mxd name
-    df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, visible, lyr_source]),
-                    columns = ['map_name', 'layer_name', 'visible', 'layer_source'])
+    df = pd.DataFrame(np.column_stack([mxd_name, lyr_name, visible, lyr_source,
+                                min_scale, max_scale, def_query, transparency, labels]),
+                    columns = ['map_name', 'layer_name', 'visible', 'layer_source',
+                                'min_scale','max_scale','def_query','transparency','show_label'])
 
     fp_out = os.path.join(fp_base, fname_csv)
     pd.DataFrame.to_csv(df, fp_out)
+
+    # ADD 3/10/2021
+    # lyr.minScale, lyr.maxScale, lyr.definitionQuery, lyr.transparency, showLable
 
 def write_folder_contents(fp):
     '''
@@ -1231,23 +1259,49 @@ def files_in_folder(fp_in, csv_name, ext = 'mxd', return_df = False):
     else:
         return(df)
 
-def feat_to_feat_provenance(fcs_in, fcs_path_out, fcs_name_out):
+def feat_to_feat_provenance(fcs_in, fcs_dir_out, feat_name):
     '''
-    saga in passing properly formatted strings to arcpy functions (windows).
-    Must use r-path using incorrect delimeters BUT prob doesnt work when
-    passing to funcitons with SQL addAttributes so use path/to/directly however
-    you can acheive.
-    Function to copy feat and add attribute with path of original feature
+    copy field with orig field path attribute
     '''
-    arcpy.env.overwriteOutput = True
-    basename = os.path.basename(fcs_in)
-    if '.shp' in basename:
-        basename = os.path.splitext(basename)[0]
-    lyr_name = r'in_memory/{}_lyr2'.format(basename)
-    arcpy.MakeFeatureLayer_management(fcs_in, lyr_name)
-    arcpy.AddField_management(lyr_name, 'fp_fc_orig', 'text')
+    arcpy.FeatureClassToFeatureClass_conversion(fcs_in, fcs_dir_out, feat_name)
+    fp_fcs_copied = os.path.join(fcs_dir_out, feat_name)
+    arcpy.AddField_management(fp_fcs_copied, 'fp_fc_orig', 'text')
     # cast into proper delimeters - followed links in accepted answer
     # https://stackoverflow.com/questions/4415259/convert-regular-python-string-to-raw-string
     fcs_in = fcs_in.replace('\\','/')
-    arcpy.CalculateField_management(lyr_name, 'fp_fc_orig', '"'+fcs_in+'"', "PYTHON")
-    arcpy.FeatureClassToFeatureClass_conversion(lyr_name, fcs_path_out, fcs_name_out)
+    arcpy.CalculateField_management(fp_fcs_copied, 'fp_fc_orig', '"'+fcs_in+'"', "PYTHON")
+
+def feat_select_union(fp_in, field_name, val_list, feat_name_out):
+    fcs_list = []
+    for val in val_list:
+        sql_clause = '"{}" IN ({})'.format(field_name, val)
+        print(fp_in)
+        print(val)
+        print(sql_clause)
+        arcpy.FeatureClassToFeatureClass_conversion(fp_in, 'in_memory', val, where_clause = sql_clause)
+        fcs_list.append('in_memory/'.format(val))
+    arcpy.Union_analysis(fcs_list, 'in_memory/feat_name_out')
+
+def extract_cursor(fp_csv, feat_name_out, arc_env):
+    arcpy.env.workspace = arc_env
+    df = pd.read_csv(fp_csv)
+    lst = []
+    for i in range(len(df)):
+        fp_feat = df.iloc[i].fp_feat
+        field_name = df.iloc[i].field_name
+        target_val = df.iloc[i].target_val
+        print('FEATURE: {}\nFIELD NAME {} TARGET VAL {}'.format(fp_feat, field_name, target_val))
+        # accumulate id fields in case multiple rows in one feature
+        with arcpy.da.SearchCursor(fp_feat, [field_name, 'SHAPE@']) as cursor:
+            for row in cursor:
+                if target_val in row:
+                    # get shape field from tuple
+                    # initiate new feature
+                    if 'shapes_union' not in locals():
+                        shapes_union = copy.copy(row[1])
+                        print('initiate shapes_union')
+                    else:
+                        shapes_union = shapes_union.union(row[1])
+                        print('Perform union')
+                    lst.append(row)
+    return(lst)

@@ -764,6 +764,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     except KeyError:
         mxd_list = [item for item in os.listdir(fp_base) if '.mxd' in item]
     fp_mxd_list = [os.path.join(fp_base, fname_mxd) for fname_mxd in mxd_list]
+    # fp_mxd_list = [fp_mxd.replace('\\', '/') for fp_mxd in fp_mxd_list]
     lyr_list = []
     lyr_name = []
     lyr_source = []
@@ -771,6 +772,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     visible = []
     min_scale, max_scale, def_query, transparency, labels = [],[],[],[],[]
     for idx, fp_mxd in enumerate(fp_mxd_list):
+        print(fp_mxd)
         mxd = arcpy.mapping.MapDocument(fp_mxd)
         mxd_name_temp = mxd_list[idx]
         print('Inentorying: {}'.format(os.path.split(fp_mxd)[-1]))
@@ -816,7 +818,10 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
                                 min_scale, max_scale, def_query, transparency, labels]),
                     columns = ['map_name', 'layer_name', 'visible', 'layer_source',
                                 'min_scale','max_scale','def_query','transparency','show_label'])
-
+    if os.path.splitext(fname_csv)[-1] == '':
+        fname_csv = '{}.csv'.format(fname_csv)
+    elif os.path.splitext(fname_csv)[-1] == '.csv':
+        pass
     fp_out = os.path.join(fp_base, fname_csv)
     pd.DataFrame.to_csv(df, fp_out)
 
@@ -1305,3 +1310,9 @@ def extract_cursor(fp_csv, feat_name_out, arc_env):
                         print('Perform union')
                     lst.append(row)
     return(lst)
+
+# # NOTES
+# # getting path componenets
+# # 20210409
+# pathnorm = os.path.normpath(fp_desired)
+# path_components = pathnorm.split(os.sep)

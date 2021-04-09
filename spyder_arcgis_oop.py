@@ -18,17 +18,49 @@ import math
 import xml.etree.ElementTree as ET
 sys.path = [p for p in sys.path if '86' not in p]
 import arcpy
+import logging
+# note this protocol from here because debug was not writing to file
+# https://stackoverflow.com/questions/31169540/python-logging-not-saving-to-file
+from imp import reload
+reload(logging)
 
 
 class metaData(object):
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
-        self.df = pd.read_csv(fp_csv, index_col = 'ITEM', na_values = 'NA', dtype='str')
+    '''
+    ARGS
+    df_index_col            ITEM is default for use with Klamath.
+    '''
+    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv', df_str = 'df', df_index_col = 'ITEM'):
+        setattr(self, df_str, pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str'))
         # scratch copy to add working data NOT intended for retainingin updated csv/database
         self.df_working = self.df.copy(deep = True)
         # fp_csv_archive creation.
-        todays_date = datetime.datetime.today().strftime('%B %d %Y')
-        self.fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], todays_date)
+        todays_date = datetime.datetime.today().strftime('%Y%m%d')
+        self.todays_date = todays_date
+        todays_date_verbose = datetime.datetime.today().strftime('%B %d %Y')
+        self.todays_date_verbose = todays_date_verbose
+        basepath = os.path.splitext(fp_csv)[0]
 
+        if df_str == 'df':
+            fp_csv_prop_str = 'fp_csv'
+            fp_csv_archive_prop_str = 'fp_csv_archive'
+            fp_log_prop_str = 'fp_log'
+        else:
+            df_base_str = df_str.replace('df_', '')
+            fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
+            fp_csv_archive_prop_str = 'fp_csv_archive_{}'.format(df_base_str)
+            fp_log_prop_str = 'fp_log_{}'.format(df_base_str)
+        setattr(self, fp_csv_prop_str, fp_csv)
+        setattr(self, fp_csv_archive_prop_str, '{}_archive_{}.csv'.format(basepath, todays_date))
+        fp_log = '{}_logfile.log'.format(basepath)
+        setattr(self, fp_log_prop_str, fp_log)
+        # adds properties fp_log - incorporate archive and working laer ZU 20210408
+        # self.create_base_properties(fp_csv)
+        path_dict = {'working_gdb': utilities.get_path('fp_working'),
+                    'mapping_gdb': utilities.get_path('fp_mapping'),
+                    'orders_gdb': utilities.get_path('fp_orders')}
+        self.path_dict = path_dict
+        path_dict['working_gdb']
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
 
@@ -54,6 +86,7 @@ class metaData(object):
         alternative_select_col      dictionary with one key and val.  Created for
                                     management plan data candidates csv where diff
                                     groups want different layers uploaded.
+        boolean                     column with boolean vals
         '''
         # SELECT BY TAGS
         df = getattr(self, df_str)
@@ -181,6 +214,18 @@ class metaData(object):
             self.indices_iloc = iloc_temp
         except KeyError:
             pass
+
+        # using boolean vals in a col to get indices
+        try:
+            # pass a column name
+            target_col_name = kwargs['boolean']
+            target_col_vals = df[target_col_name].to_list()
+            iloc_list = [idx for idx, item in enumerate(target_col_vals) if item is True]
+            self.indices_iloc = copy.copy(iloc_list)
+            self.indices = df.iloc[iloc_list].index.tolist()
+        except KeyError:
+            pass
+
     def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
@@ -330,7 +375,7 @@ class metaData(object):
                     # assemble new purpose items
                     sub_item_lst = purp.text.splitlines()
                     for key, val in zip(purp_item, purp_value):
-                        print(purp_item, purp_values)
+                        print(purp_item, purp_value)
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, val)
 
                     # once the list is scoured and new items are either added or replaced
@@ -465,22 +510,147 @@ class metaData(object):
         df_str               i.e. df2 or mxd_inventory
         index_field         for assigning index_col in DataFrame constructor
         '''
-        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype='str')
+        # save df
+        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype = 'str')
         setattr(self, df_str, df)
-        # create working copy
+
+        # save path to csv
+        df_base_str = df_str.replace('df_', '')
+        fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
+        setattr(self, fp_csv_prop_str, fp_csv)
+
+        # save working copy
         df_working_str = '{}_working'.format(df_str)
         setattr(self, df_working_str, df.copy(deep = True))
-    def take_action_delete(self, action_type = 'delete'):
-        for index in self.indices:
-            fp_fcs = self.df.loc[index]['DATA_LOCATION_MCMILLEN_JACOBS']
-            if arcpy.Exists(fp_fcs):
-                print('deleting feature: {}'.format(index))
-                arcpy.Delete_management(fp_fcs)
-                self.df_working.drop(index, inplace = True)
-            else:
-                print('feature with ACTION == delete does not exist\n:{}'.format(index))
-        pd.DataFrame.to_csv(self.df_working, self.fp_csv_archive)
-            # pd.DataFrame.to_csv(self.df, self.fp_csv_archive)
+
+        self.create_base_properties(df_str)
+
+        # # set path to archive for later archiving
+        # # 1) create object name or archive csv path
+        # str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
+        #
+        # # 2) create path to csv to save to object
+        # fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], self.todays_date)
+        # setattr(self, str_csv_archive_obj, fp_csv_archive)
+
+    def take_action(self, df_str, action_type, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+        '''
+        Move has no checks for if the index_col == fcs name.  If it's an integer,
+        that's what the new feature name will save out as.
+        ARGUMENTS
+        df_str          access dataframe from object (self)
+        target_col      location of fcs
+        action_type     actions thus far (202104) = delete, move (string)
+        '''
+
+        # load dataframe
+        df = getattr(self, df_str)
+
+        # archive before deleting - this saves an archive csv
+        self.save_archive_csv(df_str)
+
+        df_base_str = df_str.replace('df_','')
+
+        if df_base_str == '':
+            prop_str_fp_logfile = 'fp_log'
+        else:
+            prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
+
+        fp_logfile = getattr(self, prop_str_fp_logfile)
+
+        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
+
+        # Save call string to logfile
+        banner = '    {}    '.format('-'*50)
+        call_str = 'take_action({}, {}, target_col = {}):\n'.format(df_str, action_type, target_col)
+        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
+        logging.info(msg_str)
+
+        if action_type == 'delete':
+            logging.info('DELETING FEATURES:')
+            for index in self.indices:
+                fp_fcs = df.loc[index][target_col]
+                if arcpy.Exists(fp_fcs):
+                    logging.info(fp_fcs)
+                    try:
+                        arcpy.Delete_management(fp_fcs)
+                        df.drop(index, inplace = True)
+                    except Exception as e:
+                        logging.info(e)
+                else:
+                    logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
+        elif action_type == 'move':
+            for index in self.indices:
+                df_item = df.loc[index]
+                fp_fcs_current = os.path.normpath(df_item[target_col])
+                fp_move = os.path.normpath(self.path_dict[df_item['MOVE_LOCATION']])
+                dset_move = os.path.normpath(df_item['MOVE_LOCATION_DSET'])
+                # default setting
+                rename_delete_protocol = False
+
+                fp_components = fp_fcs_current.split(os.sep)
+                # find dataset one past .gdb i.e. path/to/gdb.gdb/dset
+                for idx, comp in enumerate(fp_components):
+                    print('idx: {} component: {}'.format(idx, comp))
+                    if '.gdb' in comp:
+                        print('gdb zone')
+                        # recreated path to gdb
+                        fp_gdb_orig = os.sep.join(fp_components[:idx+1])
+                        print('fp_gdb_orig: {}'.format(fp_gdb_orig))
+                        print('fp_move: {}'.format(fp_move))
+                        dset_orig = fp_components[idx + 1]
+                        # annoying realitey - same gdb cannot have features with the same name
+                        # even in diff dsets.
+                        if fp_gdb_orig == fp_move:
+                            print('rename protocol')
+                            rename_delete_protocol = True
+                        # get the original dataset as the default with no dset
+                        # provided for move is use original in new gdb
+                        if dset_move == '':
+                            dset_move = dset_orig
+                        break
+                    # translation - there was gdb in fp_fcs_orig
+                    if idx == len(fp_components):
+                        logging.info('original location of {} had no dataset' \
+                        'but no move dset was provided. Moved to gdb standalone' \
+                        .format(index))
+                # use new dset provided in csv
+                else:
+                    pass
+                # for featureclasstofeatureclass
+                fp_new = os.path.join(fp_move, dset_move)
+                # print('fp new: \n{}'.format(fp_new))
+                # full path with featureclass name
+                fp_fcs_new = os.path.join(fp_move, dset_move, index)
+                # print('fp fcs new: \n{}'.format(fp_fcs_new))
+                # print('fp current: \n{}'.format(fp_fcs_current))
+                try:
+                    if rename_delete_protocol:
+                        print('in the protocol')
+                        fp_fcs_current_comp = fp_fcs_current.split(os.sep)
+                        fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
+                        print(fc_current_renamed)
+                        fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
+                        print(fp_fcs_renamed)
+                        arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
+                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, index)
+                        arcpy.Delete_management(fp_fcs_renamed)
+                    else:
+                        print('NOT  in the protocol')
+                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
+                        df.Delete_management(fp_fcs_current)
+                    df.at[index, target_col] = fp_fcs_new
+                    df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
+                    df.at[index, 'ACTION'] = ''
+                    msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
+                    logging.info(msg_str)
+                except Exception as e:
+                    msg_str = '\nUNABLE TO MOVE:  {}\n'.format(fp_fcs_current)
+                    logging.info(msg_str)
+                    logging.info(e)
+        setattr(self, df_str, df)
 
     def df_sets(self, df_list, col_list):
         '''
@@ -604,13 +774,98 @@ class metaData(object):
             arcpy.Merge_management(merge_lyrs, target_fc, field_mappings)
         else:
             arcpy.Merge_management(merge_lyrs, target_fc)
+    def replace_indices(self, df_str, **kwargs):
+        '''
+        For dataframes from csv with no value (math.nan) from pd.DataFrame.read_csv
+        due to...no values in csv.  This version requires user to set indices
+        using self.selection_idx.  Additionally, this version is simply for standalone
+        shapefiles or feature classes (i.e. not within gdb) and takes name automatically
+        from base filename.  ZRU 04/05/2021
+        ARGS
+        df_str          i.e. df_working
+        '''
+        df = getattr(self, df_str)
+        try:
+            kwargs['shapefile']
+            orig_index = df.index.to_list()
+            indices_iloc = self.indices_iloc
+            fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN_JACOBS.to_list()
+            print(fp_fcs)
+            for idx, item in zip(indices_iloc, fp_fcs):
+                path, ext = os.path.splitext(item)
+                new_indice = os.path.split(path)[-1]
+                print('replaceing with {}'.format(new_indice))
+                orig_index[idx] = new_indice
+            df.index = orig_index
+            setattr(self, df_str, df)
+        except KeyError:
+            print('did it pass')
+            pass
+    def create_base_properties(self, df_str):
+        '''
+        adds base properties for dataframes such as fp_csv and fp_log
+        PROPERTIES
+        fp_csv_archive      the base archive which will be overwritten if one day
+                            old.  This assumes Box will have a backup in the cloud.
+                            fp_csv_archive_temp will be a temp archive in case daily
+                            changes need to be flipped back in event of accident
+        fp_csv_archive_temp As mentioned above, used for daily backup.  Will be deleted
+                            later.
+        fp_log_prop         file path to log file
+        '''
+
+        if df_str == 'df':
+            fp_csv_prop_str = 'fp_csv'
+            fp_csv_archive_prop_str = 'fp_csv_archive'
+            fp_csv_archive_temp_prop_str = 'fp_csv_archive_temp'
+            fp_log_prop_str = 'fp_log'
+        else:
+            df_base_str = df_str.replace('df_', '')
+            fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
+            fp_csv_archive_prop_str = 'fp_csv_archive_{}'.format(df_base_str)
+            fp_csv_archive_temp_prop_str = 'fp_csv_archive_temp_{}'.format(df_base_str)
+            fp_log_prop_str = 'fp_log_{}'.format(df_base_str)
+
+        fp_csv = getattr(self, fp_csv_prop_str)
+        basepath = os.path.splitext(fp_csv)[0]
+        setattr(self, fp_csv_archive_prop_str, '{}_archive.csv'.format(basepath))
+        setattr(self, fp_csv_archive_temp_prop_str, '{}_archive_{}.csv'.format(basepath, self.todays_date))
+        fp_log = '{}_logfile.log'.format(basepath)
+        setattr(self, fp_log_prop_str, fp_log)
+
+    def save_archive_csv(self, df_str):
+
+        df_base_str = df_str.replace('df_', '')
+        if df_base_str == '':
+            str_csv_archive_obj = 'fp_csv_archive'
+            str_csv_archive_temp_obj = 'fp_csv_archive_temp'
+        else:
+            str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
+            str_csv_archive_temp_obj = 'fp_csv_archive_temp_{}'.format(df_base_str)
+
+        # 2) path to csv archive
+        fp_csv_archive = getattr(self, str_csv_archive_obj)
+        fp_csv_archive_temp = getattr(self, str_csv_archive_temp_obj)
+
+        # create archive if first time managing database
+        if not os.path.exists(fp_csv_archive):
+            # initiate archive file for day
+            pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
+
+        elif not os.path.exists(fp_csv_archive_temp):
+            # determine if temporary archive is necessary
+            pd.DataFrame.to_csv(getattr(self, df_str, fp_csv_archive_temp))
+
+        # # perhaps useful later for cleanup?
+        # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]
+        # date_obj = datetime.date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:]))
 
 class AgolAccess(metaData):
     '''
     Basic init for AGOL access
     '''
 
-    def __init__(self, fp_csv, credentials):
+    def __init__(self, credentials, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
@@ -659,7 +914,7 @@ class AgolAccess(metaData):
         except KeyError:
             pass
 
-    def take_action(self, action_type, itemType = ['feature','shapefile']):
+    def take_action_agol(self, action_type, itemType = ['feature','shapefile']):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
         only for remove.  will add others and perhaps a log for each run.
@@ -711,7 +966,7 @@ class AgolAccess(metaData):
         pd.DataFrame.to_csv(self.df_working, fp_out)
 
 
-    def add_agol_upload(self, **kwargs):
+    def add_agol_upload(self, df_str, **kwargs):
         '''
         currently passing snippets as kwarg but could be drawn from column in
         csv in future.  shapefiles need to be zipped and in file structure
@@ -827,6 +1082,70 @@ class AgolAccess(metaData):
                         That way I can format e-mails properly.   {}.
                         \n\n'''.format(signature)
         self.krrp_geospatial.notify(all_members, subject, email_body, 'email')
+
+class DbaseManagement(metaData):
+    '''
+    cleaning up gdbs
+    '''
+
+    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
+        super().__init__(fp_csv)
+
+    def flag_gdb_dset(self, df_str, target_col, flag_val, new_col_name = 'protect'):
+        '''
+        identify base paths or datasets within gdbs (via full fp) to protect from
+        ANY deletion. ZRU 3/31/2021
+
+        ARGS
+        df_str                  for csv added during add_df
+x`        target_col              name of column with fp or gdb path
+        flag_val               gdb or subdirectory or dset to flag
+        new_col_name            default == 'protect'.  This will serve as flag for
+                                categorically disqualifying row for deletion.
+        '''
+
+        df = getattr(self, df_str)
+        target_list = df[target_col].tolist()
+        target_list = [os.path.realpath(item) for item in target_list]
+        # populate new col if it doesn't exist
+        # it will exist if run multiple times with different flag_vals
+        if new_col_name not in df.columns:
+            df[new_col_name] = False
+        # get col idx for assigning values
+        col_idx = df.columns.get_loc(new_col_name)
+        for idx, fp in enumerate(target_list):
+            for component in fp.split(os.sep):
+                if flag_val == component:
+                    # figure out how to set with iloc
+                    df.iloc[idx, col_idx] = True
+                    # break will only apply to inner loops
+                    break
+
+        setattr(self, df_str, df)
+
+    def symmetric_diff_basic(self, df_str_source, source_col, df_str_target, target_col, mark_remove = True):
+        # get dataframes
+        df_source = getattr(self, df_str_source)
+        df_target = getattr(self, df_str_target)
+
+        # find overlapping values for action
+        set_source = set(df_source[source_col].to_list())
+        set_target = set(df_target[target_col].to_list())
+        target_vals = list(set_target - set_source)
+
+        if mark_remove:
+            new_col_name = 'remove'
+        else:
+            new_col_name = 'protect'
+
+        #probably unnecessary, but in case funciton run multiple times
+        if new_col_name not in df_target.columns:
+            df_target[new_col_name] = False
+
+        for idx in list(range(len(df_target))):
+            if df_target.loc[idx, target_col] in target_vals:
+                df_target.loc[idx, new_col_name] = True
+        setattr(self, df_str_target, df_target)
 
 
     # # used to remove subelements made messing arounc

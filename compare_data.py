@@ -127,7 +127,7 @@ def unpack_list(list_in, arcobj):
     return(fields_out)
 
 
-def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
+def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All', **kwargs):
     '''
     ZRU 5/6/2020
     returns list of all paths to feature classes including path/to/featureDataset/features
@@ -143,6 +143,8 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All'):
     '''
     # change to specified folder
     arcpy.env.workspace = folder_or_gdb
+    try:
+        kwarg['box_offline']
     # find standalone features within folder, if they exist
     # NOTE have not done anything yet with standalone_feats
     # standalone_feats = arcpy.ListFeatureClasses()

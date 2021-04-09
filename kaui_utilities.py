@@ -18,28 +18,40 @@ class props(object):
         print('PROPERTIES:')
         print('\n'.join(props))
         print('fuck offs')
-    # def extract_cursor(self, fp_csv, feat_name_out, arc_env):
-    #     arcpy.env.workspace = arc_env
-    #     df = pd.read_csv(fp_csv)
-    #     for i in range(len(df)):
-    #         fp_feat = df.iloc[i].fp_feat
-    #         field_name = df.iloc[i].field_name
-    #         target_val = df.iloc[i].target_val
-    #         print('FEATURE: {}\nFIELD NAME {} TARGET VAL {}'.format(fp_feat, field_name, target_val))
-    #         # accumulate id fields in case multiple rows in one feature
-    #         with arcpy.da.SearchCursor(fp_feat, [field_name, 'SHAPE@']) as cursor:
-    #             for row in cursor:
-    #                 if target_val in row:
-    #                     # get shape field from tuple
-    #                     print(dir(row[1]))
-    #                     # initiate new feature
-    #                     if 'shapes_union' not in locals():
-    #                         shapes_union = copy.copy(row[1])
-    #                         print('initiate shapes_union')
-    #                     else:
-    #                         shapes_union = shapes_union.union(row[1])
-    #                         print('Perform union')
-    #     # arcpy.CopyFeatures_management(shapes_union, feat_name_out)
+    def extract_cursor(self, fp_csv, feat_name_out):
+        # add iff needed
+        # arcpy.env.workspace = arc_env
+        df = pd.read_csv(fp_csv)
+        for i in range(len(df)):
+            fp_feat = df.iloc[i].fp_feat
+            field_name = df.iloc[i].field_name
+            target_val = df.iloc[i].target_val
+            print('FEATURE: {}\nFIELD NAME {} TARGET VAL {}'.format(fp_feat, field_name, target_val))
+            # accumulate id fields in case multiple rows in one feature
+            with arcpy.da.SearchCursor(fp_feat, [field_name, 'SHAPE@']) as cursor:
+                for row in cursor:
+                    if target_val in row:
+                        # get shape field from tuple
+                        print(dir(row[1]))
+                        # initiate new feature
+                        if 'shapes_union' not in locals():
+                            shapes_union = copy.copy(row[1])
+                            print('initiate shapes_union')
+                        else:
+                            shapes_union = shapes_union.union(row[1])
+                            print('Perform union')
+        arcpy.CopyFeatures_management(shapes_union, feat_name_out)
+
+    def extract_cursor2(self, fcs_list, where_clause, fname):
+        shapes = []
+        for fc, where in zip(fcs_list, where_clause):
+            for row in arcpy.da.SearchCursor(fc, ["SHAPE@"], where):
+                shapes.append(row[0])
+        merged_shape = shapes[0]
+        for s in shapes[1:]:
+            merged_shape = merged_shape.union(s)
+        arcpy.CopyFeatures_management(merged_shape, fname)
+
 
 
 # # python window buffer stuff

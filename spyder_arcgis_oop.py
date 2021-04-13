@@ -60,7 +60,8 @@ class metaData(object):
                     'mapping_gdb': utilities.get_path('fp_mapping'),
                     'orders_gdb': utilities.get_path('fp_orders')}
         self.path_dict = path_dict
-        path_dict['working_gdb']
+        self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
+        
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
 
@@ -129,7 +130,6 @@ class metaData(object):
                 target_action = [target_action]
             # pull tags column from df (list)
             parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ACTION')
-            print(parsed_list)
 
             # get proper df
             df_working_str = '{}_working'.format(df_str)
@@ -150,7 +150,6 @@ class metaData(object):
                     # check for nan vals
                     try:
                         if target in actions:
-                            print(ct)
                             iloc_temp.append(ct)
                     # type error with nans in parsed list
                     except TypeError:
@@ -162,6 +161,10 @@ class metaData(object):
             # get index names from iloc vals
             self.indices_iloc = copy.copy(iloc_action)
             self.indices = df.iloc[iloc_action].index.tolist()
+            print('iloc')
+            print(' --- '.join([str(i) for i in iloc_action]))
+            print('indices')
+            print(' --- '.join(df.iloc[iloc_action].index.tolist()))
             # if not tags selection then indices will be     passed
         except KeyError:
             pass
@@ -593,34 +596,33 @@ class metaData(object):
                 fp_components = fp_fcs_current.split(os.sep)
                 # find dataset one past .gdb i.e. path/to/gdb.gdb/dset
                 for idx, comp in enumerate(fp_components):
-                    print('idx: {} component: {}'.format(idx, comp))
                     if '.gdb' in comp:
-                        print('gdb zone')
                         # recreated path to gdb
                         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
-                        print('fp_gdb_orig: {}'.format(fp_gdb_orig))
-                        print('fp_move: {}'.format(fp_move))
                         dset_orig = fp_components[idx + 1]
                         # annoying realitey - same gdb cannot have features with the same name
                         # even in diff dsets.
                         if fp_gdb_orig == fp_move:
-                            print('rename protocol')
                             rename_delete_protocol = True
                         # get the original dataset as the default with no dset
                         # provided for move is use original in new gdb
                         if dset_move == '':
+                            # in this case, rename_delete_protocol will remain FALSE
                             dset_move = dset_orig
                         break
-                    # translation - there was gdb in fp_fcs_orig
+                    # translation - there was no gdb in fp_fcs_orig
                     if idx == len(fp_components):
                         logging.info('original location of {} had no dataset' \
                         'but no move dset was provided. Moved to gdb standalone' \
                         .format(index))
-                # use new dset provided in csv
-                else:
-                    pass
+                    # use new dset provided in csv
+                    else:
+                        pass
                 # for featureclasstofeatureclass
                 fp_new = os.path.join(fp_move, dset_move)
+                # check to make sure output dset exists before proceeding
+                if not arcpy.Exists(fp_new):
+                    arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
                 # print('fp new: \n{}'.format(fp_new))
                 # full path with featureclass name
                 fp_fcs_new = os.path.join(fp_move, dset_move, index)
@@ -628,26 +630,28 @@ class metaData(object):
                 # print('fp current: \n{}'.format(fp_fcs_current))
                 try:
                     if rename_delete_protocol:
-                        print('in the protocol')
+                        print('Rename Protocol GO!!!')
                         fp_fcs_current_comp = fp_fcs_current.split(os.sep)
                         fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
-                        print(fc_current_renamed)
                         fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
-                        print(fp_fcs_renamed)
+                        # arcpy_msg to debug where failed
+                        arcpy_msg = 'RENAME False FC to FC False DELETE False'
                         arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
+                        arcpy_msg = 'RENAME: True FC to FC: False DELETE: False'
                         arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, index)
+                        arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
                         arcpy.Delete_management(fp_fcs_renamed)
                     else:
-                        print('NOT  in the protocol')
+                        print('Delete Protocol GO!!!')
                         arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
-                        df.Delete_management(fp_fcs_current)
+                        arcpy.Delete_management(fp_fcs_current)
                     df.at[index, target_col] = fp_fcs_new
                     df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
                     df.at[index, 'ACTION'] = ''
                     msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                     logging.info(msg_str)
                 except Exception as e:
-                    msg_str = '\nUNABLE TO MOVE:  {}\n'.format(fp_fcs_current)
+                    msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                     logging.info(msg_str)
                     logging.info(e)
         setattr(self, df_str, df)

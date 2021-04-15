@@ -61,7 +61,7 @@ class metaData(object):
                     'orders_gdb': utilities.get_path('fp_orders')}
         self.path_dict = path_dict
         self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
-        
+
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
 
@@ -584,12 +584,12 @@ class metaData(object):
                         logging.info(e)
                 else:
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
-        elif action_type == 'move':
+        elif action_type in ['move']:
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 fp_move = os.path.normpath(self.path_dict[df_item['MOVE_LOCATION']])
-                dset_move = os.path.normpath(df_item['MOVE_LOCATION_DSET'])
+                dset_move = df_item['MOVE_LOCATION_DSET']
                 # default setting
                 rename_delete_protocol = False
 
@@ -606,7 +606,7 @@ class metaData(object):
                             rename_delete_protocol = True
                         # get the original dataset as the default with no dset
                         # provided for move is use original in new gdb
-                        if dset_move == '':
+                        if pd.isnull(dset_move):
                             # in this case, rename_delete_protocol will remain FALSE
                             dset_move = dset_orig
                         break
@@ -644,10 +644,13 @@ class metaData(object):
                     else:
                         print('Delete Protocol GO!!!')
                         arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
+                        arcpy_msg = 'FC to FC True DELETE False'
                         arcpy.Delete_management(fp_fcs_current)
                     df.at[index, target_col] = fp_fcs_new
                     df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
                     df.at[index, 'ACTION'] = ''
+                    df.at[index, 'MOVE_LOCATION'] = ''
+                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
                     msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                     logging.info(msg_str)
                 except Exception as e:
@@ -856,7 +859,7 @@ class metaData(object):
             # initiate archive file for day
             pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
 
-        elif not os.path.exists(fp_csv_archive_temp):
+        if not os.path.exists(fp_csv_archive_temp):
             # determine if temporary archive is necessary
             pd.DataFrame.to_csv(getattr(self, df_str, fp_csv_archive_temp))
 

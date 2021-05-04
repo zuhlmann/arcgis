@@ -32,7 +32,7 @@ def show_table(display_preference):
     # display table with options for filepaths
     print('')
     print(table)
-def get_path(idx):
+def get_path(idx, path_type):
     '''
     args:
     idx         integer for iloc or string of alias
@@ -40,13 +40,16 @@ def get_path(idx):
     paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/compare_vers/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 1)
     # if passing index with iloc
+    col_dict = {'gdb':'path_gdb',
+                'csv':'path_csv'}
+    col_name = col_dict[path_type]
     if isinstance(idx, int):
-        path_out = df.iloc[idx]['path']
+        path_out = df.iloc[idx][col_name]
     # if passing string of alias
     else:
-        path_out = df.loc[idx]['path']
+        path_out = df.loc[idx][col_name]
     return(path_out)
-    pd.DataFrame.to_csv(df, paths_table)
+
 def add_table_entry(alias, desc, fp):
     '''
     can add table entry by passing three required args

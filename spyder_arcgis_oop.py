@@ -32,8 +32,6 @@ class metaData(object):
     '''
     def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv', df_str = 'df', df_index_col = 'ITEM'):
         setattr(self, df_str, pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str'))
-        # scratch copy to add working data NOT intended for retainingin updated csv/database
-        self.df_working = self.df.copy(deep = True)
         # fp_csv_archive creation.
         todays_date = datetime.datetime.today().strftime('%Y%m%d')
         self.todays_date = todays_date
@@ -56,10 +54,19 @@ class metaData(object):
         setattr(self, fp_log_prop_str, fp_log)
         # adds properties fp_log - incorporate archive and working laer ZU 20210408
         # self.create_base_properties(fp_csv)
-        path_dict = {'working_gdb': utilities.get_path('fp_working'),
-                    'mapping_gdb': utilities.get_path('fp_mapping'),
-                    'orders_gdb': utilities.get_path('fp_orders')}
-        self.path_dict = path_dict
+        path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
+                    'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
+                    'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
+                    'master_gdb': utilities.get_path('fp_master', 'gdb')}
+        df_str_dict = {'working_gdb':'df_working',
+                        'mapping_gdb':'df_mapping',
+                        'orders_gdb':'df_orders',
+                        'master_gdb':'df_master'}
+        path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
+                        'master_gdb': utilities.get_path('fp_master', 'csv')}
+        self.path_gdb_dict = path_gdb_dict
+        self.df_str_dict = df_str_dict
+        self.path_csv_dict = path_csv_dict
         self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
 
     def zip_agol_upload(self):
@@ -131,14 +138,6 @@ class metaData(object):
             # pull tags column from df (list)
             parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ACTION')
 
-            # get proper df
-            df_working_str = '{}_working'.format(df_str)
-            df_working = getattr(self, df_working_str)
-
-            # add actions to working dataframe
-            df_working.assign(target_action = parsed_list)
-            setattr(self, df_working_str, df_working)
-
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
             iloc_temp = []
@@ -201,14 +200,17 @@ class metaData(object):
             indices_dict = kwargs['alternative_select_col']
             col_title = list(indices_dict.keys())[0]
             target_val = list(indices_dict.values())[0]
+            print(col_title)
+            print(target_val)
             # note a1), despite df.loc[] with just [], since subsetting we get a dataframe
-            self.indices = df.loc[self.df[col_title] == target_val].index.tolist()
+            df = getattr(self, df_str)
+            self.indices = df[df[col_title] == target_val].index.tolist()
             # get iloc vals TURN INTO FUNCTION SOMETIME
             iloc_temp = []
             ct = 0
             try:
                 # note a2) even though [] like a1) this yields a series
-                for alternative_val in self.df[col_title].to_list():
+                for alternative_val in df[col_title].to_list():
                     if target_val == alternative_val:
                         iloc_temp.append(ct)
                     ct += 1
@@ -522,10 +524,6 @@ class metaData(object):
         fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
         setattr(self, fp_csv_prop_str, fp_csv)
 
-        # save working copy
-        df_working_str = '{}_working'.format(df_str)
-        setattr(self, df_working_str, df.copy(deep = True))
-
         self.create_base_properties(df_str)
 
         # # set path to archive for later archiving
@@ -536,7 +534,8 @@ class metaData(object):
         # fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], self.todays_date)
         # setattr(self, str_csv_archive_obj, fp_csv_archive)
 
-    def take_action(self, df_str, action_type, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+    def take_action(self, df_str, action_type, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
+                    populate_target_df = True):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
@@ -544,6 +543,8 @@ class metaData(object):
         df_str          access dataframe from object (self)
         target_col      location of fcs
         action_type     actions thus far (202104) = delete, move (string)
+        populate_target_df  True or False.  Opens df of target and adds new fc
+                                            row and relevant attributes
         '''
 
         # load dataframe
@@ -584,11 +585,78 @@ class metaData(object):
                         logging.info(e)
                 else:
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
+
+        elif action_type in ['copy']:
+            logging.info('COPYING FEATURES')
+            if populate_target_df:
+                try:
+                    df_master = getattr(self, 'df_str_master')
+                except AttributeError:
+                    df_str_master = self.df_str_dict['master_gdb']
+                    fp_csv_master = self.path_csv_dict['master_gdb']
+                    self.add_df(fp_csv_master, df_str_master, 'ITEM')
+                    df_master = getattr(self, df_str_master)
+            for index in self.indices:
+                df_item = df.loc[index]
+                fp_fcs_current = os.path.normpath(df_item[target_col])
+                fp_copy = os.path.normpath(self.path_gdb_dict[df_item['COPY_LOCATION']])
+                dset_copy = df_item['COPY_LOCATION_DSET']
+                dset_lower = df_item['DSET_LOWER_CASE']
+
+                # add data to be copied to dataframe
+
+                fp_components = fp_fcs_current.split(os.sep)
+                # find dataset one past .gdb i.e. path/to/gdb.gdb/dset
+                for idx, comp in enumerate(fp_components):
+                    if '.gdb' in comp:
+                        # recreated path to gdb
+                        fp_gdb_orig = os.sep.join(fp_components[:idx+1])
+                        dset_orig = fp_components[idx + 1]
+                        # get the original dataset as the default with no dset
+                        # provided for move is use original in new gdb
+                        if pd.isnull(dset_copy):
+                            # in this case, rename_delete_protocol will remain FALSE
+                            dset_copy = dset_orig
+                            if dset_lower:
+                                # lower case dset name if specified
+                                dset_copy = dset_copy.lower()
+                        break
+                    # translation - there was no gdb in fp_fcs_orig
+                    if idx == len(fp_components):
+                        logging.info('original location of {} had no dataset' \
+                        'but no move dset was provided. Moved to gdb standalone' \
+                        .format(index))
+                    # use new dset provided in csv
+                    else:
+                        pass
+                # for featureclasstofeatureclass
+                fp_new = os.path.join(fp_copy, dset_copy)
+                # check to make sure output dset exists before proceeding
+                if not arcpy.Exists(fp_new):
+                    arcpy.CreateFeatureDataset_management(fp_copy, dset_copy, self.prj_file)
+                # full path with featureclass name
+                fp_fcs_new = os.path.join(fp_copy, dset_copy, index)
+
+                try:
+                    print('COPY Protocol GO!!!')
+                    # arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
+                    arcpy_msg = 'FC to FC True DELETE False'
+                    df.at[index, 'DATA_MASTER_LOCATION'] = fp_fcs_new
+                    df.at[index, 'ACTION'] = ''
+                    df.at[index, 'COPY_LOCATION'] = ''
+                    df.at[index, 'COPY_LOCATION_DSET'] = ''
+                    msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
+                    # logging.info(msg_str)
+                except Exception as e:
+                    msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
+                    # logging.info(msg_str)
+                    # logging.info(e)
+
         elif action_type in ['move']:
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
-                fp_move = os.path.normpath(self.path_dict[df_item['MOVE_LOCATION']])
+                fp_move = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 # default setting
                 rename_delete_protocol = False
@@ -867,6 +935,91 @@ class metaData(object):
         # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]
         # date_obj = datetime.date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:]))
 
+    def cast_columns(self, df_str):
+        '''
+        basic funciton to convert columns to specific datatypes
+        '''
+        df = getattr(self, df_str)
+        col_names = df.columns
+        if 'visible' in col_names:
+            boolean_key = {'visible':{'TRUE':True,'FALSE':False} }
+            df = df.replace(boolean_key)
+        if 'duplicate' in col_names:
+            df['duplicate'] = pd.to_numeric(df['duplicate'])
+        setattr(self, df_str, df)
+
+    def retain_visible(self, df_str_source, df_str_target, match_col_list, replace_col_target):
+        '''
+        df_str_target           string of dataframe to add values to based off other arguments
+        df_str_source           string of dataframe to transfer values from
+        match_col_list          columns to match from table to table [col_source_str, col_target_str]
+                                i.e. fp_feat, DATA_LOCATION_MCMILLEN_JACOBS
+        replace_col_target      column where we add tag / val
+        '''
+        # STRING to NUMBERIC!!
+        # https://stackoverflow.com/questions/15891038/change-column-type-in-pandas
+        df_source = getattr(self, df_str_source)
+        df_str_working_target = '{}_matched'.format(df_str_target)
+        try:
+            # already working, add to working
+            df_target = getattr(self, df_str_working_target)
+            print('it existed')
+        except AttributeError:
+            # no action yet, add to original
+            print('did not exist')
+            df_target = getattr(self, df_str_target)
+        match_col_source = match_col_list[0]
+        match_col_target = match_col_list[1]
+        df_working = df_source[df_source.visible == True]
+        df_working = df_working.drop_duplicates(subset = ['duplicate'], keep = 'first')
+        # should be list of file paths to fcs
+        vals_match = df_working[match_col_source].to_list()
+        target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
+
+        # add "retain" to field
+        for indice in target_indices:
+            df_target.at[indice, replace_col_target] = 'retain'
+
+        setattr(self, df_str_working_target, df_target)
+
+    def df_to_df_transfer(self, df_str_source, df_str_target, match_col_list, replace_col_list, target_val):
+        '''
+        More for manual transfers.
+        df_str_target           string of dataframe to add values to based off other arguments
+        df_str_source           string of dataframe to transfer values from
+        match_col_list          columns to match from table to table [col_source_str, col_target_str]
+        target_col_list        confusingly TARGET i.e. col we are searching for value in df_source and
+                                col where we are replacing in target
+        target_val              val to search for in replace_col
+        '''
+
+        df_source = getattr(self, df_str_source)
+        df_str_working_target = '{}_matched'.format(df_str_target)
+        try:
+            # already working, add to working
+            df_target = getattr(self, df_str_working_target)
+            print('it existed')
+        except AttributeError:
+            # no action yet, add to original
+            print('did not exist')
+            df_target = getattr(self, df_str_target)
+        match_col_source = match_col_list[0]
+        match_col_target = match_col_list[1]
+        replace_col_source = replace_col_list[0]
+        replace_col_target = replace_col_list[1]
+        # indices that match target_val in source
+        source_indices = df_source.index[df_source[replace_col_source]==target_val]
+        # file paths most likely
+        vals_match = df_source.loc[source_indices][match_col_source].to_list()
+        # indices in df_target matching source indices
+
+
+        target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
+
+        for indice in target_indices:
+            df_target.at[indice, replace_col_target] = target_val
+        setattr(self, '{}_matched'.format(df_str_target), df_target)
+
 class AgolAccess(metaData):
     '''
     Basic init for AGOL access
@@ -925,6 +1078,7 @@ class AgolAccess(metaData):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
         only for remove.  will add others and perhaps a log for each run.
+        # NEED TO REPLACE df_working as this was removed as a property(concept) on 4/15/2021
         ARGS
         itemType       same as identify_items_online method. pass as list of
                         strings or one string.  i.e 'shapefile'.  Default =

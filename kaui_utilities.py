@@ -1,17 +1,18 @@
 import arcpy
 import pandas as pd
 import copy
+import os
 
 class props(object):
     def __init__(self):
     # paths_dict = {'working':0, 'reworked':1, 'project_features':2, 'scratch':3, 'diversions':4}
-        props = ['working', 'reworked', 'project_features', 'scratch', 'diversions']
+        props = ['working', 'reworked', 'project_features', 'scratch', 'diversions', 'dist_bdry_scratch']
         paths_list =  [r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working',
         r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\kaui_reworked_data_202103.gdb',
         r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\Project_Features',
         r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\kaui_scratch.gdb\scratch_projected',
-        r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\kaui_reworked_data_202103.gdb\diversions']
-
+        r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\kaui_reworked_data_202103.gdb\diversions',
+        r'C:\Users\uhlmann\Box\Projects\KIUC\West Kauai Energy Project\6.0 Phase 2 Design\6.0 Plans and Specs\6.6_GIS\GIS_files\Working\kaui_reworked_data_202103.gdb\disturbance_boundary_scratch']
         for prop, path in zip(props, paths_list):
             prop = 'fp_{}'.format(prop)
             setattr(self, prop, path)
@@ -51,6 +52,24 @@ class props(object):
         for s in shapes[1:]:
             merged_shape = merged_shape.union(s)
         arcpy.CopyFeatures_management(merged_shape, fname)
+
+    def buff_line_merge(self, fcs_list, buff_str_list, fp_fcs_out, gaps = True):
+        arcpy.env.overwriteOutput = True
+        fcs_out_memory_list = []
+        for fc, buff_str in zip(fcs_list, buff_str_list):
+            buff_str_formatted = buff_str.replace(' ', '_')
+            buff_str_formatted = buff_str_formatted.replace('.', '_')
+            buff_str_formatted = buff_str_formatted.lower()
+            fcs_out_memory = os.path.join("in_memory", '{}_{}_buffer'.format(fc, buff_str_formatted))
+            fcs_out_memory_list.append(fcs_out_memory)
+            arcpy.Buffer_analysis(fc, fcs_out_memory, buff_str, '','',"ALL",'')
+        # print('unioning these\n: {}'.format('\n'.join(fcs_out_memory_list)))
+        # print('\n'.join(fcs_out_memory_list))
+        if gaps:
+            arcpy.Union_analysis(fcs_out_memory_list, fp_fcs_out)
+        else:
+            arcpy.Union_analysis(fcs_out_memory_list, fp_fcs_out,'','', False)
+
 
 
 

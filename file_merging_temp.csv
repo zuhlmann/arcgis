@@ -1,0 +1,13 @@
+feature_name,buffer_val,buffer_unit,name_field,directory,nesting season
+bald eagle,,,bald_eagle,one buffer size - take from zones ,
+golden eagle,,,copco_features,used smaller buffer - from zones,
+Sand_Hill_Crane_Nests_2019,0.25,Miles,sandhill_crane,,
+Osprey_Observations_2019,0.25,Miles,osprey,,
+Peregrine_Falcon_Nests_2019,0.25,Miles,peregrine_falcon,kim created,
+weeds,100,Feet,,kim created,
+Special_Status_Plants_Poly_2019,100,Feet,,,
+Special_Status_Plant_Pts_2019,100,Feet,,,
+BLM_Plantsbuffer,,,,"McmJac_KRRP_GIS_data\BLMplants_buffer.shp
+* skip",
+InvasiveSurvey2019_Polygon,,,,smaller footprints - skip,
+InvasiveSurvey2019_Plants,,,,smaller footprints - skip,

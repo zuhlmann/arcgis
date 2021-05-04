@@ -143,8 +143,7 @@ def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All', **kwargs):
     '''
     # change to specified folder
     arcpy.env.workspace = folder_or_gdb
-    try:
-        kwarg['box_offline']
+    
     # find standalone features within folder, if they exist
     # NOTE have not done anything yet with standalone_feats
     # standalone_feats = arcpy.ListFeatureClasses()

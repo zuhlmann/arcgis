@@ -301,7 +301,7 @@ class metaData(object):
 
 
 
-    def write_xml(self, df_str, **kwargs):
+    def write_xml(self, df_str, shp = False, **kwargs):
         '''
         Update metadata to include assemble_metadata() statement or skip that
         step and add lines to existing Item Description.  This can be fleshed
@@ -314,35 +314,49 @@ class metaData(object):
                                     being column titles from item_desc.
                                     i.e. DATA_LOCATION_MCMILLEN_JACOBS
         '''
+        df = getattr(self, df_str)
 
-        # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
-        fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
-        index_names = self.df.loc[self.indices].index.to_list()
-        print(index_names)
-        # glob strings will create the string to pass to  glob.glob which
-        # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-        glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
-        # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
-        # for item in glob_strings:
-        #     print('NAME {}\nTYPE: {}'.format(item, type(item)))
-        for glob_string in glob_strings:
-            print('GLOBBING: {}'.format(glob_string))
-            glob.glob(glob_string)[0]
+        # may not use too often -  legacy from before master.gdb and direct gdb
+        # updating ZU 20210505
+        if shp:
+            # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
+            # NOTE fp_base is refering to base name for shapefiles (since multiple file extensions
+            # under same BASE name)
+            fp_base = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
+            index_names = df.loc[self.indices].index.to_list()
+            # glob strings will create the string to pass to  glob.glob which
+            # uses th *xml wildcard to pull JUST the xml files from shapefile folder
+            glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
+            # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
+            # for item in glob_strings:
+            #     print('NAME {}\nTYPE: {}'.format(item, type(item)))
+            # # PRINT BELOW DEBUG
+            # for glob_string in glob_strings:
+            #     print('GLOBBING: {}'.format(glob_string))
+            #     glob.glob(glob_string)[0]
 
-        fp_xml_orig = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+            fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
 
-        for item in fp_xml_orig:
-            print(item)
-        ct = 0
         # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
         # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
         # need to fix all columns in this regard when writing xml
         # FIX THIS it is not prepared to handle other cases.
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
-        for idx, fp_xml in enumerate(fp_xml_orig):
-            print('indice {}. path {}'.format(self.indices_iloc[ct], fp_xml))# refer to notes below for diff betw trees and elements
-            ct+=1
+        ct = 0
+        for indice, indice_iloc in zip(self.indices, self.indices_iloc):
+            if shp:
+                fp_xml = fp_xml_orig_shp[ct]
+                temp_path = copy.copy(fp_xml)
+            elif not shp:
+                fp_fcs = df.loc[indice]['DATA_LOCATION_MCM_MASTER']
+                temp_path = copy.copy(fp_fcs)
+                tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
+                fp_xml = arcpy.CreateScratchName('.xml', workspace = arcpy.env.scratchFolder)
+                # copy xml of feature class -- next up - update it
+                tgt_item_md.saveAsXML(fp_xml, 'EXACT_COPY')
+            ct += 1
 
+            print('indice {}. path {}'.format(indice_iloc, temp_path))# refer to notes below for diff betw trees and elements
             tree = ET.parse(fp_xml)
             # root is the root ELEMENT of a tree
             root = tree.getroot()
@@ -356,22 +370,27 @@ class metaData(object):
             abstract = dataIdInfo.find('idAbs')
             credits = dataIdInfo.find('idCredit')
 
-            index_name = index_names[idx]
             # the try block will add new lines to existing idPurp element
             # if specified.  Thus far used when adding a McMillen_Path : path/to/file
             # to Item Description when idPurp exists.
-            new_purp_items = add_new_purp_list[self.indices_iloc[idx]]
-            print('iloc {} new purp: {}'.format(self.indices_iloc[idx], new_purp_items))
+            new_purp_items = add_new_purp_list[indice_iloc]
+            print('iloc {} new purp: {}'.format(indice_iloc, new_purp_items))
             # if is a string this means there is a value.  if empty value it will be
             # a float for dumb reason.
             if isinstance(new_purp_items[0], str):
                 purp_item, purp_value = [], []
                 for item in new_purp_items:
                     purp_item.append(item)
-                    purp_value.append(self.df.loc[index_name][item])
+                    purp_value.append(df.loc[indice][item])
 
                 # If add_purp but no purp exists(blank item desc) add new sub items
                 if purp is None:
+                    purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
+                    purpose_new = '\n'.join(purpose_new)
+                    print('new purp will be this:\n{}'.format(purpose_new))
+                # needed if text deleted manaully in arc (i.e. Edit Metadata)
+                # for some reason purp will NOT be None, but purp.text will be None
+                elif purp.text is None:
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
                     print('new purp will be this:\n{}'.format(purpose_new))
@@ -402,10 +421,9 @@ class metaData(object):
             # If not adding lines to purp, etc.
             else:
                 # get new element text
-                index_name = index_names[idx]
-                credits_new = self.df_meta_add.loc[index_name]['credits_new']
-                abstract_new = self.df_meta_add.loc[index_name]['abstract']
-                purpose_new = self.df_meta_add.loc[index_name]['purpose_new']
+                credits_new = self.df_meta_add.loc[indice]['credits_new']
+                abstract_new = self.df_meta_add.loc[indice]['abstract']
+                purpose_new = self.df_meta_add.loc[indice]['purpose_new']
                 element_text_list = [purpose_new, abstract_new, credits_new]
                 element_list = [purp, abstract, credits]
                 element_title = ['idPurp', 'idAbs', 'idCredit']
@@ -435,7 +453,15 @@ class metaData(object):
                         print('this means nan float for thing')
                         pass
 
+            # for standalone xmp in shapefile --> this is all you need
             tree.write(fp_xml)
+            # additional step for fcs in gdb
+            if not shp:
+                # copy new metadata
+                src_template_md = arcpy.metadata.Metadata(fp_xml)
+                # apply to fcs (tgt)
+                tgt_item_md.copy(src_template_md)
+                tgt_item_md.save()
 
     def quickie_inventory(self, **kwargs):
         '''
@@ -545,6 +571,7 @@ class metaData(object):
         action_type     actions thus far (202104) = delete, move (string)
         populate_target_df  True or False.  Opens df of target and adds new fc
                                             row and relevant attributes
+
         '''
 
         # load dataframe
@@ -559,6 +586,7 @@ class metaData(object):
             prop_str_fp_logfile = 'fp_log'
         else:
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
+            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
@@ -590,18 +618,25 @@ class metaData(object):
             logging.info('COPYING FEATURES')
             if populate_target_df:
                 try:
-                    df_master = getattr(self, 'df_str_master')
+                    df_str_master = 'df_master'
+                    fp_csv_master = getattr(self, 'fp_csv_master')
+                # master_gdb not added via self.add_df
                 except AttributeError:
+                    print('populating target')
                     df_str_master = self.df_str_dict['master_gdb']
                     fp_csv_master = self.path_csv_dict['master_gdb']
+                    # note this also creates fp_csv_archive
                     self.add_df(fp_csv_master, df_str_master, 'ITEM')
                     df_master = getattr(self, df_str_master)
+                # save a base archive if NEVER saved and a daily archive if never saved
+                self.save_archive_csv(df_str_master)
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 fp_copy = os.path.normpath(self.path_gdb_dict[df_item['COPY_LOCATION']])
                 dset_copy = df_item['COPY_LOCATION_DSET']
                 dset_lower = df_item['DSET_LOWER_CASE']
+                rename = df_item['RENAME']
 
                 # add data to be copied to dataframe
 
@@ -634,24 +669,56 @@ class metaData(object):
                 # check to make sure output dset exists before proceeding
                 if not arcpy.Exists(fp_new):
                     arcpy.CreateFeatureDataset_management(fp_copy, dset_copy, self.prj_file)
-                # full path with featureclass name
-                fp_fcs_new = os.path.join(fp_copy, dset_copy, index)
+
+                # if rename was provided
+                if not pd.isnull(rename):
+                    feat_name = rename
+                    # full path with featureclass name
+                    fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
+                # retain original name
+                else:
+                    feat_name = copy.copy(index)
+                    # full path with featureclass name
+                    fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
 
                 try:
                     print('COPY Protocol GO!!!')
-                    # arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
+                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
                     arcpy_msg = 'FC to FC True DELETE False'
+                    # SOURCE DF UPDATES
                     df.at[index, 'DATA_MASTER_LOCATION'] = fp_fcs_new
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'COPY_LOCATION'] = ''
                     df.at[index, 'COPY_LOCATION_DSET'] = ''
+
+                    # TARGET DF UPDATES
+                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
+                        'DATA_LOCATION_MCM_MASTER':fp_fcs_new}
+                    ser_append = pd.Series(data = d,
+                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
+                                        'DATA_LOCATION_MCM_MASTER'],
+                                 name = feat_name)
+                    # append new row
+                    df_master = df_master.append(ser_append)
+                    # LOG it up
                     msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
-                    # logging.info(msg_str)
+                    logging.info(msg_str)
                 except Exception as e:
                     msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
-                    # logging.info(msg_str)
-                    # logging.info(e)
+                    logging.info(msg_str)
+                    logging.info(e)
+            # finally save out to new csv - note archive was saved in either:
+            # 1) add_df    OR    2) top of this method
+            print('here')
+            # SAVE TO MASTER CSV
+            setattr(self, 'df_master', df_master)
+            fp_csv_master = getattr(self, 'fp_csv_master')
+            pd.DataFrame.to_csv(df_master, fp_csv_master)
 
+            # SAVE TO SOURCE CSV
+            setattr(self, df_str, df)
+            fp_csv_source = getattr(self, prop_str_fp_csv)
+            pd.DataFrame.to_csv(df, fp_csv_source)
         elif action_type in ['move']:
             for index in self.indices:
                 df_item = df.loc[index]
@@ -925,9 +992,11 @@ class metaData(object):
         # create archive if first time managing database
         if not os.path.exists(fp_csv_archive):
             # initiate archive file for day
+            print('save an archive:\n{}'.format(fp_csv_archive))
             pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
 
         if not os.path.exists(fp_csv_archive_temp):
+            print('save a time stamped archive:\n{}'.format(fp_csv_archive_temp))
             # determine if temporary archive is necessary
             pd.DataFrame.to_csv(getattr(self, df_str, fp_csv_archive_temp))
 

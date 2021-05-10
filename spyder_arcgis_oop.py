@@ -30,7 +30,8 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv', df_str = 'df', df_index_col = 'ITEM'):
+    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv',
+                df_str = 'df', df_index_col = 'ITEM', **kwargs):
         setattr(self, df_str, pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str'))
         # fp_csv_archive creation.
         todays_date = datetime.datetime.today().strftime('%Y%m%d')
@@ -54,20 +55,30 @@ class metaData(object):
         setattr(self, fp_log_prop_str, fp_log)
         # adds properties fp_log - incorporate archive and working laer ZU 20210408
         # self.create_base_properties(fp_csv)
-        path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
-                    'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
-                    'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
-                    'master_gdb': utilities.get_path('fp_master', 'gdb')}
-        df_str_dict = {'working_gdb':'df_working',
-                        'mapping_gdb':'df_mapping',
-                        'orders_gdb':'df_orders',
-                        'master_gdb':'df_master'}
-        path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
-                        'master_gdb': utilities.get_path('fp_master', 'csv')}
-        self.path_gdb_dict = path_gdb_dict
-        self.df_str_dict = df_str_dict
-        self.path_csv_dict = path_csv_dict
-        self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
+
+        # change at some point to pass a json for whatever dbase is in use
+        # i.e. all four properties contained in a metadata_props_dbase.json
+        try:
+            self.path_gdb_dict = kwargs['non_klamath_df_dict']
+        except KeyError:
+            path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
+                        'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
+                        'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
+                        'master_gdb': utilities.get_path('fp_master', 'gdb')}
+            df_str_dict = {'working_gdb':'df_working',
+                            'mapping_gdb':'df_mapping',
+                            'orders_gdb':'df_orders',
+                            'master_gdb':'df_master'}
+            path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
+                            'master_gdb': utilities.get_path('fp_master', 'csv')}
+            self.path_gdb_dict = path_gdb_dict
+            self.df_str_dict = df_str_dict
+            self.path_csv_dict = path_csv_dict
+            self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
+        try:
+            self.prj_file = kwargs['prj_file']
+        except KeyError:
+            pass
 
     def zip_agol_upload(self):
         # 1) ZIP SHAPEFILES
@@ -725,6 +736,7 @@ class metaData(object):
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 fp_move = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
                 dset_move = df_item['MOVE_LOCATION_DSET']
+                fc_new_name = df_item['RENAME']
                 # default setting
                 rename_delete_protocol = False
 
@@ -759,8 +771,13 @@ class metaData(object):
                 if not arcpy.Exists(fp_new):
                     arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
                 # print('fp new: \n{}'.format(fp_new))
+                # if rename specified
+                if not pd.isnull(fc_new_name):
+                    fc_name = copy.copy(fc_new_name)
+                else:
+                    fc_name = copy.copy(index)
                 # full path with featureclass name
-                fp_fcs_new = os.path.join(fp_move, dset_move, index)
+                fp_fcs_new = os.path.join(fp_move, dset_move, fc_name)
                 # print('fp fcs new: \n{}'.format(fp_fcs_new))
                 # print('fp current: \n{}'.format(fp_fcs_current))
                 try:
@@ -773,12 +790,12 @@ class metaData(object):
                         arcpy_msg = 'RENAME False FC to FC False DELETE False'
                         arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
                         arcpy_msg = 'RENAME: True FC to FC: False DELETE: False'
-                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, index)
+                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, fc_name)
                         arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
                         arcpy.Delete_management(fp_fcs_renamed)
                     else:
                         print('Delete Protocol GO!!!')
-                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, index)
+                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, fc_name)
                         arcpy_msg = 'FC to FC True DELETE False'
                         arcpy.Delete_management(fp_fcs_current)
                     df.at[index, target_col] = fp_fcs_new
@@ -787,11 +804,35 @@ class metaData(object):
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
                     msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
+                    print(msg_str)
                     logging.info(msg_str)
                 except Exception as e:
                     msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                     logging.info(msg_str)
                     logging.info(e)
+        elif action_type in ['rename']:
+            for index in self.indices:
+                df_item = df.loc[index]
+                fp_fcs_current = os.path.normpath(df_item[target_col])
+                # create new filename components
+                fc_new_name = df_item['RENAME']
+                fp_components = fp_fcs_current.split(os.sep)
+                # all but original file name
+                fp_base = os.sep.join(fp_components[:-1])
+                # full path to new fcs
+                fp_fcs_new = os.path.join(fp_base, fc_new_name)
+                # new col values
+                df.at[index, target_col] = fp_fcs_new
+                df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
+                df.at[index, 'DATA_LOCATION_MCMZ_ORIGINAL_new'] = fp_fcs_new
+                df.at[index, 'ACTION'] = ''
+                df.at[index, 'RENAME'] = ''
+
+                msg_str = 'RENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
+                arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+                print(msg_str)
+                logging.info(msg_str)
+
         setattr(self, df_str, df)
 
     def df_sets(self, df_list, col_list):
@@ -1019,6 +1060,12 @@ class metaData(object):
 
     def retain_visible(self, df_str_source, df_str_target, match_col_list, replace_col_target):
         '''
+        Should transfer a value of 'retain' to rows in match_col_target (match_col_list[1])
+        of target df where the source data of visible layers in mxds reside.
+        For instance Project Action Layer in upperset.mxd visible = True, therefore
+        the corresponding datasource fp/to/gdb/project_action_bdry2 will be
+        set to a value of 'retain' in the replace_col_target. 202105
+
         df_str_target           string of dataframe to add values to based off other arguments
         df_str_source           string of dataframe to transfer values from
         match_col_list          columns to match from table to table [col_source_str, col_target_str]
@@ -1040,11 +1087,14 @@ class metaData(object):
         match_col_source = match_col_list[0]
         match_col_target = match_col_list[1]
         df_working = df_source[df_source.visible == True]
-        df_working = df_working.drop_duplicates(subset = ['duplicate'], keep = 'first')
+        # previous method for removing duplicates BUT treated NAs as duplicate group candidate
+        # df_working = df_working.drop_duplicates(subset = ['duplicate'], keep = 'first')
+        # this solution worked
+        df_working = df_working[~df_working['duplicate'].duplicated() | df_working['duplicate'].isna()]
+        pd.DataFrame.to_csv(df_working, 'c:/Users/uhlmann/Documents/temp.csv')
         # should be list of file paths to fcs
         vals_match = df_working[match_col_source].to_list()
         target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
-
         # add "retain" to field
         for indice in target_indices:
             df_target.at[indice, replace_col_target] = 'retain'
@@ -1088,6 +1138,17 @@ class metaData(object):
         for indice in target_indices:
             df_target.at[indice, replace_col_target] = target_val
         setattr(self, '{}_matched'.format(df_str_target), df_target)
+
+    def update_inventory(self):
+        '''
+        If gdb and mxd have been updated since going through identification protocol
+        to remove unneeded data --> agol_obj.df_to_df_transfer or agol_obj.retain_visible, etc.
+        Redo process and join old df (csv) to updated df (csv)
+        ARGS
+        join_index      list [source_index, target_index]
+
+        '''
+
 
 class AgolAccess(metaData):
     '''

@@ -359,7 +359,7 @@ class metaData(object):
                 fp_xml = fp_xml_orig_shp[ct]
                 temp_path = copy.copy(fp_xml)
             elif not shp:
-                fp_fcs = df.loc[indice]['DATA_LOCATION_MCM_MASTER']
+                fp_fcs = df.loc[indice]['DATA_LOCATION_MCMILLEN_JACOBS']
                 temp_path = copy.copy(fp_fcs)
                 tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
                 fp_xml = arcpy.CreateScratchName('.xml', workspace = arcpy.env.scratchFolder)
@@ -374,12 +374,18 @@ class metaData(object):
             # remove the mess in root
             # Parent for idPurp
             dataIdInfo = root.find('dataIdInfo')
+            for child in root:
+                print(child.tag, child.attrib)
+
             # search for element <idPurp> - consult python doc for more methods. find
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
-            purp = dataIdInfo.find('idPurp')
-            abstract = dataIdInfo.find('idAbs')
-            credits = dataIdInfo.find('idCredit')
+            if not pd.isnull(dataIdInfo):
+                purp = dataIdInfo.find('idPurp')
+                abstract = dataIdInfo.find('idAbs')
+                credits = dataIdInfo.find('idCredit')
+            else:
+                print('no data id CRASH')
 
             # the try block will add new lines to existing idPurp element
             # if specified.  Thus far used when adding a McMillen_Path : path/to/file
@@ -464,6 +470,33 @@ class metaData(object):
                         print('this means nan float for thing')
                         pass
 
+            # ABSTRACT
+            try:
+                abstract_new = df.loc[indice]['ABSTRACT']
+                if isinstance(abstract_new, str):
+                    el = ET.SubElement(dataIdInfo, 'idAbs')
+                    el.text = abstract_new
+                    ET.dump(dataIdInfo)
+                elif math.isnan(abstract_new):
+                    print('this means nan float for thing')
+                    pass
+            except KeyError:
+                # no ABSTRACT col in csv
+                pass
+            # CREDITS
+            try:
+                credits_new = df.loc[indice]['CREDITS']
+                if isinstance(credits_new, str):
+                    el = ET.SubElement(dataIdInfo, 'idCredit')
+                    el.text = credits_new
+                    ET.dump(dataIdInfo)
+                elif math.isnan(credits_new):
+                    print('this means nan float for thing')
+                    pass
+            except KeyError:
+                # No CREDITS col in csv
+                pass
+
             # for standalone xmp in shapefile --> this is all you need
             tree.write(fp_xml)
             # additional step for fcs in gdb
@@ -474,75 +507,105 @@ class metaData(object):
                 tgt_item_md.copy(src_template_md)
                 tgt_item_md.save()
 
-    def quickie_inventory(self, **kwargs):
+    def quickie_inventory(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
+                        shp = False, standard_credits = True, **kwargs):
         '''
         quick grab item description to add to new csv for the gang.  ZRU 20201207
+        updated (slightly 5/11/2021) for functionality with feature classes.
+        ARGUMENTS
+        df_str              string of datatrame to getattr
+        target_col          data location column
+        shp                 True or False.  Nowadays (May 2021) most likely fcs
+                            not shapefiles
+        standard_credits    use same credits throughout.  Saves cut and pasting
+                            credits in spreadsheet
         '''
 
         # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
-        fp_base = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
-        index_names = self.df.loc[self.indices].index.to_list()
+        df = getattr(self, df_str)
+        fp_base = df.loc[self.indices][target_col].tolist()
+        index_names = df.loc[self.indices].index.to_list()
         print(index_names)
 
-        # glob strings will create the string to pass to  glob.glob which
-        # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-        glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
-        fp_xml_orig = []
-        for idx, glob_string in enumerate(glob_strings):
-            try:
-                # ...[0] because it is a list of list - [[path/to/file]]
-                temp = glob.glob(glob_string)[0]
-                print(temp)
-                fp_xml_orig.append(temp)
-            # if file not_uploaded, credit_crush, etc.  ZU 20210122
-            except IndexError:
-                fp_xml_orig.append(fp_base[idx])
-        ct = 0
-        # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
-        # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
-        # need to fix all columns in this regard when writing xml
-        # FIX THIS it is not prepared to handle other cases.
+        # initiate lists
         purp_list = []
         abstract_list = []
         credits_list = []
-        for idx, fp_xml in enumerate(fp_xml_orig):
-            print('indice {}. path {}'.format(self.indices_iloc[idx], fp_xml))# refer to notes below for diff betw trees and elements
-            try:
-                tree = ET.parse(fp_xml)
-                # root is the root ELEMENT of a tree
-                root = tree.getroot()
-                # remove the mess in root
-                # Parent for idPurp
-                dataIdInfo = root.find('dataIdInfo')
-                # search for element <idPurp> - consult python doc for more methods. find
-                # stops at first DIRECT child.  use root.iter for recursive search
-                # if doesn't exist.  Add else statements for if does exist and update with dict
-                purp = dataIdInfo.find('idPurp')
-                abstract = dataIdInfo.find('idAbs')
-                credits = dataIdInfo.find('idCredit')
-                try:
-                    purp_list.append(purp.text)
-                except AttributeError:
-                    purp_list.append(None)
-                try:
-                    abstract_list.append(abstract.text)
-                except AttributeError:
-                    abstract_list.append(None)
-                try:
-                    credits_list.append(credits.text)
-                except AttributeError:
-                    credits_list.append(None)
-            except FileNotFoundError:
-                str = 'AGOL upload status: {}'.format(fp_base[idx])
-                purp_list.append(str)
-                abstract_list.append(None)
-                credits_list.append(None)
-        # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
 
+        # If standard credits stamp
+        credits_stamp = 'Zachary Uhlmann\nMcMillen Jacobs\nuhlmann@mcmjac.com'
+        # If feature classes
+        if not shp:
+            for indice in self.indices:
+                fp_fcs = df.loc[indice][target_col]
+                tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
+                purp_list.append(tgt_item_md.summary)
+                abstract_list.append(tgt_item_md.description)
+                if standard_credits:
+                    credits = credits_stamp
+                else:
+                    credits = tgt_item_md.credits
+                credits_list.append(credits)
+
+        #If SHAPEFILE ---> relic
+        else:
+            # glob strings will create the string to pass to  glob.glob which
+            # uses th *xml wildcard to pull JUST the xml files from shapefile folder
+            glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
+            fp_xml_orig = []
+            for idx, glob_string in enumerate(glob_strings):
+                try:
+                    # ...[0] because it is a list of list - [[path/to/file]]
+                    temp = glob.glob(glob_string)[0]
+                    print(temp)
+                    fp_xml_orig.append(temp)
+                # if file not_uploaded, credit_crush, etc.  ZU 20210122
+                except IndexError:
+                    fp_xml_orig.append(fp_base[idx])
+            ct = 0
+            # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
+            # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
+            # need to fix all columns in this regard when writing xml
+            # FIX THIS it is not prepared to handle other cases.
+            for idx, fp_xml in enumerate(fp_xml_orig):
+                print('indice {}. path {}'.format(self.indices_iloc[idx], fp_xml))# refer to notes below for diff betw trees and elements
+                try:
+                    tree = ET.parse(fp_xml)
+                    # root is the root ELEMENT of a tree
+                    root = tree.getroot()
+                    # remove the mess in root
+                    # Parent for idPurp
+                    dataIdInfo = root.find('dataIdInfo')
+                    # search for element <idPurp> - consult python doc for more methods. find
+                    # stops at first DIRECT child.  use root.iter for recursive search
+                    # if doesn't exist.  Add else statements for if does exist and update with dict
+                    purp = dataIdInfo.find('idPurp')
+                    abstract = dataIdInfo.find('idAbs')
+                    credits = dataIdInfo.find('idCredit')
+                    try:
+                        purp_list.append(purp.text)
+                    except AttributeError:
+                        purp_list.append(None)
+                    try:
+                        abstract_list.append(abstract.text)
+                    except AttributeError:
+                        abstract_list.append(None)
+                    try:
+                        credits_list.append(credits.text)
+                    except AttributeError:
+                        credits_list.append(None)
+                except FileNotFoundError:
+                    str = 'AGOL upload status: {}'.format(fp_base[idx])
+                    purp_list.append(str)
+                    abstract_list.append(None)
+                    credits_list.append(None)
+            # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
+
+        # EXPORT INVENTORY
         df_quick_inventory = pd.DataFrame(np.column_stack(
                                 [index_names, purp_list, abstract_list, credits_list]),
                                 columns = ['feature_name', 'purpose', 'abstract', 'credits'])
-        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\data_hunting_and_inventory\agol_klamath_data_assessment_2021b.csv'
+        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\compare_vers\database_contents\master_gdb\\agol_master_gdb_assessmen_2021c.csv'
         pd.DataFrame.to_csv(df_quick_inventory, fp_out)
 
     def add_df(self, fp_csv, df_str, index_field):
@@ -624,6 +687,30 @@ class metaData(object):
                         logging.info(e)
                 else:
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
+
+        elif action_type in ['rename']:
+            for index in self.indices:
+                df_item = df.loc[index]
+                fp_fcs_current = os.path.normpath(df_item[target_col])
+                # create new filename components
+                fc_new_name = df_item['RENAME']
+                fp_components = fp_fcs_current.split(os.sep)
+                # all but original file name
+                fp_base = os.sep.join(fp_components[:-1])
+                # full path to new fcs
+                fp_fcs_new = os.path.join(fp_base, fc_new_name)
+
+                # NEW COL VALUES
+                df.at[index, target_col] = fp_fcs_new
+                df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
+                df.at[index, 'DATA_LOCATION_MCM_ORIGINAL_new'] = fp_fcs_new
+                df.at[index, 'ACTION'] = ''
+                df.at[index, 'RENAME'] = ''
+
+                msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
+                arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+                print(msg_str)
+                logging.info(msg_str)
 
         elif action_type in ['copy']:
             logging.info('COPYING FEATURES')
@@ -810,28 +897,6 @@ class metaData(object):
                     msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                     logging.info(msg_str)
                     logging.info(e)
-        elif action_type in ['rename']:
-            for index in self.indices:
-                df_item = df.loc[index]
-                fp_fcs_current = os.path.normpath(df_item[target_col])
-                # create new filename components
-                fc_new_name = df_item['RENAME']
-                fp_components = fp_fcs_current.split(os.sep)
-                # all but original file name
-                fp_base = os.sep.join(fp_components[:-1])
-                # full path to new fcs
-                fp_fcs_new = os.path.join(fp_base, fc_new_name)
-                # new col values
-                df.at[index, target_col] = fp_fcs_new
-                df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
-                df.at[index, 'DATA_LOCATION_MCMZ_ORIGINAL_new'] = fp_fcs_new
-                df.at[index, 'ACTION'] = ''
-                df.at[index, 'RENAME'] = ''
-
-                msg_str = 'RENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
-                arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
-                print(msg_str)
-                logging.info(msg_str)
 
         setattr(self, df_str, df)
 
@@ -1138,17 +1203,6 @@ class metaData(object):
         for indice in target_indices:
             df_target.at[indice, replace_col_target] = target_val
         setattr(self, '{}_matched'.format(df_str_target), df_target)
-
-    def update_inventory(self):
-        '''
-        If gdb and mxd have been updated since going through identification protocol
-        to remove unneeded data --> agol_obj.df_to_df_transfer or agol_obj.retain_visible, etc.
-        Redo process and join old df (csv) to updated df (csv)
-        ARGS
-        join_index      list [source_index, target_index]
-
-        '''
-
 
 class AgolAccess(metaData):
     '''

@@ -919,26 +919,29 @@ def return_mxd_obj(fp_mxd):
     '''
     mxd = arcpy.mapping.MapDocument(fp_mxd)
     return(mxd)
-
-def parse_item_desc(sub_item_list, target_key, target_val):
+def test_run(string_print):
+    print('FUUUUUUCKKKK {}'.format(string_print))
+def parse_item_desc(sub_item_list, target_key, target_val, add = True):
     '''
     Quick utility used for adding and updating Item Description metadata via
-    xml files.  ZRU 11/15/2020
+    xml files.  Note this is used to pass a single target key and target val
+        ZRU 11/15/2020
     ARGS:
     sub_item_list = pass list from idPurp of xml for shapefiles.  The list will be
                     the item_desc_str.splitlines() which splits at /n - essentially
                     splitting each key:val pair into one item in list i.e.
                     ['DATA_LOCATION_MCMILLEN_JACOBS: <file path',
                     'DATE_ADDED_AGOL: 20201115']
-    target_key      list of target keys i.e. [DATA_LOCATION_MCMILLEN_JACOBS,
-                                                DATE_ADDED_AGOL]
-    target_val      list of vals to pair with each target.  len(target_key) == len(target_list)
+    target_key     target key i.e. DATA_LOCATION_MCMILLEN_JACOBS,
+                                                DATE_ADDED_AGOL
+    target_val     vals to pair with each target.
     RETURNS
     New Item Description list with strings per sub item
     '''
     # initiate as false
     replaced_sub_item = False
     idx_offset = 0
+    print('we called this righrt?')
     for idx, sub_item in enumerate(sub_item_list):
         # if empty sub_items shrunk the list, idx will be notched back one at a time
         idx_adjusted = idx - idx_offset
@@ -949,18 +952,25 @@ def parse_item_desc(sub_item_list, target_key, target_val):
             sub_item_key = sub_item[:temp_idx]
             # if already present, then replace and return new list
             if target_key == sub_item_key:
-                print('replacing subitem')
-                sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
-                replaced_sub_item = True
+                # if ADDING purp lines
+                if add:
+                    print('replacing subitem {} with value {}'.format(sub_item_key, target_val))
+                    sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
+                    replaced_sub_item = True
+                # if REMOVING purp items
+                else:
+                    print('Removed {}'.format(sub_item_list[idx_adjusted]))
+                    sub_item_list.remove(sub_item_list[idx_adjusted])
         # if empty string in sub items, remove
         else:
             idx_adjusted = idx - idx_offset
             sub_item_list = [item for idx2, item in enumerate(sub_item_list) if idx_adjusted != idx2]
             idx_offset += 1
     # if no matched sub items were found, then simply add to list
-    if not replaced_sub_item:
-        sub_item_list.append('{}: {}'.format(target_key, target_val))
-    # if no matches are found, then return original list
+    if add:
+        if not replaced_sub_item:
+            sub_item_list.append('{}: {}'.format(target_key, target_val))
+        # if no matches are found, then return original list
     return(sub_item_list)
 
 def create_poly_from_pts(table_in, fp_out, offsets, **kwargs):

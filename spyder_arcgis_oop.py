@@ -258,7 +258,7 @@ class metaData(object):
                 parsed_csl_temp.append([item.strip(' ') for item in items.split(',')])
             except AttributeError:
                 # nans from pd.read_csv(...) are saved as floats which have
-                parsed_csl_temp.append(items)
+                parsed_csl_temp.append([items])
         # for idx, item in enumerate(parsed_csl_temp):
         #     print(idx, ' ', item)
         return(parsed_csl_temp)
@@ -348,11 +348,9 @@ class metaData(object):
 
             fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
 
-        # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
-        # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
-        # need to fix all columns in this regard when writing xml
-        # FIX THIS it is not prepared to handle other cases.
+        # key/val and key lists for add and subtract purpose list respectively
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
+        subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
         ct = 0
         for indice, indice_iloc in zip(self.indices, self.indices_iloc):
             if shp:
@@ -374,8 +372,6 @@ class metaData(object):
             # remove the mess in root
             # Parent for idPurp
             dataIdInfo = root.find('dataIdInfo')
-            for child in root:
-                print(child.tag, child.attrib)
 
             # search for element <idPurp> - consult python doc for more methods. find
             # stops at first DIRECT child.  use root.iter for recursive search
@@ -385,16 +381,29 @@ class metaData(object):
                 abstract = dataIdInfo.find('idAbs')
                 credits = dataIdInfo.find('idCredit')
             else:
-                print('no data id CRASH')
+                print('\ndataIdInfo Mucking it up!!!!!\n')
+
+
+            # ADD NEW PURP
+            new_purp_items = add_new_purp_list[indice_iloc]
+            print('iloc {} new purp: {}'.format(indice_iloc, new_purp_items))
+            # SUBTRACT NEW PURP
+            subtract_purp_items = subtract_new_purp_list[indice_iloc]
 
             # the try block will add new lines to existing idPurp element
             # if specified.  Thus far used when adding a McMillen_Path : path/to/file
             # to Item Description when idPurp exists.
-            new_purp_items = add_new_purp_list[indice_iloc]
-            print('iloc {} new purp: {}'.format(indice_iloc, new_purp_items))
+
             # if is a string this means there is a value.  if empty value it will be
             # a float for dumb reason.
-            if isinstance(new_purp_items[0], str):
+            if not isinstance(new_purp_items[0], str):
+                print('nothing to append')
+                # Marks To Do if - do NOT update purp unless subtract_lines_purp specified below
+                update_purp = False
+                pass
+            else:
+                # Marks To Do if - proceed with updating Purp
+                update_purp = True
                 purp_item, purp_value = [], []
                 for item in new_purp_items:
                     purp_item.append(item)
@@ -411,12 +420,13 @@ class metaData(object):
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
                     print('new purp will be this:\n{}'.format(purpose_new))
-                # add new purp to existing
+                # add new purp if existing
                 else:
                     # assemble new purpose items
                     sub_item_lst = purp.text.splitlines()
+                    # ADDING lines
                     for key, val in zip(purp_item, purp_value):
-                        print(purp_item, purp_value)
+                        print(key, val)
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, val)
 
                     # once the list is scoured and new items are either added or replaced
@@ -425,50 +435,57 @@ class metaData(object):
                     print('should be adding this to EXISTING purp:\n{}'.format(purpose_new))
                     # purpose_new = purp.text + purpose_new
 
+            # Nan from pd.dataframe.read_csv == dtype float
+            if isinstance(subtract_purp_items[0], str):
+                print('did we make it here')
+                if (purp is None) | (purp.text is None):
+                    print('No Purpose Items to Subtract')
+                else:
+                    # Did not update Add
+                    if not update_purp:
+                        sub_item_lst = purp.text.splitlines()
+                    # Updated add
+                    else:
+                        sub_item_lst = purpose_new.splitlines()
+                    # Update Subtract
+                    for key in subtract_purp_items:
+                        print('subitem list: {}'.format(sub_item_lst))
+                        print('SUBTRACE {}'.format(key))
+                        sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, '', False)
+                        purpose_new = '\n'.join(sub_item_lst)
+
+                    # Marks To Do - proceed with updating Purp
+                    update_purp = True
+
+            if update_purp:
                 element_text_list = [purpose_new]
                 element_list = [purp]
                 element_title = ['idPurp']
 
-                # try:
-                #     credits = kwargs['abstract']
-                #     if credits.lower() == 'replace':
-                #         credits_new = self.df.iloc[self.indices_iloc[ct]]['CREDITS']
-
-
-            # If not adding lines to purp, etc.
-            else:
-                # get new element text
-                credits_new = self.df_meta_add.loc[indice]['credits_new']
-                abstract_new = self.df_meta_add.loc[indice]['abstract']
-                purpose_new = self.df_meta_add.loc[indice]['purpose_new']
-                element_text_list = [purpose_new, abstract_new, credits_new]
-                element_list = [purp, abstract, credits]
-                element_title = ['idPurp', 'idAbs', 'idCredit']
-
-            for el, el_title, el_text in zip(element_list, element_title, element_text_list):
-                # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
-                # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
-                if el is not None:
-                    el.text = el_text
-                    el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
-                    # tree.write(fp_xml)
-
-                # if the element does not exist yet
-                elif (el is None):
-                    # wierd if/else but if string means it exists
-                    if isinstance(el_text, str):
-                        # purp = purpose.text
-                        el = ET.SubElement(dataIdInfo, el_title)
+                for el, el_title, el_text in zip(element_list, element_title, element_text_list):
+                    # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
+                    # print('\\nel_text: \\n{}\\nel_type:\\n{}'.format(el_text[idx], type(el_text[idx])))
+                    if el is not None:
                         el.text = el_text
-                        ET.dump(dataIdInfo)
-                        # OPTIONAL: this adds an attribute - a key, val pair
                         el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+                        # tree.write(fp_xml)
 
-                    # when csv has no value - i.e. nan, str becomes a float to signify nan
-                    # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
-                    elif math.isnan(el_text):
-                        print('this means nan float for thing')
-                        pass
+                    # if the element does not exist yet
+                    elif (el is None):
+                        # wierd if/else but if string means it exists
+                        if isinstance(el_text, str):
+                            # purp = purpose.text
+                            el = ET.SubElement(dataIdInfo, el_title)
+                            el.text = el_text
+                            ET.dump(dataIdInfo)
+                            # OPTIONAL: this adds an attribute - a key, val pair
+                            el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
+
+                        # when csv has no value - i.e. nan, str becomes a float to signify nan
+                        # isnan() is a proxy for that.  Could is isinstanc(el_text, float) too
+                        elif math.isnan(el_text):
+                            print('this means nan float for thing')
+                            pass
 
             # ABSTRACT
             try:
@@ -484,10 +501,20 @@ class metaData(object):
                 # no ABSTRACT col in csv
                 pass
             # CREDITS
+            # standard credits --> set col value to 'standard' in csv
+            credits_stamp = 'Zachary Uhlmann\nMcMillen Jacobs\nuhlmann@mcmjac.com'
             try:
+                #   NEEDS WORK - doesn't erase existimng --> see RAMP_restoration_bdry
+                print('CREDITS')
                 credits_new = df.loc[indice]['CREDITS']
                 if isinstance(credits_new, str):
                     el = ET.SubElement(dataIdInfo, 'idCredit')
+                    # stamp with standard credits or use specific
+                    if credits_new == 'standard':
+                        print('stamp STANDARD')
+                        credits_new = copy.copy(credits_stamp)
+                    else:
+                        pass
                     el.text = credits_new
                     ET.dump(dataIdInfo)
                 elif math.isnan(credits_new):

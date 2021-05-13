@@ -321,9 +321,6 @@ class metaData(object):
         df_str:                     same as add_df and duplicate_column - string to
                                     access dataframe assigned to self.  Allows
                                     to select non item_descriptions.csv ZU march 2021
-        add_lines_purp (kwargs):    comma separated entry from item_desc with items
-                                    being column titles from item_desc.
-                                    i.e. DATA_LOCATION_MCMILLEN_JACOBS
         '''
         df = getattr(self, df_str)
 
@@ -744,7 +741,7 @@ class metaData(object):
             if populate_target_df:
                 try:
                     df_str_master = 'df_master'
-                    fp_csv_master = getattr(self, 'fp_csv_master')
+                    df_master = getattr(self, df_str_master)
                 # master_gdb not added via self.add_df
                 except AttributeError:
                     print('populating target')
@@ -752,9 +749,9 @@ class metaData(object):
                     fp_csv_master = self.path_csv_dict['master_gdb']
                     # note this also creates fp_csv_archive
                     self.add_df(fp_csv_master, df_str_master, 'ITEM')
-                    df_master = getattr(self, df_str_master)
-                # save a base archive if NEVER saved and a daily archive if never saved
-                self.save_archive_csv(df_str_master)
+                    df_master = getattr(self,df_str_master)
+                    # save a base archive if NEVER saved and a daily archive if never saved
+                    self.save_archive_csv(df_str_master)
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
@@ -808,22 +805,23 @@ class metaData(object):
 
                 try:
                     print('COPY Protocol GO!!!')
-                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
+                    # arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
                     arcpy_msg = 'FC to FC True DELETE False'
                     # SOURCE DF UPDATES
-                    df.at[index, 'DATA_MASTER_LOCATION'] = fp_fcs_new
+                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'COPY_LOCATION'] = ''
                     df.at[index, 'COPY_LOCATION_DSET'] = ''
 
                     # TARGET DF UPDATES
+                    # Assemble Series to append to Master DF
                     d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
-                        'DATA_LOCATION_MCM_MASTER':fp_fcs_new}
+                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
                     ser_append = pd.Series(data = d,
                                  index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCM_MASTER'],
+                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
                                  name = feat_name)
-                    # append new row
+                    # append new row from Series
                     df_master = df_master.append(ser_append)
                     # LOG it up
                     msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
@@ -835,13 +833,15 @@ class metaData(object):
             # finally save out to new csv - note archive was saved in either:
             # 1) add_df    OR    2) top of this method
             print('here')
-            # SAVE TO MASTER CSV
+            # SetAttr HERE in case Permission Lock kills below if master csv accidentally open
             setattr(self, 'df_master', df_master)
+            setattr(self, df_str, df)
+
+            # SAVE TO MASTER CSV
             fp_csv_master = getattr(self, 'fp_csv_master')
             pd.DataFrame.to_csv(df_master, fp_csv_master)
 
             # SAVE TO SOURCE CSV
-            setattr(self, df_str, df)
             fp_csv_source = getattr(self, prop_str_fp_csv)
             pd.DataFrame.to_csv(df, fp_csv_source)
         elif action_type in ['move']:

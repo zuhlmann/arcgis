@@ -127,34 +127,33 @@ def unpack_list(list_in, arcobj):
     return(fields_out)
 
 
-def file_paths_arc(folder_or_gdb, want_df, dsets_desired = 'All', **kwargs):
+def file_paths_arc(folder_or_gdb, want_df, **kwargs):
     '''
     ZRU 5/6/2020
     returns list of all paths to feature classes including path/to/featureDataset/features
-    Note Will change environment temporarilly
+    Note Will change environment temporarilly. UPdated 20210513 so dsets_desired
+    is a kwarg and ALL dsets_desired is default if kword not provied
     ARGS:
     folder_or_gdb       Currently designed for a gdb
     want_df                  boolean - if True, output dataframe
-    dsets_desired           default to ALL.  Or pass list of dataset names.  Final
-                            option pass 'none' if just want standalone.  Note:
-                            'all' will include standalone.
+    kwarg[dsets_desired]    default to ALL if not passed.  Or pass list of dataset names.  Final
+                            option pass empty list if just want standalone.
     RETURNS:
     path_to_dset_feats          list of paths/to/dataset/feature
     '''
     # change to specified folder
     arcpy.env.workspace = folder_or_gdb
-    
+
     # find standalone features within folder, if they exist
     # NOTE have not done anything yet with standalone_feats
     # standalone_feats = arcpy.ListFeatureClasses()
     # dsets = [dset.decode('utf-8') for dset in arcpy.ListDatasets()]
     # # note python 2.7 likes:
 
-    if dsets_desired.lower() != 'all':
-        dsets = [dsets_desired]
-    elif dsets_desired.lower() == 'none':
-        dsets = []
-    else:
+    try:
+        dsets = kwargs['dsets_desired']
+    # if kword not passed then ALL dsets will be inventoried
+    except KeyError:
         dsets = [dset for dset in arcpy.ListDatasets()]
     path_to_feat = []
     feats_df = []

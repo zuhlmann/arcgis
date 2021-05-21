@@ -75,8 +75,8 @@ utilities.zipShapefilesInDir(fp_out, '{}_zip'.format(fp_out))
 # 1) get index using indices = range() or target_action = remove
 # 2) identify_items_online
 # 3) take_action
-# agol_obj.identify_items_online()
-# agol_obj.take_action('remove')
+agol_obj.identify_items_online()
+agol_obj.take_action('remove')
 
 # f) ADD SHP TO CONTENT AGOL
 # ADD same protocol for checking if already published as in g1)
@@ -88,68 +88,65 @@ snips.extend(snip1)
 snips.extend(snip2)
 # agol_obj.AgolAccess('something')
 agol_obj.add_agol_upload('df', snippets = snips)
-# #
-# #g) PUBLISH
+#
+#g) PUBLISH
 # g1)
 # creates list of items adds as attribute --> user_content_<tag name>_<file type>
-# tag = 'Biology'
-# itemType_shp = 'shapefile'
-# agol_obj.identify_items_online(itemType_shp, tags = tag)
-# # note feature2 works for identifying feature layers.  Not sure what Feature Layer Collection =
-# itemType_feat = 'feature2'
-# agol_obj.identify_items_online(itemType_feat, tags = tag)
-# itemType_feat = 'feature'
-# agol_obj.identify_items_online(itemType_feat, tags = tag)
-# # REMOVE DICTIONARY IN FUTURE! so not to hardcode item type --> .format(tag, 'shapefile')
-# shapefiles_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'shapefile'))
-# features_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer'))
-# features_services_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer_Collection'))
+tag = 'Biology'
+itemType_shp = 'shapefile'
+agol_obj.identify_items_online(itemType_shp, tags = tag)
+# note feature2 works for identifying feature layers.  Not sure what Feature Layer Collection =
+itemType_feat = 'feature2'
+agol_obj.identify_items_online(itemType_feat, tags = tag)
+itemType_feat = 'feature'
+agol_obj.identify_items_online(itemType_feat, tags = tag)
+# REMOVE DICTIONARY IN FUTURE! so not to hardcode item type --> .format(tag, 'shapefile')
+shapefiles_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'shapefile'))
+features_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer'))
+features_services_filtered = getattr(agol_obj, 'user_content_{}_{}'.format(tag, 'Feature_Layer_Collection'))
 
-# # g2)
-# # FIND content already published. ADD same protocol for adding shapefiles
-# # get index of shapefiles already uploaded to feat
-# shp_content_name = [item.title for item in shapefiles_filtered]
-# feat_content_name = [item.title for item in features_filtered]
-# feat_service_name = [item.title for item in features_services_filtered]
-# idx_remove = []
-# shp_content_lower = [item.lower() for item in shp_content_name]
-# feat_content_lower = [item.lower() for item in feat_content_name]
-# for idx, shp in enumerate(shp_content_lower):
-#     if shp in feat_content_lower:
-#         idx_remove.append(idx)
-#     print('{} shapefile {}'.format(idx, shp))
-#
-# # idx_find = list(set(range(idx)) - set(idx_remove))
-#
-# shapefiles_filtered = [i for j, i in enumerate(shapefiles_filtered) if j not in idx_remove]
-#
-# g3)
-# # finally publish
-# for content_item in shapefiles_filtered:
-#     print(content_item.name)
-#     content_item.publish(output_type = 'Feature Layer')
+# g2)
+# FIND content already published. ADD same protocol for adding shapefiles
+# get index of shapefiles already uploaded to feat
+shp_content_name = [item.title for item in shapefiles_filtered]
+feat_content_name = [item.title for item in features_filtered]
+feat_service_name = [item.title for item in features_services_filtered]
+idx_remove = []
+shp_content_lower = [item.lower() for item in shp_content_name]
+feat_content_lower = [item.lower() for item in feat_content_name]
+for idx, shp in enumerate(shp_content_lower):
+    if shp in feat_content_lower:
+        idx_remove.append(idx)
+    print('{} shapefile {}'.format(idx, shp))
 
-# h)
-# remove data
-#
-# agol_obj.selection_idx(target_action = 'remove')
-# # This will find all Feature Layer Collections
-# agol_obj.identify_items_online('feature')
-# # list of feature items from online
-# feat_layers = agol_obj.user_content_Feature_Layer_Collection
-# for feat_layer in feat_layers:
-#     for feat_to_remove in agol_obj.indices:
-#         if feat_to_remove == feat_layer.title:
-#             feat_layer.delete()
-#
-# # deleting features from AGOL
-# matching_features = [feat_layer for feat_layer in agol_obj.user_content_Feature_Layer if feat_layer.title in agol_obj.indices]
-# feature_layer.update(item_properties = {'title' = '<new_title'})
-#
-# # to update columns in dataframe
-# df.at[<int; row idx>, <str; col name>] = 'action'
-# df.at[0, 'ACTION'] = ''
-#
+# idx_find = list(set(range(idx)) - set(idx_remove))
+
+shapefiles_filtered = [i for j, i in enumerate(shapefiles_filtered) if j not in idx_remove]
+
+g3)
+# finally publish
+for content_item in shapefiles_filtered:
+    print(content_item.name)
+    content_item.publish(output_type = 'Feature Layer')
+
+h)
+remove data
+
+agol_obj.selection_idx(target_action = 'remove')
+# This will find all Feature Layer Collections
+agol_obj.identify_items_online('feature')
+# list of feature items from online
+feat_layers = agol_obj.user_content_Feature_Layer_Collection
+for feat_layer in feat_layers:
+    for feat_to_remove in agol_obj.indices:
+        if feat_to_remove == feat_layer.title:
+            feat_layer.delete()
+
+# deleting features from AGOL
+matching_features = [feat_layer for feat_layer in agol_obj.user_content_Feature_Layer if feat_layer.title in agol_obj.indices]
+feature_layer.update(item_properties = {'title' = '<new_title'})
+
+
 # 1. ContentManager Module (accessed via GIS Module in my code i.e.
 # mcm_gis = GIS(username, pword))
 # mcm_gis.content.search('owner: uhlmann@mcmjac.com', item_type = itemType, max_items = 900))

@@ -60,6 +60,7 @@ class metaData(object):
         # i.e. all four properties contained in a metadata_props_dbase.json
         try:
             self.path_gdb_dict = kwargs['non_klamath_df_dict']
+
         except KeyError:
             path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
                         'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
@@ -168,6 +169,7 @@ class metaData(object):
                 ct += 1
             # if multiple target_actions using set will slim down duplicate indices
             iloc_action = list(set(iloc_temp))
+            iloc_action.sort()
             # get index names from iloc vals
             self.indices_iloc = copy.copy(iloc_action)
             self.indices = df.iloc[iloc_action].index.tolist()
@@ -324,6 +326,29 @@ class metaData(object):
         '''
         df = getattr(self, df_str)
 
+        # archive before deleting - this saves an archive csv
+        self.save_archive_csv(df_str)
+
+        df_base_str = df_str.replace('df_','')
+
+        if df_base_str == '':
+            prop_str_fp_logfile = 'fp_log'
+        else:
+            prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
+            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+
+        fp_logfile = getattr(self, prop_str_fp_logfile)
+
+        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
+
+        # Save call string to logfile
+        banner = '    {}    '.format('-'*50)
+        call_str = 'take_action({}, {}, target_col = {}):\n'.format(df_str, action_type, target_col)
+        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
+        logging.info(msg_str)
+
         # may not use too often -  legacy from before master.gdb and direct gdb
         # updating ZU 20210505
         if shp:
@@ -410,13 +435,11 @@ class metaData(object):
                 if purp is None:
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
-                    print('new purp will be this:\n{}'.format(purpose_new))
                 # needed if text deleted manaully in arc (i.e. Edit Metadata)
                 # for some reason purp will NOT be None, but purp.text will be None
                 elif purp.text is None:
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
-                    print('new purp will be this:\n{}'.format(purpose_new))
                 # add new purp if existing
                 else:
                     # assemble new purpose items
@@ -429,14 +452,18 @@ class metaData(object):
                     # once the list is scoured and new items are either added or replaced
                     # join into one big string
                     purpose_new = '\n'.join(sub_item_lst)
-                    print('should be adding this to EXISTING purp:\n{}'.format(purpose_new))
-                    # purpose_new = purp.text + purpose_new
+
+                # LOG and DOCUMENT DF
+                msg_str = 'NEW PURPOSE for\n{}:\n{}'.format(indice, purpose_new)
+                # purpose_new = purp.text + purpose_new
+                df.at[indice, 'ADD_LINES_PURP'] = ''
 
             # Nan from pd.dataframe.read_csv == dtype float
             if isinstance(subtract_purp_items[0], str):
                 print('did we make it here')
                 if (purp is None) | (purp.text is None):
-                    print('No Purpose Items to Subtract')
+                    # no purpose to subtract
+                    pass
                 else:
                     # Did not update Add
                     if not update_purp:
@@ -447,17 +474,23 @@ class metaData(object):
                     # Update Subtract
                     for key in subtract_purp_items:
                         print('subitem list: {}'.format(sub_item_lst))
-                        print('SUBTRACE {}'.format(key))
+                        print('SUBTRACT {}'.format(key))
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, '', False)
                         purpose_new = '\n'.join(sub_item_lst)
 
                     # Marks To Do - proceed with updating Purp
                     update_purp = True
 
+                    msg_str = 'NEW PURPOSE for\n{}:\n{}'.format(indice, purpose_new)
+                    df.at[indice, 'REMOVE_LINES_PURP']=''
+
             if update_purp:
                 element_text_list = [purpose_new]
                 element_list = [purp]
                 element_title = ['idPurp']
+
+                # log what the new purp will look like
+                logging.info(msg_str)
 
                 for el, el_title, el_text in zip(element_list, element_title, element_text_list):
                     # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
@@ -491,6 +524,7 @@ class metaData(object):
                     el = ET.SubElement(dataIdInfo, 'idAbs')
                     el.text = abstract_new
                     ET.dump(dataIdInfo)
+                    df.at[indice, 'ABSTRACT'] = ''
                 elif math.isnan(abstract_new):
                     print('this means nan float for thing')
                     pass
@@ -514,6 +548,7 @@ class metaData(object):
                         pass
                     el.text = credits_new
                     ET.dump(dataIdInfo)
+                    df.at[indice, 'CREDITS'] = ''
                 elif math.isnan(credits_new):
                     print('this means nan float for thing')
                     pass
@@ -523,6 +558,8 @@ class metaData(object):
 
             # for standalone xmp in shapefile --> this is all you need
             tree.write(fp_xml)
+            # if added/subtracted purp then lines removed
+            setattr(self, df_str, df)
             # additional step for fcs in gdb
             if not shp:
                 # copy new metadata
@@ -758,7 +795,11 @@ class metaData(object):
                 fp_copy = os.path.normpath(self.path_gdb_dict[df_item['COPY_LOCATION']])
                 dset_copy = df_item['COPY_LOCATION_DSET']
                 dset_lower = df_item['DSET_LOWER_CASE']
-                rename = df_item['RENAME']
+                try:
+                    rename = df_item['RENAME']
+                # if no rename column
+                except KeyError:
+                    rename = np.nan
 
                 # add data to be copied to dataframe
 
@@ -800,12 +841,16 @@ class metaData(object):
                 # retain original name
                 else:
                     feat_name = copy.copy(index)
+                    feat_name = feat_name.replace(' ','_')
+                    feat_name = feat_name.replace('&','_')
+                    print('feat name to copy {}'.format(feat_name))
+
                     # full path with featureclass name
                     fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
 
                 try:
                     print('COPY Protocol GO!!!')
-                    # arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
+                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
                     arcpy_msg = 'FC to FC True DELETE False'
                     # SOURCE DF UPDATES
                     df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
@@ -813,16 +858,17 @@ class metaData(object):
                     df.at[index, 'COPY_LOCATION'] = ''
                     df.at[index, 'COPY_LOCATION_DSET'] = ''
 
-                    # TARGET DF UPDATES
-                    # Assemble Series to append to Master DF
-                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
-                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
-                    ser_append = pd.Series(data = d,
-                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
-                                 name = feat_name)
-                    # append new row from Series
-                    df_master = df_master.append(ser_append)
+                    if populate_target_df:
+                        # TARGET DF UPDATES
+                        # Assemble Series to append to Master DF
+                        d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
+                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                        ser_append = pd.Series(data = d,
+                                     index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
+                                            'DATA_LOCATION_MCMILLEN_JACOBS'],
+                                     name = feat_name)
+                        # append new row from Series
+                        df_master = df_master.append(ser_append)
                     # LOG it up
                     msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                     logging.info(msg_str)
@@ -834,16 +880,18 @@ class metaData(object):
             # 1) add_df    OR    2) top of this method
             print('here')
             # SetAttr HERE in case Permission Lock kills below if master csv accidentally open
-            setattr(self, 'df_master', df_master)
             setattr(self, df_str, df)
 
+
             # SAVE TO MASTER CSV
-            fp_csv_master = getattr(self, 'fp_csv_master')
-            pd.DataFrame.to_csv(df_master, fp_csv_master)
+            if populate_target_df:
+                setattr(self, 'df_master', df_master)
+                fp_csv_master = getattr(self, 'fp_csv_master')
+                pd.DataFrame.to_csv(df_master, fp_csv_master)
 
             # SAVE TO SOURCE CSV
             fp_csv_source = getattr(self, prop_str_fp_csv)
-            pd.DataFrame.to_csv(df, fp_csv_source)
+            # pd.DataFrame.to_csv(df, fp_csv_source)
         elif action_type in ['move']:
             for index in self.indices:
                 df_item = df.loc[index]
@@ -1285,7 +1333,7 @@ class AgolAccess(metaData):
         except KeyError:
             pass
 
-    def take_action_agol(self, action_type, itemType = ['feature','shapefile']):
+    def take_action_agol(self, df_str, action_type, itemType = ['feature','shapefile']):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
         only for remove.  will add others and perhaps a log for each run.
@@ -1297,12 +1345,19 @@ class AgolAccess(metaData):
         action_type     thus far just 'remove' but need to add 'tags', publish
                         and 'share'
         '''
+        df = getattr(self, df_str)
         ct = 1
         for item in itemType:
+            # search for agol content in self
             item = self.item_type_dict[item]
             item = item.replace(' ', '_').lower()
             str = 'user_content_{}'.format(item)
             user_content = getattr(self, str)
+            if action_type == 'agol_status':
+                for content_item in user_content:
+                    title = content_item.title
+                    if title in self.indices:
+                        df.at[title, 'AGOL_STATUS'] = 'online'
             if action_type == 'remove':
                 for content_item in user_content:
                     title = content_item.title
@@ -1314,9 +1369,10 @@ class AgolAccess(metaData):
                             # this is for useing ALTERNATE column - not INDEX
                             # idloc = (self.df_working.ITEM == title).idxmax()
                             # fancy method to value for action at idloc
-                            initial_vals = self.df_working.at[title, 'ACTION']
+                            initial_vals = df.at[title, 'ACTION']
                             # basically parse comma separated While removing spaces
                             updated_vals = [vals.strip(' ') for vals in initial_vals.split(',')]
+                            # remove 'remove' tag
                             updated_vals.remove('remove')
                             # if no actions remain, then set to nan
                             # seems to work without converting NoneType to math.nan, but just in case
@@ -1329,13 +1385,14 @@ class AgolAccess(metaData):
                             else:
                                 updated_vals = ', '.join(updated_vals)
                             print('updating vals for {}'.format(content_item))
-                            self.df_working.at[title, 'ACTION'] = updated_vals
+                            df.at[title, 'ACTION'] = updated_vals
                             # set status to offline
-                            self.df_working.at[title, 'AGOL_STATUS'] = 'offline'
+                            df.at[title, 'AGOL_STATUS'] = 'offline'
             # keep count going
             ct += 1
-        fp_out = r'C:\Users\uhlmann\code\item_description_updated_test.csv'
-        pd.DataFrame.to_csv(self.df_working, fp_out)
+        setattr(self, 'df', df)
+        fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions_temp.csv'
+        # pd.DataFrame.to_csv(df, fp_item_desc_temp)
 
 
     def add_agol_upload(self, df_str, **kwargs):

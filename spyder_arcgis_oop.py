@@ -32,7 +32,8 @@ class metaData(object):
     '''
     def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv',
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
-        setattr(self, df_str, pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str'))
+        df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
+        setattr(self, df_str, df)
         # fp_csv_archive creation.
         todays_date = datetime.datetime.today().strftime('%Y%m%d')
         self.todays_date = todays_date
@@ -40,21 +41,18 @@ class metaData(object):
         self.todays_date_verbose = todays_date_verbose
         basepath = os.path.splitext(fp_csv)[0]
 
+        # save path to csv
         if df_str == 'df':
             fp_csv_prop_str = 'fp_csv'
-            fp_csv_archive_prop_str = 'fp_csv_archive'
-            fp_log_prop_str = 'fp_log'
         else:
+            # passing a different base df
             df_base_str = df_str.replace('df_', '')
             fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
-            fp_csv_archive_prop_str = 'fp_csv_archive_{}'.format(df_base_str)
-            fp_log_prop_str = 'fp_log_{}'.format(df_base_str)
+
         setattr(self, fp_csv_prop_str, fp_csv)
-        setattr(self, fp_csv_archive_prop_str, '{}_archive_{}.csv'.format(basepath, todays_date))
-        fp_log = '{}_logfile.log'.format(basepath)
-        setattr(self, fp_log_prop_str, fp_log)
-        # adds properties fp_log - incorporate archive and working laer ZU 20210408
-        # self.create_base_properties(fp_csv)
+
+        # adds fp_log, csv_archive, csv_temp, etc.
+        self.create_base_properties(df_str)
 
         # change at some point to pass a json for whatever dbase is in use
         # i.e. all four properties contained in a metadata_props_dbase.json
@@ -80,17 +78,70 @@ class metaData(object):
             self.prj_file = kwargs['prj_file']
         except KeyError:
             pass
+    def fcs_to_shp_agol_prep(self, df_str, base_dir_shp, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+        '''
+        Created long time ago.  Edited for different workflow - i.e. pass indices
+        for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
 
-    def zip_agol_upload(self):
-        # 1) ZIP SHAPEFILES
+        ARGS:
+        df_str              df for example
+        base_dir_shp        path/to/dir/with/agol_Uploads/2020_10_05
+        target_col          col name for  col with file path to fcs for conversion
+        '''
+        # 1) create subfolder for each shapefiles
+        df = getattr(self, df_str)
+        yyyy_mm_dd = os.path.basename(base_dir_shp)
+        # create subdir JUST for shapefiles
+        inDir = os.path.join(base_dir_shp, yyyy_mm_dd)
+        # shp subdir does not exist
+        if not os.path.exists(inDir):
+            os.mkdir(inDir)
+        # 2) Convert FCS to SHAPEFILE
+        ct = 0
+        for indice in self.indices:
+            fp_fcs_in = df.loc[indice][target_col]
+            symb = '-'*20
+            shp_name = os.path.join(inDir, indice + '.shp')
+            if not arcpy.Exists(shp_name):
+                print('{}  CONVERTING  {}\nInput FCS: {}\nOutput SHP: {}'.format
+                                (symb, symb, fp_fcs_in, '{}.shp'.format(indice)))
+                arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_in, inDir, indice)
+                print('{}  CONVERSION COMPLETE  {}'.format(symb, symb))
+            else:
+                print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(shp_name))
 
-        inDir = self.df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()[0]
+    def zip_shp_agol_prep(self, base_dir_shp, **kwargs):
+        '''
+        Created long time ago.  Edited for different workflow - i.e. pass indices
+        for one fell swoop within function as opposed to calling within for loop.
+        Also, convert fcs to shp AND zip in one fell swoop.  ZU 5/21/21
+
+        ARGS:
+        base_dir_shp:           path/to/dir/with/agol_Uploads/2020_10_05
+        exclude_files:          take from self.indices --> string of shapefile name
+                                to exclude from zipping (already zipped)
+        '''
+
+        yyyy_mm_dd = os.path.basename(base_dir_shp)
+        # create subdir JUST for shapefiles
+
+        inDir = os.path.join(base_dir_shp, yyyy_mm_dd)
+        # shp subdir does not exist
+        if not os.path.exists(inDir):
+            os.mkdir(inDir)
+
         outDir = '{}_zip'.format(inDir)
-        if os.path.exists(outDir):
-            pass
-        else:
+        # ensure shp_dir does not already exist
+        if not os.path.exists(outDir):
             os.mkdir(outDir)
-        utilities.zipShapefilesInDir(inDir, outDir)
+
+        # 3) ZIP all Files at once
+        try:
+            # exclude files if already zipped
+            exclude_files = kwargs['exclude_files']
+            utilities.zipShapefilesInDir(inDir, outDir, exclude_files = exclude_files)
+        except KeyError:
+            utilities.zipShapefilesInDir(inDir, outDir)
         setattr(self, 'outDir', outDir)
 
     def selection_idx(self, df_str, **kwargs):
@@ -207,6 +258,24 @@ class metaData(object):
         except KeyError:
             # there should be a a key either tags or indices so delete or resoovle code somehow
             pass
+
+        try:
+            # find matching indice in another dataframe in object and find
+            # iloc values. ZU 20210525
+            df_str_target = kwargs['get_iloc_alternate_df']
+            df_target = getattr(self, df_str_target)
+            alternate_df_iloc = []
+            for indice in self.indices:
+                try:
+                    alternate_df_iloc.append(df_target.index.get_loc(indice))
+                except KeyError:
+                    print('missing index {}'.format(indice))
+            attribute_str = '{}_indices_iloc'.format(df_str_target)
+            print(attribute_str)
+            setattr(self, attribute_str, alternate_df_iloc)
+        except KeyError:
+            pass
+
 
         # if using column other than tags to select rows.  Note: it is a dict
         try:
@@ -329,13 +398,14 @@ class metaData(object):
         # archive before deleting - this saves an archive csv
         self.save_archive_csv(df_str)
 
-        df_base_str = df_str.replace('df_','')
-
-        if df_base_str == '':
+        if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
+            prop_str_indices_iloc = 'indices_iloc'
         else:
+            df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices_iloc = '{}_indices_iloc'.format(df_str)
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
@@ -343,8 +413,7 @@ class metaData(object):
 
         # Save call string to logfile
         banner = '    {}    '.format('-'*50)
-        call_str = 'take_action({}, {}, target_col = {}):\n'.format(df_str, action_type, target_col)
-        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        fct_call_str = 'Performing function write_xml'
         date_str = datetime.datetime.today().strftime('%D %H:%M')
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
@@ -374,7 +443,9 @@ class metaData(object):
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
         subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
         ct = 0
-        for indice, indice_iloc in zip(self.indices, self.indices_iloc):
+
+        indices_iloc = getattr(self, prop_str_indices_iloc)
+        for indice, indice_iloc in zip(self.indices, indices_iloc):
             if shp:
                 fp_xml = fp_xml_orig_shp[ct]
                 temp_path = copy.copy(fp_xml)
@@ -715,11 +786,10 @@ class metaData(object):
         # archive before deleting - this saves an archive csv
         self.save_archive_csv(df_str)
 
-        df_base_str = df_str.replace('df_','')
-
-        if df_base_str == '':
+        if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
         else:
+            df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
 
@@ -873,7 +943,7 @@ class metaData(object):
                     msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                     logging.info(msg_str)
                 except Exception as e:
-                    msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
+                    msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, msg_str)
                     logging.info(msg_str)
                     logging.info(e)
             # finally save out to new csv - note archive was saved in either:
@@ -1158,11 +1228,13 @@ class metaData(object):
 
     def save_archive_csv(self, df_str):
 
-        df_base_str = df_str.replace('df_', '')
-        if df_base_str == '':
+        if df_str == 'df':
+            # if df
             str_csv_archive_obj = 'fp_csv_archive'
             str_csv_archive_temp_obj = 'fp_csv_archive_temp'
         else:
+            # strip away the df_
+            df_base_str = df_str.replace('df_', '')
             str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
             str_csv_archive_temp_obj = 'fp_csv_archive_temp_{}'.format(df_base_str)
 
@@ -1333,17 +1405,25 @@ class AgolAccess(metaData):
         except KeyError:
             pass
 
-    def take_action_agol(self, df_str, action_type, itemType = ['feature','shapefile']):
+    def take_action_agol(self, df_str, action_type, itemType = ['feature','shapefile'],
+                            update_agol_status = False, update_sharing_status = False,
+                            **kwargs):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
         only for remove.  will add others and perhaps a log for each run.
-        # NEED TO REPLACE df_working as this was removed as a property(concept) on 4/15/2021
+        #
         ARGS
-        itemType       same as identify_items_online method. pass as list of
-                        strings or one string.  i.e 'shapefile'.  Default =
-                        ['shapefile', 'feature']
-        action_type     thus far just 'remove' but need to add 'tags', publish
-                        and 'share'
+        itemType                same as identify_items_online method. pass as list of
+                                strings or one string.  i.e 'shapefile'.  Default =
+                                ['shapefile', 'feature']
+        action_type             thus far just 'remove' but need to add 'tags', publish
+                                and 'share'
+        update_sharing_status   Boolean. update the SHARED_GROUP col
+        update_agol_status      Boolean. update the AGOL_STATUS col
+        kwargs                  update_action --> ONLY kwarg option:
+                                this will remove action val (string specified)
+                                as val in key/val pair of kwarg update_aaction
+
         '''
         df = getattr(self, df_str)
         ct = 1
@@ -1358,44 +1438,106 @@ class AgolAccess(metaData):
                     title = content_item.title
                     if title in self.indices:
                         df.at[title, 'AGOL_STATUS'] = 'online'
+                    else:
+                        df.at[title, 'AGOL_STATUS'] = 'offline'
+
+                    # if we want to remove vals in ACTION col
+                    try:
+                        col_val = kwargs['update_action']
+                        df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                    except:
+                        pass
+
             if action_type == 'remove':
                 for content_item in user_content:
                     title = content_item.title
                     if title in self.indices:
                         content_item.delete()
-                        # Only need update csv once! Not both for shapefile and feature
-                        if ct == 1:
-                            # gets idx in df; assumes just ONE item with exact name -NOT > 1
-                            # this is for useing ALTERNATE column - not INDEX
-                            # idloc = (self.df_working.ITEM == title).idxmax()
-                            # fancy method to value for action at idloc
-                            initial_vals = df.at[title, 'ACTION']
-                            # basically parse comma separated While removing spaces
-                            updated_vals = [vals.strip(' ') for vals in initial_vals.split(',')]
-                            # remove 'remove' tag
-                            updated_vals.remove('remove')
-                            # if no actions remain, then set to nan
-                            # seems to work without converting NoneType to math.nan, but just in case
-                            # upon import None and NaN = NaN (df = pd.read_csv(fp_csv))
-                            # checking for None - interesting post:
-                            # https://stackoverflow.com/questions/23086383/how-to-test-nonetype-in-python
-                            if updated_vals is None:
-                                updated_vals = math.nan
-                            # otherwise, join back into comma separated string
-                            else:
-                                updated_vals = ', '.join(updated_vals)
-                            print('updating vals for {}'.format(content_item))
-                            df.at[title, 'ACTION'] = updated_vals
-                            # set status to offline
+                        # gets idx in df; assumes just ONE item with exact name -NOT > 1
+                        # this is for useing ALTERNATE column - not INDEX
+                        # idloc = (self.df_working.ITEM == title).idxmax()
+                        # fancy method to value for action at idloc
+                        # OFFLINE set status to offline
+                        if update_agol_status:
                             df.at[title, 'AGOL_STATUS'] = 'offline'
-            # keep count going
+
+                    # if we want to remove vals in ACTION col
+                    try:
+                        col_val = kwargs['update_action']
+                        df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                    except:
+                        pass
+
+            if action_type == 'publish':
+                for indice in self.indices:
+                    # comes as a list for what should prob be a dictionary
+                    item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Shapefile')
+                    if indice == item_list[0].title:
+                        print('PUBLISHING: {}'.format(indice))
+                        item_list[0].publish()
+                    else:
+                        print('item title {} did not match queried result on agol --> did NOT publish'.format(indice))
+                    # if we want to remove vals in ACTION col
+                    try:
+                        col_val = kwargs['update_action']
+                        df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                    except:
+                        pass
+            if action_type == 'share':
+                # get group id for sharing
+                try:
+                    getattr(self, 'krrp_geospatial')
+                except AttributeError:
+                    self.get_group('krrp_geospatial')
+
+                for indice in self.indices:
+                    # comes as a list for what should prob be a dictionary
+                    item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Feature Layer')
+                    if indice == item_list[0].title:
+                        print('SHARING: {}'.format(indice))
+                        item_list[0].share(groups = [self.krrp_geospatial])
+                        if update_sharing_status:
+                            df.at[title, 'SHARED_GROUP'] = True
+                    else:
+                        print('NOT SHARING:\nItem Title {} did not match queried result on agol'.format(indice))
+
+                    # if we want to remove vals in ACTION col
+                    try:
+                        col_val = kwargs['update_action']
+                        df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                    except:
+                        pass
+
+            # keep count going for item_type
             ct += 1
         setattr(self, 'df', df)
         fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions_temp.csv'
         # pd.DataFrame.to_csv(df, fp_item_desc_temp)
+    def update_comma_sep_vals(self, df, index, col_name, col_val):
+        # UPDATE comma-sep list
+        initial_vals = df.at[index, col_name]
+        # basically parse comma separated While removing spaces
+        updated_vals = [vals.strip(' ') for vals in initial_vals.split(',')]
+        # remove tag
+        try:
+            updated_vals.remove(col_val)
+        except ValueError:
+            # most likely looped through once and already removed
+            pass
+        # if no actions remain, then set to nan
+        # seems to work without converting NoneType to math.nan, but just in case
+        # upon import None and NaN = NaN (df = pd.read_csv(fp_csv))
+        # checking for None - interesting post:
+        # https://stackoverflow.com/questions/23086383/how-to-test-nonetype-in-python
+        if updated_vals is None:
+            updated_vals = math.nan
+        # otherwise, join back into comma separated string
+        else:
+            updated_vals = ', '.join(updated_vals)
+        df.at[index, 'ACTION'] = updated_vals
+        return(df)
 
-
-    def add_agol_upload(self, df_str, **kwargs):
+    def add_agol_upload(self, df_str, target_col = 'DATA_LOCATION_ZIP', **kwargs):
         '''
         currently passing snippets as kwarg but could be drawn from column in
         csv in future.  shapefiles need to be zipped and in file structure
@@ -1408,7 +1550,7 @@ class AgolAccess(metaData):
         # grab tags of iloc ONLY if they were zipped  CONSIDER MOVING TO def indices
         # OR ABSTRACT as function with values and column names to ignore
         ignore_upload = ['not_zipped', 'shapefile_failed', 'not_uploaded']
-        indices_loc = [idx for idx in self.indices_iloc if self.df.iloc[idx].DATA_LOCATION_MCMILLEN_JACOBS not in ignore_upload]
+        indices_loc = [idx for idx in self.indices_iloc if self.df.iloc[idx][target_col] not in ignore_upload]
 
         titles = self.df.iloc[indices_loc].index.values.tolist()
 
@@ -1449,7 +1591,7 @@ class AgolAccess(metaData):
 
         # need indices from self.selection_idx
         # YES this is correct.  Each shapefile gets its OWN zip folder
-        upload_folders = self.df.loc[titles]['DATA_LOCATION_MCMILLEN_JACOBS'].values.tolist()
+        upload_folders = self.df.loc[titles]['DATA_LOCATION_ZIP'].values.tolist()
         parent_zip_folder = ['{}_zip'.format(upload_folder) for upload_folder in upload_folders]
         zipped_folders = [os.path.join(zip_folder, title) for zip_folder, title in zip(parent_zip_folder, titles)]
         zipped_folders = ['{}.zip'.format(zip_folder) for zip_folder in zipped_folders]
@@ -1463,9 +1605,11 @@ class AgolAccess(metaData):
 
          # zipped_dir will be index title
         for idx, shp in enumerate(zipped_folders):
-            properties_dict = {'title':titles[idx],
+            properties_dict = {'type':'Shapefile',
+                                'title':titles[idx],
                                 'tags':tags[idx],
                                 'snippet':snippets[idx]}
+            print('ADDING TO AGOL: \n{}'.format(shp))
             fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))

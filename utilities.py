@@ -482,6 +482,8 @@ def zipShapefilesInDir(inDir, outDir, **kwarg):
     print("Zipping shapefile(s)in folder {} to output folder {}".format(inDir, outDir))
 
     try:
+        # Seems more for Problematic files that break function with Exception
+        # unrelated to the file's existence 5/21/21
         exclude_files = kwarg['exclude_files']
         if isinstance(exclude_files, str):
             exclude_files = [exclude_files]
@@ -1323,6 +1325,27 @@ def extract_cursor(fp_csv, feat_name_out, arc_env):
                         print('Perform union')
                     lst.append(row)
     return(lst)
+
+def fix_fp(df, target_col_list, fp_csv_out):
+    '''
+    Not sure how robust this is - only used with dataframe use case with mixed
+    linux windows single and double delimeters.  ZU 20210525
+    Used to fix delimeters to Item Description in AGOL does not get butchered.
+    '''
+    for tc in target_col_list:
+        for idx in df.index.to_list():
+            # from pd dataframe should load in with double for sep '\\' and single '/'
+            path_orig = df.at[idx, tc]
+            try:
+                path_orig = path_orig.replace('\\', '//')
+                path_orig = path_orig.replace('////','//')
+                path_orig = path_orig.replace('/','//')
+                path_orig = path_orig.replace('////','//')
+                df.at[idx, tc] = path_orig
+            except AttributeError:
+                print('No value in col {}\nFor Item {}'.format(tc, idx))
+    pd.DataFrame.to_csv(df, fp_csv_out)
+
 
 # # NOTES
 # # getting path componenets

@@ -1346,6 +1346,32 @@ def fix_fp(df, target_col_list, fp_csv_out):
                 print('No value in col {}\nFor Item {}'.format(tc, idx))
     pd.DataFrame.to_csv(df, fp_csv_out)
 
+def check_layer_source(fp_mxd, fp_csv_inventory, fp_csv_out,
+                        df_index_col = 'layer_name', target_col = 'layer_source'):
+    df = pd.read_csv(fp_csv_inventory, index_col = df_index_col)
+    mxd = arcpy.mapping.MapDocument(fp_mxd)
+    lyr_name, lyr_source = [],[]
+    for lyr in arcpy.mapping.ListLayers(mxd):
+        # supports(DATASOURCE) is a convenient method to determine if layer
+        # has value for that attribute essentially
+        # visibile obviously if checked on map
+        # if (lyr.supports("DATASOURCE")) & (lyr.visible):
+        if lyr.supports("DATASOURCE"):
+            try:
+                temp_path = df.loc[lyr.name, target_col]
+                if not arcpy.Exists(temp_path):
+                    df.at[lyr.name, 'PATH_CHANGED'] = TRUE
+                    lyr_name.append(lyr.name)
+                else:
+                    df.at[lyr.name, 'PATH_CHANGED'] = FALSE
+                # if os.path.normpath(lyr.dataSource) == os.path.normpath(df.loc[lyr.name, target_col]):
+                #     df.at[lyr.name, 'MATCHED_SOURCES'] = TRUE
+            except:
+                pass
+    print(lyr_name)
+    pd.DataFrame.to_csv(df, fp_csv_out)
+
+
 
 # # NOTES
 # # getting path componenets

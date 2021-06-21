@@ -805,7 +805,7 @@ class metaData(object):
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
 
-        if action_type == 'delete':
+        if action_type == 'delete':            
             logging.info('DELETING FEATURES:')
             for index in self.indices:
                 fp_fcs = df.loc[index][target_col]

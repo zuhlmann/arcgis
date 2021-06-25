@@ -30,7 +30,7 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv',
+    def __init__(self,  prj_file, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv',
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
@@ -56,6 +56,7 @@ class metaData(object):
 
         # change at some point to pass a json for whatever dbase is in use
         # i.e. all four properties contained in a metadata_props_dbase.json
+        # GDB PATHS
         try:
             self.path_gdb_dict = kwargs['non_klamath_df_dict']
 
@@ -64,20 +65,25 @@ class metaData(object):
                         'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
                         'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
                         'master_gdb': utilities.get_path('fp_master', 'gdb')}
-            df_str_dict = {'working_gdb':'df_working',
-                            'mapping_gdb':'df_mapping',
-                            'orders_gdb':'df_orders',
-                            'master_gdb':'df_master'}
+            self.path_gdb_dict = path_gdb_dict
+        # CSV PATHS
+        try:
+            self.path_csv_dict = kwargs['non_klamath_csv_dict']
+        except KeyError:
             path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
                             'master_gdb': utilities.get_path('fp_master', 'csv')}
-            self.path_gdb_dict = path_gdb_dict
-            self.df_str_dict = df_str_dict
             self.path_csv_dict = path_csv_dict
-            self.prj_file = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\McmJac_KRRP_GIS_data\NAD83_2011_CA_StatePlane_Proj.prj'
-        try:
-            self.prj_file = kwargs['prj_file']
-        except KeyError:
-            pass
+
+        # DF STRINGS
+        df_str_dict = {'working_gdb':'df_working',
+                        'mapping_gdb':'df_mapping',
+                        'orders_gdb':'df_orders',
+                        'master_gdb':'df_master'}
+        self.df_str_dict = df_str_dict
+
+        # PRJ FILE
+        self.prj_file = prj_file
+
     def fcs_to_shp_agol_prep(self, df_str, base_dir_shp, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
@@ -766,8 +772,10 @@ class metaData(object):
         # fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], self.todays_date)
         # setattr(self, str_csv_archive_obj, fp_csv_archive)
 
-    def take_action(self, df_str, action_type, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
-                    populate_target_df = True):
+    def take_action(self, df_str, action_type, target_gdb_str,
+                    target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
+                    update_maestro = False, dry_run = False,
+                    replace_action = ''):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
@@ -775,8 +783,13 @@ class metaData(object):
         df_str          access dataframe from object (self)
         target_col      location of fcs
         action_type     actions thus far (202104) = delete, move (string)
-        populate_target_df  True or False.  Opens df of target and adds new fc
+        target_gdb_str  True or False.  Opens df of target and adds new fc
                                             row and relevant attributes
+        dry_run         True or False.  If True, then DONT copy features.  Makeshift
+                        functionality to populate dataframe i.e. DATA_LOCATION...
+        replace_action  either set as empty string "''" or new string if for instance
+                        intention is to perform another action sequentially on the
+                        same indices
 
         '''
 
@@ -805,7 +818,7 @@ class metaData(object):
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
 
-        if action_type == 'delete':            
+        if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in self.indices:
                 fp_fcs = df.loc[index][target_col]
@@ -845,25 +858,24 @@ class metaData(object):
 
         elif action_type in ['copy']:
             logging.info('COPYING FEATURES')
-            if populate_target_df:
-                try:
-                    df_str_master = 'df_master'
-                    df_master = getattr(self, df_str_master)
-                # master_gdb not added via self.add_df
-                except AttributeError:
-                    print('populating target')
-                    df_str_master = self.df_str_dict['master_gdb']
-                    fp_csv_master = self.path_csv_dict['master_gdb']
-                    # note this also creates fp_csv_archive
-                    self.add_df(fp_csv_master, df_str_master, 'ITEM')
-                    df_master = getattr(self,df_str_master)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_master)
+            fp_csv_target = self.path_csv_dict[target_gdb_str]
+            df_str_target = self.df_str_dict[target_gdb_str]
+            # If datafrome already added via self.add_df
+            try:
+                df_target = getattr(self, target_gdb_str)
+            # if dataframe NOT already added via self.add_df
+            except AttributeError:
+                print('populating target')
+                # note this also creates fp_csv_archive
+                self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                df_target = getattr(self, df_str_target)
+                # save a base archive if NEVER saved and a daily archive if never saved
+                self.save_archive_csv(df_str_target)
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
-                fp_copy = os.path.normpath(self.path_gdb_dict[df_item['COPY_LOCATION']])
-                dset_copy = df_item['COPY_LOCATION_DSET']
+                fp_copy = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
+                dset_copy = df_item['MOVE_LOCATION_DSET']
                 dset_lower = df_item['DSET_LOWER_CASE']
                 try:
                     rename = df_item['RENAME']
@@ -919,50 +931,71 @@ class metaData(object):
                     fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
 
                 try:
-                    print('COPY Protocol GO!!!')
-                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
+
+                    # copy feature classes if NOT dry_run
+                    if not dry_run:
+                        print('COPY Protocol GO!!!')
+                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
                     arcpy_msg = 'FC to FC True DELETE False'
                     # SOURCE DF UPDATES
                     df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
-                    df.at[index, 'ACTION'] = ''
-                    df.at[index, 'COPY_LOCATION'] = ''
-                    df.at[index, 'COPY_LOCATION_DSET'] = ''
+                    df.at[index, 'ACTION'] = replace_action
+                    df.at[index, 'MOVE_LOCATION'] = ''
+                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
 
-                    if populate_target_df:
-                        # TARGET DF UPDATES
-                        # Assemble Series to append to Master DF
-                        d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
-                        ser_append = pd.Series(data = d,
-                                     index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                            'DATA_LOCATION_MCMILLEN_JACOBS'],
-                                     name = feat_name)
-                        # append new row from Series
-                        df_master = df_master.append(ser_append)
-                    # LOG it up
-                    msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
-                    logging.info(msg_str)
+                    # TARGET DF UPDATES
+                    # Assemble Series to append to Master DF
+                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
+                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                    ser_append = pd.Series(data = d,
+                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
+                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
+                                 name = feat_name)
+                    # append new row from Series
+                    df_target = df_target.append(ser_append)
+
+                    # SAVE TO TARGET_DF every Iter in case Exception
+                    setattr(self, df_str_target, df_target)
+                    setattr(self, df_str, df)
+
+                    # UPDATE maestro
+                    if update_maestro:
+                        df_maestro = self.df
+                        try:
+                            df_maestro.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
+                        # INDEX does not exist
+                        except KeyError:
+                            d = {'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
+                            ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
+                                        name = index)
+                            df_maestro.append(ser_append)
+                        setattr(self, 'df', df_maestro)
+                    # If dry run NO logging
+                    if not dry_run:
+                        # LOG it up
+                        msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
+                        logging.info(msg_str)
                 except Exception as e:
-                    msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, msg_str)
-                    logging.info(msg_str)
-                    logging.info(e)
-            # finally save out to new csv - note archive was saved in either:
-            # 1) add_df    OR    2) top of this method
-            print('here')
-            # SetAttr HERE in case Permission Lock kills below if master csv accidentally open
-            setattr(self, df_str, df)
+                    # If dry run NO logging
+                    if not dry_run:
+                        msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, msg_str)
+                        logging.info(msg_str)
+                        logging.info(e)
 
-
-            # SAVE TO MASTER CSV
-            if populate_target_df:
-                setattr(self, 'df_master', df_master)
-                fp_csv_master = getattr(self, 'fp_csv_master')
-                pd.DataFrame.to_csv(df_master, fp_csv_master)
-
-            # SAVE TO SOURCE CSV
-            fp_csv_source = getattr(self, prop_str_fp_csv)
-            # pd.DataFrame.to_csv(df, fp_csv_source)
         elif action_type in ['move']:
+            # TARGET DF information
+            fp_csv_target = self.path_csv_dict[target_gdb_str]
+            df_str_target = self.df_str_dict[target_gdb_str]
+            try:
+                df_target = getattr(self, target_gdb_str)
+            # if dataframe NOT already added via self.add_df
+            except AttributeError:
+                print('populating target')
+                # note this also creates fp_csv_archive
+                self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                df_target = getattr(self, df_str_target)
+                # save a base archive if NEVER saved and a daily archive if never saved
+                self.save_archive_csv(df_str_target)
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
@@ -1035,15 +1068,41 @@ class metaData(object):
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
+
+                    # TARGET DF UPDATES
+                    # Assemble Series to append to Master DF
+                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_move,
+                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                    ser_append = pd.Series(data = d,
+                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
+                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
+                                 name = feat_name)
+                    # append new row from Series
+                    df_target = df_target.append(ser_append)
+
+                    # SAVE TO TARGET_DF every Iter in case Exception
+                    setattr(self, df_str_target, df_target)
+                    setattr(self, df_str, df)
+
                     msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                     print(msg_str)
                     logging.info(msg_str)
+
+                    if update_maestro:
+                        df_maestro = self.df
+                        try:
+                            df_maestro.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
+                        # INDEX does not exist
+                        except KeyError:
+                            d = {'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
+                            ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
+                                        name = index)
+                            df_maestro.append(ser_append)
+                        setattr(self, 'df', df_maestro)
                 except Exception as e:
                     msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                     logging.info(msg_str)
                     logging.info(e)
-
-        setattr(self, df_str, df)
 
     def df_sets(self, df_list, col_list):
         '''
@@ -1356,7 +1415,7 @@ class AgolAccess(metaData):
     Basic init for AGOL access
     '''
 
-    def __init__(self, credentials, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
+    def __init__(self, credentials, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
@@ -1437,7 +1496,9 @@ class AgolAccess(metaData):
                 for content_item in user_content:
                     title = content_item.title
                     if title in self.indices:
+                        print(df.at[title, 'AGOL_STATUS'])
                         df.at[title, 'AGOL_STATUS'] = 'online'
+                        # print('TITLE:{}TYPE:{}'.format(title, type(title)))
                     else:
                         df.at[title, 'AGOL_STATUS'] = 'offline'
 
@@ -1510,8 +1571,10 @@ class AgolAccess(metaData):
 
             # keep count going for item_type
             ct += 1
-        setattr(self, 'df', df)
-        fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions_temp.csv'
+        print('ARE WE HERE?')
+        print(df.ACTION.to_list())
+        setattr(self, 'df_vageen', df)
+        fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions_temp.csv'
         # pd.DataFrame.to_csv(df, fp_item_desc_temp)
     def update_comma_sep_vals(self, df, index, col_name, col_val):
         # UPDATE comma-sep list
@@ -1661,7 +1724,7 @@ class DbaseManagement(metaData):
     cleaning up gdbs
     '''
 
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\item_descriptions.csv'):
+    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
         super().__init__(fp_csv)
 
     def flag_gdb_dset(self, df_str, target_col, flag_val, new_col_name = 'protect'):

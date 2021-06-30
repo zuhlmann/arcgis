@@ -185,7 +185,7 @@ def file_paths_arc(folder_or_gdb, want_df, **kwargs):
 
     if want_df:
         df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat]),
-                            columns = ['feature_name', 'feature_dataset', 'fp_feat'])
+                            columns = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS'])
     return(df)
 
 def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):

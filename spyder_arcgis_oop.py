@@ -1493,14 +1493,13 @@ class AgolAccess(metaData):
             str = 'user_content_{}'.format(item)
             user_content = getattr(self, str)
             if action_type == 'agol_status':
-                for content_item in user_content:
-                    title = content_item.title
-                    if title in self.indices:
-                        print(df.at[title, 'AGOL_STATUS'])
-                        df.at[title, 'AGOL_STATUS'] = 'online'
+                titles = [content_item.title for content_item in user_content]
+                for indice in self.indices:
+                    if indice in titles:
+                        df.at[indice, 'AGOL_STATUS'] = 'online'
                         # print('TITLE:{}TYPE:{}'.format(title, type(title)))
                     else:
-                        df.at[title, 'AGOL_STATUS'] = 'offline'
+                        df.at[indice, 'AGOL_STATUS'] = 'offline'
 
                     # if we want to remove vals in ACTION col
                     try:

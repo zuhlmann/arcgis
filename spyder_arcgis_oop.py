@@ -64,21 +64,25 @@ class metaData(object):
             path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
                         'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
                         'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
-                        'master_gdb': utilities.get_path('fp_master', 'gdb')}
+                        'master_gdb': utilities.get_path('fp_master', 'gdb'),
+                        'archive_gdb': utilities.get_path('fp_archive', 'gdb')}
             self.path_gdb_dict = path_gdb_dict
         # CSV PATHS
         try:
             self.path_csv_dict = kwargs['non_klamath_csv_dict']
         except KeyError:
             path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
-                            'master_gdb': utilities.get_path('fp_master', 'csv')}
+                            'master_gdb': utilities.get_path('fp_master', 'csv'),
+                            'mapping_gdb': utilities.get_path('fp_mapping', 'csv'),
+                            'archive_gdb': utilities.get_path('fp_archive', 'csv')}
             self.path_csv_dict = path_csv_dict
 
         # DF STRINGS
         df_str_dict = {'working_gdb':'df_working',
                         'mapping_gdb':'df_mapping',
                         'orders_gdb':'df_orders',
-                        'master_gdb':'df_master'}
+                        'master_gdb':'df_master',
+                        'archive_gdb':'df_archive'}
         self.df_str_dict = df_str_dict
 
         # PRJ FILE
@@ -291,7 +295,6 @@ class metaData(object):
             print(col_title)
             print(target_val)
             # note a1), despite df.loc[] with just [], since subsetting we get a dataframe
-            df = getattr(self, df_str)
             self.indices = df[df[col_title] == target_val].index.tolist()
             # get iloc vals TURN INTO FUNCTION SOMETIME
             iloc_temp = []
@@ -538,7 +541,10 @@ class metaData(object):
             # Nan from pd.dataframe.read_csv == dtype float
             if isinstance(subtract_purp_items[0], str):
                 print('did we make it here')
-                if (purp is None) | (purp.text is None):
+                if purp is None:
+                    # no purpose to extract
+                    pass
+                elif purp.text is None:
                     # no purpose to subtract
                     pass
                 else:
@@ -853,6 +859,10 @@ class metaData(object):
 
                 msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
                 arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+
+                # RENAME label
+                df = df.rename(index = {index:fc_new_name})
+
                 print(msg_str)
                 logging.info(msg_str)
 
@@ -920,6 +930,8 @@ class metaData(object):
                     feat_name = rename
                     # full path with featureclass name
                     fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
+                    # flag to change index label
+                    update_label = True
                 # retain original name
                 else:
                     feat_name = copy.copy(index)
@@ -929,6 +941,9 @@ class metaData(object):
 
                     # full path with featureclass name
                     fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
+
+                    # flag to change index label
+                    update_label = False
 
                 try:
 
@@ -943,13 +958,14 @@ class metaData(object):
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
 
+                    notes = df.loc[index, 'NOTES']
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
                     d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
-                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new, 'NOTES':notes}
                     ser_append = pd.Series(data = d,
                                  index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
+                                        'DATA_LOCATION_MCMILLEN_JACOBS', 'NOTES'],
                                  name = feat_name)
                     # append new row from Series
                     df_target = df_target.append(ser_append)
@@ -969,6 +985,9 @@ class metaData(object):
                             ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
                                         name = index)
                             df_maestro.append(ser_append)
+                        # item was renamed
+                        if update_label:
+                            df_maestro = df_maestro.rename(index = {index:feat_name})
                         setattr(self, 'df', df_maestro)
                     # If dry run NO logging
                     if not dry_run:
@@ -1039,36 +1058,42 @@ class metaData(object):
                 # if rename specified
                 if not pd.isnull(fc_new_name):
                     fc_name = copy.copy(fc_new_name)
+                    # flag to change index label
+                    update_label = True
                 else:
                     fc_name = copy.copy(index)
+                    update_label = False
                 # full path with featureclass name
                 fp_fcs_new = os.path.join(fp_move, dset_move, fc_name)
                 # print('fp fcs new: \n{}'.format(fp_fcs_new))
                 # print('fp current: \n{}'.format(fp_fcs_current))
                 try:
-                    if rename_delete_protocol:
-                        print('Rename Protocol GO!!!')
-                        fp_fcs_current_comp = fp_fcs_current.split(os.sep)
-                        fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
-                        fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
-                        # arcpy_msg to debug where failed
-                        arcpy_msg = 'RENAME False FC to FC False DELETE False'
-                        arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
-                        arcpy_msg = 'RENAME: True FC to FC: False DELETE: False'
-                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, fc_name)
-                        arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
-                        arcpy.Delete_management(fp_fcs_renamed)
-                    else:
-                        print('Delete Protocol GO!!!')
-                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, fc_name)
-                        arcpy_msg = 'FC to FC True DELETE False'
-                        arcpy.Delete_management(fp_fcs_current)
+                    if not dry_run:
+                        if rename_delete_protocol:
+                            print('Rename Protocol GO!!!')
+                            fp_fcs_current_comp = fp_fcs_current.split(os.sep)
+                            fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
+                            fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
+                            # arcpy_msg to debug where failed
+                            arcpy_msg = 'RENAME False FC to FC False DELETE False'
+                            arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
+                            arcpy_msg = 'RENAME: True FC to FC: False DELETE: False'
+                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, fc_name)
+                            arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
+                            arcpy.Delete_management(fp_fcs_renamed)
+                        else:
+                            print('Delete Protocol GO!!!')
+                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, fc_name)
+                            arcpy_msg = 'FC to FC True DELETE False'
+                            arcpy.Delete_management(fp_fcs_current)
+
                     df.at[index, target_col] = fp_fcs_new
                     df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
-
+                    if update_label:
+                        df = df.rename(index = {index:fc_name})
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
                     d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_move,
@@ -1076,17 +1101,19 @@ class metaData(object):
                     ser_append = pd.Series(data = d,
                                  index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
                                         'DATA_LOCATION_MCMILLEN_JACOBS'],
-                                 name = feat_name)
+                                 name = fc_name)
                     # append new row from Series
                     df_target = df_target.append(ser_append)
+                    if update_label:
+                        df_target = df_target.rename(index = {index:fc_name})
 
                     # SAVE TO TARGET_DF every Iter in case Exception
                     setattr(self, df_str_target, df_target)
                     setattr(self, df_str, df)
-
-                    msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
-                    print(msg_str)
-                    logging.info(msg_str)
+                    if not dry_run:
+                        msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
+                        print(msg_str)
+                        logging.info(msg_str)
 
                     if update_maestro:
                         df_maestro = self.df
@@ -1098,11 +1125,14 @@ class metaData(object):
                             ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
                                         name = index)
                             df_maestro.append(ser_append)
+                        if update_label:
+                            df_maestro = df_maestro.rename(index = {index:fc_name})
                         setattr(self, 'df', df_maestro)
                 except Exception as e:
-                    msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
-                    logging.info(msg_str)
-                    logging.info(e)
+                    if not dry_run:
+                        msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
+                        logging.info(msg_str)
+                        logging.info(e)
 
     def df_sets(self, df_list, col_list):
         '''
@@ -1427,6 +1457,8 @@ class AgolAccess(metaData):
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
+        # FOUND NO difference between feature layer collection and feature layer.  All feature layers were
+        # detected as both with mcmjac_gis.content.search(item_type = <collection or layer>)
         self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
 
     def get_group(self, group_key):
@@ -1450,10 +1482,22 @@ class AgolAccess(metaData):
         # item_type_dict created in __init__
         for item in itemType:
             itemType = self.item_type_dict[item]
-            items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
-                                            item_type = itemType, max_items = 900)
-            itemType = itemType.replace(' ', '_').lower()
-            setattr(self, 'user_content_{}'.format(itemType), items)
+            try:
+                group_name = kwargs['group']
+                groups = self.mcmjac_gis.groups.search()
+                try:
+                    group_obj = [item for item in groups if group_name == item.title][0]
+                    items = group_obj.content()
+                    itemType = itemType.replace(' ', '_').lower()
+                    group_name = group_name.replace(' ','_').replace('-','_').lower()
+                    setattr(self, 'user_content_{}_{}'.format(itemType, group_name), items)
+                except IndexError:
+                    sys.exit('Group: {} Does Not Exist'.format(group_name))
+            except KeyError:
+                items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
+                                                item_type = itemType, max_items = 900)
+                itemType = itemType.replace(' ', '_').lower()
+                setattr(self, 'user_content_{}'.format(itemType), items)
             # filtered tags attribute
         try:
             tags = kwargs['tags']
@@ -1464,21 +1508,21 @@ class AgolAccess(metaData):
         except KeyError:
             pass
 
-    def take_action_agol(self, df_str, action_type, itemType = ['feature','shapefile'],
-                            update_agol_status = False, update_sharing_status = False,
-                            **kwargs):
+    def take_action_agol(self, df_str, action_type, user_content_str,
+                            group = 'KRRP_Geospatial', **kwargs):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
         only for remove.  will add others and perhaps a log for each run.
         #
         ARGS
-        itemType                same as identify_items_online method. pass as list of
-                                strings or one string.  i.e 'shapefile'.  Default =
-                                ['shapefile', 'feature']
+        user_content_str        property from identify_objects_online method
+                                ex. user_content_feature_layer_collection_krrp_geospatial
         action_type             thus far just 'remove' but need to add 'tags', publish
                                 and 'share'
-        update_sharing_status   Boolean. update the SHARED_GROUP col
-        update_agol_status      Boolean. update the AGOL_STATUS col
+        group                   Group to use with multiple action types - Share,
+                                share_status.  More suitable as a kwarg since
+                                only applicable with a couple action types, but
+                                seemed best. ZU 20210701
         kwargs                  update_action --> ONLY kwarg option:
                                 this will remove action val (string specified)
                                 as val in key/val pair of kwarg update_aaction
@@ -1486,95 +1530,119 @@ class AgolAccess(metaData):
         '''
         df = getattr(self, df_str)
         ct = 1
-        for item in itemType:
-            # search for agol content in self
-            item = self.item_type_dict[item]
-            item = item.replace(' ', '_').lower()
-            str = 'user_content_{}'.format(item)
-            user_content = getattr(self, str)
-            if action_type == 'agol_status':
-                titles = [content_item.title for content_item in user_content]
-                for indice in self.indices:
-                    if indice in titles:
-                        df.at[indice, 'AGOL_STATUS'] = 'online'
-                        # print('TITLE:{}TYPE:{}'.format(title, type(title)))
-                    else:
-                        df.at[indice, 'AGOL_STATUS'] = 'offline'
+        # ACCESS AGOL items
+        user_content = getattr(self, user_content_str)
+        if action_type == 'agol_status':
+            titles = [content_item.title for content_item in user_content]
+            for indice in self.indices:
+                if indice in titles:
+                    df.at[indice, 'AGOL_STATUS'] = True
+                    # print('TITLE:{}TYPE:{}'.format(title, type(title)))
+                else:
+                    df.at[indice, 'AGOL_STATUS'] = False
 
-                    # if we want to remove vals in ACTION col
-                    try:
-                        col_val = kwargs['update_action']
-                        df = update_comma_sep_vals(df, title, 'ACTION', col_val)
-                    except:
-                        pass
-
-            if action_type == 'remove':
-                for content_item in user_content:
-                    title = content_item.title
-                    if title in self.indices:
-                        content_item.delete()
-                        # gets idx in df; assumes just ONE item with exact name -NOT > 1
-                        # this is for useing ALTERNATE column - not INDEX
-                        # idloc = (self.df_working.ITEM == title).idxmax()
-                        # fancy method to value for action at idloc
-                        # OFFLINE set status to offline
-                        if update_agol_status:
-                            df.at[title, 'AGOL_STATUS'] = 'offline'
-
-                    # if we want to remove vals in ACTION col
-                    try:
-                        col_val = kwargs['update_action']
-                        df = update_comma_sep_vals(df, title, 'ACTION', col_val)
-                    except:
-                        pass
-
-            if action_type == 'publish':
-                for indice in self.indices:
-                    # comes as a list for what should prob be a dictionary
-                    item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Shapefile')
-                    if indice == item_list[0].title:
-                        print('PUBLISHING: {}'.format(indice))
-                        item_list[0].publish()
-                    else:
-                        print('item title {} did not match queried result on agol --> did NOT publish'.format(indice))
-                    # if we want to remove vals in ACTION col
-                    try:
-                        col_val = kwargs['update_action']
-                        df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
-                    except:
-                        pass
-            if action_type == 'share':
-                # get group id for sharing
+                # if we want to remove vals in ACTION col
                 try:
-                    getattr(self, 'krrp_geospatial')
-                except AttributeError:
-                    self.get_group('krrp_geospatial')
+                    col_val = kwargs['update_action']
+                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                except:
+                    pass
+        if action_type == 'share_status':
+            substr = group.replace('-','_').replace(' ','_').lower()
+            group_str = 'user_content_feature_layer_collection_{}'.format(substr)
+            user_content_group = getattr(self, group_str)
+            list1 = copy.copy(self.indices)
+            list2 = [item.title for item in user_content_group]
+            set1 = set(list1)
+            set2 = set(list2)
+            df1_present_df2_absent = set1.difference(set2)
+            # To add someday for content in Group NOT owned by uhlmann@mcmjac.com
+            df2_present_df1_absent = set2.difference(set1)
+            # SET all to True then REPLACE with False
+            for indice in self.indices:
+                df.at[indice, 'SHARED_GROUP'] = True
+            # REPLACE with False
+            for indice in list(df1_present_df2_absent):
+                df.at[indice, 'SHARED_GROUP'] = False
+        if action_type == 'publish_status':
+            user_content_shp = getattr(self, 'user_content_shapefile')
+            user_content_feat = getattr(self, 'user_content_feature_layer_collection')
+            list1 = [item.title for item in user_content_shp]
+            list2 = [item.title for item in user_content_feat]
+            set1, set2 = set(list1), set(list2)
+            not_published = list(set1.difference(set2))
+            # SET all to True then REPLACE with False
+            for indice in self.indices:
+                df.at[indice, 'PUBLISHED'] = False
+            # REPLACE with False
+            for indice in not_published:
+                df.at[indice, 'PUBLISHED'] = False
 
-                for indice in self.indices:
-                    # comes as a list for what should prob be a dictionary
-                    item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Feature Layer')
-                    if indice == item_list[0].title:
-                        print('SHARING: {}'.format(indice))
-                        item_list[0].share(groups = [self.krrp_geospatial])
-                        if update_sharing_status:
-                            df.at[title, 'SHARED_GROUP'] = True
-                    else:
-                        print('NOT SHARING:\nItem Title {} did not match queried result on agol'.format(indice))
+        if action_type == 'remove':
+            for content_item in user_content:
+                title = content_item.title
+                if title in self.indices:
+                    content_item.delete()
+                    # gets idx in df; assumes just ONE item with exact name -NOT > 1
+                    # this is for useing ALTERNATE column - not INDEX
+                    # idloc = (self.df_working.ITEM == title).idxmax()
+                    # fancy method to value for action at idloc
+                    # OFFLINE set status to offline
+                    df.at[title, 'AGOL_STATUS'] = False
 
-                    # if we want to remove vals in ACTION col
-                    try:
-                        col_val = kwargs['update_action']
-                        df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
-                    except:
-                        pass
+                # if we want to remove vals in ACTION col
+                try:
+                    col_val = kwargs['update_action']
+                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                except:
+                    pass
 
-            # keep count going for item_type
-            ct += 1
+        if action_type == 'publish':
+            for indice in self.indices:
+                # comes as a list for what should prob be a dictionary
+                item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Shapefile')
+                if indice == item_list[0].title:
+                    print('PUBLISHING: {}'.format(indice))
+                    item_list[0].publish()
+                else:
+                    print('item title {} did not match queried result on agol --> did NOT publish'.format(indice))
+                # if we want to remove vals in ACTION col
+                try:
+                    col_val = kwargs['update_action']
+                    df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                except:
+                    pass
+        if action_type == 'share':
+            # get group id for sharing
+            try:
+                getattr(self, 'krrp_geospatial')
+            except AttributeError:
+                self.get_group('krrp_geospatial')
+
+            for indice in self.indices:
+                # comes as a list for what should prob be a dictionary
+                item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Feature Layer')
+                if indice == item_list[0].title:
+                    print('SHARING: {}'.format(indice))
+                    item_list[0].share(groups = [self.krrp_geospatial])
+                    df.at[title, 'SHARED_GROUP'] = True
+                else:
+                    print('NOT SHARING:\nItem Title {} did not match queried result on agol'.format(indice))
+
+                # if we want to remove vals in ACTION col
+                try:
+                    col_val = kwargs['update_action']
+                    df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                except:
+                    pass
+
+        # keep count going for item_type
+        ct += 1
         print('ARE WE HERE?')
         print(df.ACTION.to_list())
         setattr(self, 'df_vageen', df)
         fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions_temp.csv'
-        # pd.DataFrame.to_csv(df, fp_item_desc_temp)
+        pd.DataFrame.to_csv(df, fp_item_desc_temp)
     def update_comma_sep_vals(self, df, index, col_name, col_val):
         # UPDATE comma-sep list
         initial_vals = df.at[index, col_name]

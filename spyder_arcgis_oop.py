@@ -78,12 +78,15 @@ class metaData(object):
             self.path_csv_dict = path_csv_dict
 
         # DF STRINGS
-        df_str_dict = {'working_gdb':'df_working',
-                        'mapping_gdb':'df_mapping',
-                        'orders_gdb':'df_orders',
-                        'master_gdb':'df_master',
-                        'archive_gdb':'df_archive'}
-        self.df_str_dict = df_str_dict
+        try:
+            self.df_str_dict = kwargs['non_klamath_df_str_dict']
+        except KeyError:
+            df_str_dict = {'working_gdb':'df_working',
+                            'mapping_gdb':'df_mapping',
+                            'orders_gdb':'df_orders',
+                            'master_gdb':'df_master',
+                            'archive_gdb':'df_archive'}
+            self.df_str_dict = df_str_dict
 
         # PRJ FILE
         self.prj_file = prj_file
@@ -603,9 +606,13 @@ class metaData(object):
             # ABSTRACT
             try:
                 abstract_new = df.loc[indice]['ABSTRACT']
+                print('abstact  ENGAGE')
                 if isinstance(abstract_new, str):
                     el = ET.SubElement(dataIdInfo, 'idAbs')
+                    print(el.text)
+                    print('add abstract {}'.format(abstract_new))
                     el.text = abstract_new
+                    print(el.text)
                     ET.dump(dataIdInfo)
                     df.at[indice, 'ABSTRACT'] = ''
                 elif math.isnan(abstract_new):
@@ -778,20 +785,19 @@ class metaData(object):
         # fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], self.todays_date)
         # setattr(self, str_csv_archive_obj, fp_csv_archive)
 
-    def take_action(self, df_str, action_type, target_gdb_str,
+    def take_action(self, df_str, action_type,
                     target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
-                    update_maestro = False, dry_run = False,
-                    replace_action = ''):
+                    dry_run = False, replace_action = ''):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
         ARGUMENTS
         df_str          access dataframe from object (self)
-        target_col      location of fcs
-        action_type     actions thus far (202104) = delete, move (string)
-        target_gdb_str  True or False.  Opens df of target and adds new fc
-                                            row and relevant attributes
-        dry_run         True or False.  If True, then DONT copy features.  Makeshift
+        action_type     phase this out one day, but for now only ONE action at a time (ZU 20210815)
+                        move and copy housed under one if/else.
+                        rename and delete are standalone for now
+        target_col      location of source FCS to performa ction on
+        dry_run         True or False.  If True, then DONT copy, move or log Makeshift
                         functionality to populate dataframe i.e. DATA_LOCATION...
         replace_action  either set as empty string "''" or new string if for instance
                         intention is to perform another action sequentially on the
@@ -833,6 +839,7 @@ class metaData(object):
                     try:
                         arcpy.Delete_management(fp_fcs)
                         df.drop(index, inplace = True)
+                        setattr(self, df_str, df)
                     except Exception as e:
                         logging.info(e)
                 else:
@@ -844,6 +851,7 @@ class metaData(object):
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 # create new filename components
                 fc_new_name = df_item['RENAME']
+                col_name_original = df_item['COL_NAME_ARCHIVAL']
                 fp_components = fp_fcs_current.split(os.sep)
                 # all but original file name
                 fp_base = os.sep.join(fp_components[:-1])
@@ -852,8 +860,8 @@ class metaData(object):
 
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new
-                df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
-                df.at[index, 'DATA_LOCATION_MCM_ORIGINAL_new'] = fp_fcs_new
+                df.at[index, col_name_original] = fp_fcs_current
+                df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
                 df.at[index, 'ACTION'] = ''
                 df.at[index, 'RENAME'] = ''
 
@@ -862,165 +870,20 @@ class metaData(object):
 
                 # RENAME label
                 df = df.rename(index = {index:fc_new_name})
+                setattr(self, df_str, df)
 
                 print(msg_str)
                 logging.info(msg_str)
 
-        elif action_type in ['copy']:
-            logging.info('COPYING FEATURES')
-            fp_csv_target = self.path_csv_dict[target_gdb_str]
-            df_str_target = self.df_str_dict[target_gdb_str]
-            # If datafrome already added via self.add_df
-            try:
-                df_target = getattr(self, target_gdb_str)
-            # if dataframe NOT already added via self.add_df
-            except AttributeError:
-                print('populating target')
-                # note this also creates fp_csv_archive
-                self.add_df(fp_csv_target, df_str_target, 'ITEM')
-                df_target = getattr(self, df_str_target)
-                # save a base archive if NEVER saved and a daily archive if never saved
-                self.save_archive_csv(df_str_target)
-            for index in self.indices:
-                df_item = df.loc[index]
-                fp_fcs_current = os.path.normpath(df_item[target_col])
-                fp_copy = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
-                dset_copy = df_item['MOVE_LOCATION_DSET']
-                dset_lower = df_item['DSET_LOWER_CASE']
-                try:
-                    rename = df_item['RENAME']
-                # if no rename column
-                except KeyError:
-                    rename = np.nan
+        elif action_type in ['move','copy']:
 
-                # add data to be copied to dataframe
-
-                fp_components = fp_fcs_current.split(os.sep)
-                # find dataset one past .gdb i.e. path/to/gdb.gdb/dset
-                for idx, comp in enumerate(fp_components):
-                    if '.gdb' in comp:
-                        # recreated path to gdb
-                        fp_gdb_orig = os.sep.join(fp_components[:idx+1])
-                        dset_orig = fp_components[idx + 1]
-                        # get the original dataset as the default with no dset
-                        # provided for move is use original in new gdb
-                        if pd.isnull(dset_copy):
-                            # in this case, rename_delete_protocol will remain FALSE
-                            dset_copy = dset_orig
-                            if dset_lower:
-                                # lower case dset name if specified
-                                dset_copy = dset_copy.lower()
-                        break
-                    # translation - there was no gdb in fp_fcs_orig
-                    if idx == len(fp_components):
-                        logging.info('original location of {} had no dataset' \
-                        'but no move dset was provided. Moved to gdb standalone' \
-                        .format(index))
-                    # use new dset provided in csv
-                    else:
-                        pass
-                # for featureclasstofeatureclass
-                fp_new = os.path.join(fp_copy, dset_copy)
-                # check to make sure output dset exists before proceeding
-                if not arcpy.Exists(fp_new):
-                    arcpy.CreateFeatureDataset_management(fp_copy, dset_copy, self.prj_file)
-
-                # if rename was provided
-                if not pd.isnull(rename):
-                    feat_name = rename
-                    # full path with featureclass name
-                    fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
-                    # flag to change index label
-                    update_label = True
-                # retain original name
-                else:
-                    feat_name = copy.copy(index)
-                    feat_name = feat_name.replace(' ','_')
-                    feat_name = feat_name.replace('&','_')
-                    print('feat name to copy {}'.format(feat_name))
-
-                    # full path with featureclass name
-                    fp_fcs_new = os.path.join(fp_copy, dset_copy, feat_name)
-
-                    # flag to change index label
-                    update_label = False
-
-                try:
-
-                    # copy feature classes if NOT dry_run
-                    if not dry_run:
-                        print('COPY Protocol GO!!!')
-                        arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, feat_name)
-                    arcpy_msg = 'FC to FC True DELETE False'
-                    # SOURCE DF UPDATES
-                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
-                    df.at[index, 'ACTION'] = replace_action
-                    df.at[index, 'MOVE_LOCATION'] = ''
-                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
-
-                    notes = df.loc[index, 'NOTES']
-                    # TARGET DF UPDATES
-                    # Assemble Series to append to Master DF
-                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_copy,
-                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new, 'NOTES':notes}
-                    ser_append = pd.Series(data = d,
-                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCMILLEN_JACOBS', 'NOTES'],
-                                 name = feat_name)
-                    # append new row from Series
-                    df_target = df_target.append(ser_append)
-
-                    # SAVE TO TARGET_DF every Iter in case Exception
-                    setattr(self, df_str_target, df_target)
-                    setattr(self, df_str, df)
-
-                    # UPDATE maestro
-                    if update_maestro:
-                        df_maestro = self.df
-                        try:
-                            df_maestro.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
-                        # INDEX does not exist
-                        except KeyError:
-                            d = {'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
-                            ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
-                                        name = index)
-                            df_maestro.append(ser_append)
-                        # item was renamed
-                        if update_label:
-                            df_maestro = df_maestro.rename(index = {index:feat_name})
-                        setattr(self, 'df', df_maestro)
-                    # If dry run NO logging
-                    if not dry_run:
-                        # LOG it up
-                        msg_str = '\nCOPIED:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
-                        logging.info(msg_str)
-                except Exception as e:
-                    # If dry run NO logging
-                    if not dry_run:
-                        msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, msg_str)
-                        logging.info(msg_str)
-                        logging.info(e)
-
-        elif action_type in ['move']:
-            # TARGET DF information
-            fp_csv_target = self.path_csv_dict[target_gdb_str]
-            df_str_target = self.df_str_dict[target_gdb_str]
-            try:
-                df_target = getattr(self, target_gdb_str)
-            # if dataframe NOT already added via self.add_df
-            except AttributeError:
-                print('populating target')
-                # note this also creates fp_csv_archive
-                self.add_df(fp_csv_target, df_str_target, 'ITEM')
-                df_target = getattr(self, df_str_target)
-                # save a base archive if NEVER saved and a daily archive if never saved
-                self.save_archive_csv(df_str_target)
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 fp_move = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 fc_new_name = df_item['RENAME']
+                notes = df_item['NOTES']
                 # default setting
                 rename_delete_protocol = False
 
@@ -1032,7 +895,7 @@ class metaData(object):
                         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
                         dset_orig = fp_components[idx + 1]
                         # annoying realitey - same gdb cannot have features with the same name
-                        # even in diff dsets.
+                        # even in diff dsets.;
                         if fp_gdb_orig == fp_move:
                             rename_delete_protocol = True
                         # get the original dataset as the default with no dset
@@ -1040,7 +903,43 @@ class metaData(object):
                         if pd.isnull(dset_move):
                             # in this case, rename_delete_protocol will remain FALSE
                             dset_move = dset_orig
+
+                        # Get TargetGDB
+                        fp_components_target = fp_move.split(os.sep)
+                        target_gdb_str = '{}_gdb'.format(fp_components_target[-1][:-4])
+                        fp_csv_target = self.path_csv_dict[target_gdb_str]
+                        df_str_target = self.df_str_dict[target_gdb_str]
+                        # Only grabs TargetGDB once per gdb
+                        try:
+                            df_target = getattr(self, df_str_target)
+                        # if dataframe NOT already added via self.add_df
+                        except AttributeError:
+                            print('populating target')
+                            # note this also creates fp_csv_archive
+                            self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                            df_target = getattr(self, df_str_target)
+                            # save a base archive if NEVER saved and a daily archive if never saved
+                            self.save_archive_csv(df_str_target)
+
+                        # Get SourceGDB
+                        source_gdb_str = '{}_gdb'.format(comp[:-4])
+                        fp_csv_source = self.path_csv_dict[source_gdb_str]
+                        df_str_source = self.df_str_dict[source_gdb_str]
+                        # Only grabs TargetGDB once per gdb
+                        try:
+                            df_source = getattr(self, df_str_source)
+                        # if dataframe NOT already added via self.add_df
+                        except AttributeError:
+                            print('populating source')
+                            # note this also creates fp_csv_archive
+                            self.add_df(fp_csv_source, df_str_source, 'ITEM')
+                            df_source = getattr(self, df_str_source)
+                            # save a base archive if NEVER saved and a daily archive if never saved
+                            self.save_archive_csv(df_str_source)
+
+                        # Once gdb is found in path, then break
                         break
+
                     # translation - there was no gdb in fp_fcs_orig
                     if idx == len(fp_components):
                         logging.info('original location of {} had no dataset' \
@@ -1050,25 +949,36 @@ class metaData(object):
                     else:
                         pass
                 # for featureclasstofeatureclass
-                fp_new = os.path.join(fp_move, dset_move)
+                fp_dset = os.path.join(fp_move, dset_move)
                 # check to make sure output dset exists before proceeding
-                if not arcpy.Exists(fp_new):
+                if not arcpy.Exists(fp_dset):
                     arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
-                # print('fp new: \n{}'.format(fp_new))
+                # print('fp new: \n{}'.format(fp_dset))
                 # if rename specified
                 if not pd.isnull(fc_new_name):
-                    fc_name = copy.copy(fc_new_name)
+                    feat_name = copy.copy(fc_new_name)
                     # flag to change index label
                     update_label = True
                 else:
-                    fc_name = copy.copy(index)
+                    feat_name = copy.copy(index)
+                    feat_name = feat_name.replace(' ','_')
+                    feat_name = feat_name.replace('&','_')
+                    print('feat name to copy {}'.format(feat_name))
+
                     update_label = False
                 # full path with featureclass name
-                fp_fcs_new = os.path.join(fp_move, dset_move, fc_name)
+                fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
                 # print('fp fcs new: \n{}'.format(fp_fcs_new))
                 # print('fp current: \n{}'.format(fp_fcs_current))
+                # To document whether fp_fcs_current = Staging, Previous, Original
+                col_name_original = df_item['COL_NAME_ARCHIVAL']
+                dict_col_name_orig = {'original':'DATA_LOCATION_MCM_ORIGINAL',
+                                        'staging':'DATA_LOCATION_MCM_STAGING',
+                                        'previous':'DATA_LOCATION_MCM_PREVIOUS'}
+                col_name_original = dict_col_name_orig[col_name_original]
                 try:
                     if not dry_run:
+                        # Should only trigger if move not copy (i.e. move into same gdb)
                         if rename_delete_protocol:
                             print('Rename Protocol GO!!!')
                             fp_fcs_current_comp = fp_fcs_current.split(os.sep)
@@ -1078,56 +988,51 @@ class metaData(object):
                             arcpy_msg = 'RENAME False FC to FC False DELETE False'
                             arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
                             arcpy_msg = 'RENAME: True FC to FC: False DELETE: False'
-                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_new, fc_name)
+                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_dset, feat_name)
                             arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
                             arcpy.Delete_management(fp_fcs_renamed)
                         else:
                             print('Delete Protocol GO!!!')
-                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_new, fc_name)
+                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
                             arcpy_msg = 'FC to FC True DELETE False'
-                            arcpy.Delete_management(fp_fcs_current)
+                            # delete if file is moved
+                            if action_type == 'move':
+                                arcpy.Delete_management(fp_fcs_current)
+                                arcpy_msg = 'df_source.drop FAILED, index does not exist'
+                                df_source.drop(index, inplace = True)
+                                setattr(self, df_source_str, df_source)
 
                     df.at[index, target_col] = fp_fcs_new
-                    df.at[index, 'DATA_LOCATION_MCM_PREVIOUS'] = fp_fcs_current
+                    df.at[index, col_name_original] = fp_fcs_current
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
                     if update_label:
-                        df = df.rename(index = {index:fc_name})
+                        df = df.rename(index = {index:feat_name})
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
-                    d = {'DATA_LOCATION_MCM_ORIGINAL': fp_fcs_current, 'FEATURE_DATASET':dset_move,
-                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                    print('did we make it here above the append')
+                    d = {col_name_original: fp_fcs_current, 'FEATURE_DATASET':dset_move,
+                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
                     ser_append = pd.Series(data = d,
-                                 index = ['DATA_LOCATION_MCM_ORIGINAL', 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCMILLEN_JACOBS'],
-                                 name = fc_name)
+                                 index = [col_name_original, 'FEATURE_DATASET',
+                                        'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
+                                 name = feat_name)
+                    print('DID WE MAKE IT HERE')
                     # append new row from Series
                     df_target = df_target.append(ser_append)
                     if update_label:
-                        df_target = df_target.rename(index = {index:fc_name})
-
+                        df_target = df_target.rename(index = {index:feat_name})
+                    print('now legs set attribute')
                     # SAVE TO TARGET_DF every Iter in case Exception
                     setattr(self, df_str_target, df_target)
                     setattr(self, df_str, df)
+                    print('doth we seteth')
                     if not dry_run:
                         msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
                         print(msg_str)
                         logging.info(msg_str)
 
-                    if update_maestro:
-                        df_maestro = self.df
-                        try:
-                            df_maestro.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
-                        # INDEX does not exist
-                        except KeyError:
-                            d = {'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
-                            ser_append = pd.Series(data = d, index=['DATA_LOCATION_MCMILLEN_JACOBS'],
-                                        name = index)
-                            df_maestro.append(ser_append)
-                        if update_label:
-                            df_maestro = df_maestro.rename(index = {index:fc_name})
-                        setattr(self, 'df', df_maestro)
                 except Exception as e:
                     if not dry_run:
                         msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)

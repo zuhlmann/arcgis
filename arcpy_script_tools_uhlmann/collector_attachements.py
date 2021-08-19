@@ -11,6 +11,7 @@ import numpy as np
 fc_in = arcpy.GetParameterAsText(0)
 inTable = arcpy.GetParameterAsText(1)
 basedir = arcpy.GetParameterAsText(2)
+field_reference = arcpy.GetParameterAsText(3)
 
 # check for shp - DON'T THINK this matters because feature class is specified as fc_in data type
 if fc_in[-3:] == 'shp':
@@ -18,7 +19,7 @@ if fc_in[-3:] == 'shp':
 else:
     feat_name = os.path.split(fc_in)[-1]
 
-field_reference = 'OBJECTID'
+# field_reference = 'OBJECTID'
 
 objid_fc, globid_fc = [],[]
 with da.SearchCursor(fc_in, [field_reference, 'GLOBALID']) as cursor:
@@ -45,7 +46,7 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
         temp_globid = row[3]
         globid_formatted = temp_globid.replace('{','').replace('}','')
         matched_objid = df_fc.loc[globid_formatted, field_reference]
-        objid_substr = '{}{}'.format(field_reference, matched_objid)
+        objid_substr = '{}_{}'.format(field_reference, matched_objid)
         # Should create fname ex) Huntin_Blinds_OBJID20_ATT1_Photo1
         fname_att = '{}_{}_{}_{}'.format(feat_name, objid_substr, attid_substr, attname_substr)
 

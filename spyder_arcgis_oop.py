@@ -91,9 +91,8 @@ class metaData(object):
         # PRJ FILE
         self.prj_file = prj_file
 
-    def git_branch_merge_practice(self, print_str):
-        # testing branches
-        print(print_str)
+    def different_branch_merge_fctn(self, alternate_print_str):
+        print(alternate_print_str)
     def fcs_to_shp_agol_prep(self, df_str, base_dir_shp, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices

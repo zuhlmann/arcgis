@@ -830,16 +830,53 @@ class metaData(object):
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
 
+        # DICTIONARY to translate previous col documenting in df
+        dict_col_name_orig = {'original':'DATA_LOCATION_MCM_ORIGINAL',
+                                'staging':'DATA_LOCATION_MCM_STAGING',
+                                'previous':'DATA_LOCATION_MCM_PREVIOUS'}
+
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in self.indices:
-                fp_fcs = df.loc[index][target_col]
-                if arcpy.Exists(fp_fcs):
-                    logging.info(fp_fcs)
+                fp_fcs_current = df.loc[index][target_col]
+                if arcpy.Exists(fp_fcs_current):
+                    logging.info(fp_fcs_current)
                     try:
-                        arcpy.Delete_management(fp_fcs)
+                        arcpy.Delete_management(fp_fcs_current)
                         df.drop(index, inplace = True)
                         setattr(self, df_str, df)
+
+                        # UPDATE SOURCE inventory
+                        # ABSTRACT into FUNCTION someday 20210819 ZU
+                        fp_components = fp_fcs_current.split(os.sep)
+                        for idx, comp in enumerate(fp_components):
+                            if '.gdb' in comp:
+                                # Get Source STR
+                                src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                                # Once gdb is found in path, then break
+                                break
+                            # translation - there was no gdb in fp_fcs_orig
+                            elif idx == (len(fp_components) - 1):
+                                # Get Source STR
+                                # No gdb found == shapefile passed - use dir/folder
+                                src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+                        # Get SOURCE DF/CSV/STR
+                        fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
+                        df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                        # Only grabs TargetGDB once per gdb
+                        try:
+                            df_source = getattr(self, df_str_source)
+                        # if dataframe NOT already added via self.add_df
+                        except AttributeError:
+                            print('populating source')
+                            # note this also creates fp_csv_archive
+                            self.add_df(fp_csv_source, df_str_source, 'ITEM')
+                            df_source = getattr(self, df_str_source)
+                            # save a base archive if NEVER saved and a daily archive if never saved
+                            self.save_archive_csv(df_str_source)
+                        df_source.drop(index, inplace = True)
+                        setattr(self, df_str_source, df_source)
+
                     except Exception as e:
                         logging.info(e)
                 else:
@@ -852,6 +889,7 @@ class metaData(object):
                 # create new filename components
                 fc_new_name = df_item['RENAME']
                 col_name_original = df_item['COL_NAME_ARCHIVAL']
+                col_name_original = dict_col_name_orig[col_name_original]
                 fp_components = fp_fcs_current.split(os.sep)
                 # all but original file name
                 fp_base = os.sep.join(fp_components[:-1])
@@ -861,7 +899,6 @@ class metaData(object):
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new
                 df.at[index, col_name_original] = fp_fcs_current
-                df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
                 df.at[index, 'ACTION'] = ''
                 df.at[index, 'RENAME'] = ''
 
@@ -871,6 +908,38 @@ class metaData(object):
                 # RENAME label
                 df = df.rename(index = {index:fc_new_name})
                 setattr(self, df_str, df)
+
+                # UPDATE SOURCE inventory
+                # ABSTRACT into FUNCTION someday 20210819 ZU
+                fp_components = fp_fcs_current.split(os.sep)
+                for idx, comp in enumerate(fp_components):
+                    if '.gdb' in comp:
+                        # Get Source STR
+                        src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                        # Once gdb is found in path, then break
+                        break
+                    # translation - there was no gdb in fp_fcs_orig
+                    elif idx == (len(fp_components)-1:
+                        # Get Source STR
+                        # No gdb found == shapefile passed - use dir/folder
+                        src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+                # Get SOURCE DF/CSV/STR
+                fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
+                df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                # Only grabs TargetGDB once per gdb
+                try:
+                    df_source = getattr(self, df_str_source)
+                # if dataframe NOT already added via self.add_df
+                except AttributeError:
+                    print('populating source')
+                    # note this also creates fp_csv_archive
+                    self.add_df(fp_csv_source, df_str_source, 'ITEM')
+                    df_source = getattr(self, df_str_source)
+                    # save a base archive if NEVER saved and a daily archive if never saved
+                    self.save_archive_csv(df_str_source)
+                df_source.at[index, target_col] = fp_fcs_new
+                df_source.at[index, col_name_original] = fp_fcs_current
+                setattr(self, df_str_source, df_source)
 
                 print(msg_str)
                 logging.info(msg_str)
@@ -884,11 +953,10 @@ class metaData(object):
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 fc_new_name = df_item['RENAME']
                 notes = df_item['NOTES']
-                # default setting
-                rename_delete_protocol = False
 
+                # DETERMINE DSET
+                rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
-                # find dataset one past .gdb i.e. path/to/gdb.gdb/dset
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
                         # recreated path to gdb
@@ -904,50 +972,66 @@ class metaData(object):
                             # in this case, rename_delete_protocol will remain FALSE
                             dset_move = dset_orig
 
-                        # Get TargetGDB
-                        fp_components_target = fp_move.split(os.sep)
-                        target_gdb_str = '{}_gdb'.format(fp_components_target[-1][:-4])
-                        fp_csv_target = self.path_csv_dict[target_gdb_str]
-                        df_str_target = self.df_str_dict[target_gdb_str]
-                        # Only grabs TargetGDB once per gdb
-                        try:
-                            df_target = getattr(self, df_str_target)
-                        # if dataframe NOT already added via self.add_df
-                        except AttributeError:
-                            print('populating target')
-                            # note this also creates fp_csv_archive
-                            self.add_df(fp_csv_target, df_str_target, 'ITEM')
-                            df_target = getattr(self, df_str_target)
-                            # save a base archive if NEVER saved and a daily archive if never saved
-                            self.save_archive_csv(df_str_target)
-
-                        # Get SourceGDB
-                        source_gdb_str = '{}_gdb'.format(comp[:-4])
-                        fp_csv_source = self.path_csv_dict[source_gdb_str]
-                        df_str_source = self.df_str_dict[source_gdb_str]
-                        # Only grabs TargetGDB once per gdb
-                        try:
-                            df_source = getattr(self, df_str_source)
-                        # if dataframe NOT already added via self.add_df
-                        except AttributeError:
-                            print('populating source')
-                            # note this also creates fp_csv_archive
-                            self.add_df(fp_csv_source, df_str_source, 'ITEM')
-                            df_source = getattr(self, df_str_source)
-                            # save a base archive if NEVER saved and a daily archive if never saved
-                            self.save_archive_csv(df_str_source)
+                        # Get Source STR
+                        src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
 
                         # Once gdb is found in path, then break
                         break
 
-                    # translation - there was no gdb in fp_fcs_orig
-                    if idx == len(fp_components):
+                    # translation - there was no gdb in fp_fcs_current
+                    elif idx == (len(fp_components) - 1):
                         logging.info('original location of {} had no dataset' \
                         'but no move dset was provided. Moved to gdb standalone' \
                         .format(index))
-                    # use new dset provided in csv
+
+                        # Get Source STR
+                        # No gdb found == shapefile passed - use dir/folder
+                        src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+
+                    # either find gdb or it's a shape.  pass until then
                     else:
                         pass
+
+                # Get TARGET DF/CSV/STR
+                fp_components_target = fp_move.split(os.sep)
+                tgt_gdb_or_dir = fp_components_target[-1]
+                # dir as target
+                if '.gdb' not in tgt_gdb_or_dir:
+                    tgt_gdb_or_dir = fp_components_target[-1]
+                    tgt_gdb_or_dir_str = '{}_dir'.format(tgt_gdb_or_dir)
+                # GDB as target
+                else:
+                    tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
+                fp_csv_target = self.path_csv_dict[tgt_gdb_or_dir_str]
+                df_str_target = self.df_str_dict[tgt_gdb_or_dir_str]
+                # Only grabs TargetGDB once per gdb
+                try:
+                    df_target = getattr(self, df_str_target)
+                # if dataframe NOT already added via self.add_df
+                except AttributeError:
+                    print('populating target')
+                    # note this also creates fp_csv_archive
+                    self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                    df_target = getattr(self, df_str_target)
+                    # save a base archive if NEVER saved and a daily archive if never saved
+                    self.save_archive_csv(df_str_target)
+
+                # Get SOURCE DF/CSV/STR
+                fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
+                df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                # Only grabs TargetGDB once per gdb
+                try:
+                    df_source = getattr(self, df_str_source)
+                # if dataframe NOT already added via self.add_df
+                except AttributeError:
+                    print('populating source')
+                    # note this also creates fp_csv_archive
+                    self.add_df(fp_csv_source, df_str_source, 'ITEM')
+                    df_source = getattr(self, df_str_source)
+                    # save a base archive if NEVER saved and a daily archive if never saved
+                    self.save_archive_csv(df_str_source)
+
+
                 # for featureclasstofeatureclass
                 fp_dset = os.path.join(fp_move, dset_move)
                 # check to make sure output dset exists before proceeding
@@ -972,9 +1056,6 @@ class metaData(object):
                 # print('fp current: \n{}'.format(fp_fcs_current))
                 # To document whether fp_fcs_current = Staging, Previous, Original
                 col_name_original = df_item['COL_NAME_ARCHIVAL']
-                dict_col_name_orig = {'original':'DATA_LOCATION_MCM_ORIGINAL',
-                                        'staging':'DATA_LOCATION_MCM_STAGING',
-                                        'previous':'DATA_LOCATION_MCM_PREVIOUS'}
                 col_name_original = dict_col_name_orig[col_name_original]
                 try:
                     if not dry_run:
@@ -1000,7 +1081,7 @@ class metaData(object):
                                 arcpy.Delete_management(fp_fcs_current)
                                 arcpy_msg = 'df_source.drop FAILED, index does not exist'
                                 df_source.drop(index, inplace = True)
-                                setattr(self, df_source_str, df_source)
+                                setattr(self, df_str_source, df_source)
 
                     df.at[index, target_col] = fp_fcs_new
                     df.at[index, col_name_original] = fp_fcs_current

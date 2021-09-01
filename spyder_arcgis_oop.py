@@ -13,6 +13,7 @@ import copy
 import pandas as pd
 import numpy as np
 import utilities
+import ductape_utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
@@ -91,8 +92,6 @@ class metaData(object):
         # PRJ FILE
         self.prj_file = prj_file
 
-    def different_branch_merge_fctn(self, alternate_print_str):
-        print(alternate_print_str)
     def fcs_to_shp_agol_prep(self, df_str, base_dir_shp, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
@@ -921,7 +920,7 @@ class metaData(object):
                         # Once gdb is found in path, then break
                         break
                     # translation - there was no gdb in fp_fcs_orig
-                    elif idx == (len(fp_components)-1:
+                    elif idx == (len(fp_components)-1):
                         # Get Source STR
                         # No gdb found == shapefile passed - use dir/folder
                         src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
@@ -1447,54 +1446,73 @@ class AgolAccess(metaData):
         # dictionary that can be expanded upon
         # FOUND NO difference between feature layer collection and feature layer.  All feature layers were
         # detected as both with mcmjac_gis.content.search(item_type = <collection or layer>)
-        self.item_type_dict = {'shapefile': 'shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
+        self.item_type_dict = {'shapefile': 'Shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
+        group_id_dict = {'KRRP_Geospatial': 'a6384c0909384a43bfd91f5d9723912b',
+                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
+        self.group_id_dict = group_id_dict
 
     def get_group(self, group_key):
         '''
         hardcoded. update if more groups become necessary.
+        DELETE ZU 20210827
         '''
-        group_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
+        group_id_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
                         'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
-        group_id = group_dict[group_key]
+        group_id = group_id_dict[group_key]
         krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
         setattr(self, group_key, krrp_geospatial)
 
-    def identify_items_online(self, itemType=['shapefile', 'feature'], **kwargs):
+    def identify_items_online(self, itemType=['feature'],
+                                group_name ='KRRP_Geospatial', **kwargs):
         '''
         find items already online
+        ARGS
+        itemType:           list with matching keys (lower case) to item_type_dict
+        group_name:         exact name as group in AGOL
         '''
+        # List should be passed
         if isinstance(itemType, list):
             pass
         else:
             itemType = [itemType]
-        # item_type_dict created in __init__
+
+        # QUERY STRING
+        # If Group (default KRRC_Geospatial), add to query str
+        if group_name is not None:
+            group_id = self.group_id_dict[group_name]
+            query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
+        else:
+            query_str = 'owner: uhlmann@mcmjac.com'
+
+        # GET ITEMS
         for item in itemType:
             itemType = self.item_type_dict[item]
+            itemType_str = itemType.replace(' ', '_').lower()
+
+            # TAGS  --> filter
             try:
-                group_name = kwargs['group']
-                groups = self.mcmjac_gis.groups.search()
-                try:
-                    group_obj = [item for item in groups if group_name == item.title][0]
-                    items = group_obj.content()
-                    itemType = itemType.replace(' ', '_').lower()
-                    group_name = group_name.replace(' ','_').replace('-','_').lower()
-                    setattr(self, 'user_content_{}_{}'.format(itemType, group_name), items)
-                except IndexError:
-                    sys.exit('Group: {} Does Not Exist'.format(group_name))
+                tag = kwargs['tag']
+                items_filtered = [item for item in items if tag in item.tags]
+                # format text for attribute to replace spaces with underSc
+                tag_substr = 'tagged_{}'.format(tag)
             except KeyError:
-                items = self.mcmjac_gis.content.search('owner: uhlmann@mcmjac.com',
-                                                item_type = itemType, max_items = 900)
-                itemType = itemType.replace(' ', '_').lower()
-                setattr(self, 'user_content_{}'.format(itemType), items)
+                tag_substr = ''
+                pass
+
+            # Set Content_Str
+            if group_name is None:
+                content_str = 'user_content_{}{}'.format(itemType_str, tag_substr)
+            else:
+                content_str = 'user_content_{}_{}'.format(group_name, itemType_str, tag_substr)
+
+            # GET CONTENT
+            print(query_str)
+            print(itemType)
+            print(content_str)
+            items = self.mcmjac_gis.content.search(query_str,
+                                            item_type = itemType, max_items = 250)
+            setattr(self, content_str, items)
             # filtered tags attribute
-        try:
-            tags = kwargs['tags']
-            items_filtered = [item for item in items if tags in item.tags]
-            # format text for attribute to replace spaces with underSc
-            itemType_text = itemType.replace(' ', '_')
-            setattr(self, 'user_content_{}_{}'.format(tags, itemType_text), items_filtered)
-        except KeyError:
-            pass
 
     def take_action_agol(self, df_str, action_type, user_content_str,
                             group = 'KRRP_Geospatial', **kwargs):
@@ -1570,6 +1588,7 @@ class AgolAccess(metaData):
             for content_item in user_content:
                 title = content_item.title
                 if title in self.indices:
+                    print('REMOVING: {}'.format(title))
                     content_item.delete()
                     # gets idx in df; assumes just ONE item with exact name -NOT > 1
                     # this is for useing ALTERNATE column - not INDEX
@@ -1586,51 +1605,73 @@ class AgolAccess(metaData):
                     pass
 
         if action_type == 'publish':
-            for indice in self.indices:
-                # comes as a list for what should prob be a dictionary
-                item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Shapefile')
-                if indice == item_list[0].title:
-                    print('PUBLISHING: {}'.format(indice))
-                    item_list[0].publish()
+            for content_item in user_content:
+                title = content_item.title
+                if title in self.indices:
+                    print('PUBLISHING: {}'.format(title))
+                    content_item.publish()
                 else:
-                    print('item title {} did not match queried result on agol --> did NOT publish'.format(indice))
+                    print('item title {} did not match queried result on agol --> did NOT publish'.format(title))
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
-                    df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
                 except:
                     pass
         if action_type == 'share':
+            # To account for any ITEMS from df that are NOT online as features
+            indices_remaining = copy.copy(self.indices)
             # get group id for sharing
             try:
                 getattr(self, 'krrp_geospatial')
             except AttributeError:
                 self.get_group('krrp_geospatial')
-
-            for indice in self.indices:
-                # comes as a list for what should prob be a dictionary
-                item_list = self.mcmjac_gis.content.search(query = indice, item_type = 'Feature Layer')
-                if indice == item_list[0].title:
-                    print('SHARING: {}'.format(indice))
-                    item_list[0].share(groups = [self.krrp_geospatial])
+            for content_item in user_content:
+                title = content_item.title
+                if title in self.indices:
+                    print('SHARING: {}'.format(content_item))
+                    content_item.share(groups = [self.krrp_geospatial], org = True)
                     df.at[title, 'SHARED_GROUP'] = True
+                    indices_remaining.remove(title)
                 else:
-                    print('NOT SHARING:\nItem Title {} did not match queried result on agol'.format(indice))
-
+                    pass
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
                     df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
                 except:
                     pass
+            # Print out indices unaccounted for
+            if len(indices_remaining)!=0:
+                substr = '\n'.join(indices_remaining)
+                print('\nINDICES NOT FOUND IN CONTENT:\n{}'.format(substr))
+        if action_type == 'current_tags':
+            for content_item in user_content:
+                item_title = content_item.title
+                item_tags = content_item.tags
+                tags_str = ', '.join(item_tags)
+                try:
+                    df.at[item_title, 'TAGS_CURRENT'] = tags_str
+                except KeyError:
+                    print('Item {} is not present in DF'.format(item_title))
+        if action_type == 'update_tags':
+            content_items = [item for item in user_content if item.title in self.indices]
+            for content_item in content_items:
+                title = content_item.title
+                try:
+                    new_tags = df.loc[title, 'TAGS']
+                    # Get list from string
+                    new_tags = ductape_utilities.parse_csl(new_tags, False)
+                    update_dict = {'tags':new_tags}
+                    log_str = 'TAGS update for: {}'.format(title)
+                    content_item.update(update_dict)
+                except KeyError:
+                    print('Item {} is not present in DF'.format(item_title))
 
         # keep count going for item_type
         ct += 1
-        print('ARE WE HERE?')
-        print(df.ACTION.to_list())
-        setattr(self, 'df_vageen', df)
-        fp_item_desc_temp  = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions_temp.csv'
-        pd.DataFrame.to_csv(df, fp_item_desc_temp)
+        setattr(self, df_str, df)
+
     def update_comma_sep_vals(self, df, index, col_name, col_val):
         # UPDATE comma-sep list
         initial_vals = df.at[index, col_name]

@@ -1371,6 +1371,179 @@ def check_layer_source(fp_mxd, fp_csv_inventory, fp_csv_out,
     print(lyr_name)
     pd.DataFrame.to_csv(df, fp_csv_out)
 
+def ddp_map_series_index(fc_in, **kwargs):
+    '''
+    Populate page name and page num for index feature
+    ZU 20210908
+    ARGS:
+    fc_in               index feature class path
+    kwarg[pagename]     list of names for pagename if necessary
+    '''
+
+    try:
+        pagename_list = kwargs['pagename']
+    except:
+        pass
+    arcpy.AddField_management(fc_in, 'pagenum', 'SHORT')
+    arcpy.AddField_management(fc_in, 'pagename', 'TEXT', field_length = 50)
+    with arcpy.da.UpdateCursor(fc_in, ['pagenum', 'pagename']) as cursor:
+        for idx, row in enumerate(cursor):
+            row[0] = idx + 1
+            if 'pagename' not in locals():
+                row[1] = idx + 1
+            else:
+                row[1] = str(pagename_list[idx])
+            cursor.updateRow(row)
+def reindex_map_series(fc_in, index_mapping):
+    '''
+    pass a list of ordered (east to west, north to south, whatever) pagenums
+    and reindex the pagenum attribute.  Change pagename too.
+    ZU 20210908
+    ARGS
+    fc_in               path to index fx
+    index_mapping       list of integers mapping new index nums i.e. [1,4,3,2]
+                        changes 1:1 2:4 3:3 4:2
+    '''
+    # get pagename list
+    pname_orig_order = []
+    with arcpy.da.SearchCursor(fc_in, ['pagename']) as cursor:
+        for row in enumerate(cursor):
+            pname_orig_order.append(row[0])
+    # Now update pagename and pagenum
+    with arcpy.da.UpdateCursor(fc_in, ['pagenum', 'pagename']) as cursor:
+        for idx, row in enumerate(cursor):
+            new_pnum = index_mapping[idx]
+            row[0] = new_pnum
+            # change from page num to index
+            row[1] = pname_orig_order[new_pnum - 1]
+            cursor.updateRow(row)
+
+def add_lat_long(table_in):
+    arcpy.AddField_management(fp_fcs, 'easting', 'DOUBLE')
+    arcpy.AddField_management(fp_fcs, 'northing', 'DOUBLE')
+    with arcpy.da.UpdateCursor(table_in, ['SHAPE@XY', 'easting', 'northing']) as cursor:
+        for row in cursor:
+            x = row[0][0]
+            y = row[0][1]
+            row[1] = round(x,2)
+            row[2] = round(y,2)
+            cursor.updateRow(row)
+def centroid_from_attribute(table_in, att):
+    '''
+    Take an fc with multiple points with grouping field and find centroid of
+    grouped points. For example - if ddp index needed and there are groups of
+    points/polys spatially clustered that are desired to be in the same index sheet
+    then provide the att argument and df.grouby(att) will find the centroid of
+    that feature.
+    ARGS
+    table_in            table (fc) to generate centroids
+    att                 groupby attribute
+    OUT
+    fp_out              feature class centroids
+    '''
+    # https://gis.stackexchange.com/questions/307782/creating-point-feature-class-from-multiple-points-using-list-comprehension-and-a
+    att_list = []
+    x, y = [],[]
+    with arcpy.da.SearchCursor(table_in, [att, 'SHAPE@XY']) as cursor:
+        for rw in cursor:
+            att_list.append(rw[0])
+            x.append(rw[1][0])
+            y.append(rw[1][1])
+    del cursor
+    del rw
+
+    df = pd.DataFrame(np.column_stack([att_list, x, y]), columns = ['target_att', 'x', 'y'])
+    # ensure coords are numeric
+    df['x'] = pd.to_numeric(df['x'])
+    df['y'] = pd.to_numeric(df['y'])
+    ser_centroid_x = df.groupby('target_att')['x'].mean()
+    centroid_x_vals = ser_centroid_x.values
+    centroid_y_vals = df.groupby('target_att')['y'].mean().values
+    # names/attributes we grouped with
+    index = ser_centroid_x.index.to_list()
+    points = []
+    for x,y in zip(centroid_x_vals, centroid_y_vals):
+        points.append(arcpy.Point(x,y))
+    sr = arcpy.Describe(table_in).spatialReference
+    points = [arcpy.PointGeometry(p, sr) for p in points]
+    # create feat
+    basename = os.path.split(table_in)[-1]
+    basedir = os.path.split(table_in)[0]
+    basename.replace('.shp', '')
+    name_out = '{}_centroids'.format(basename)
+    fp_out = os.path.join(basedir, name_out)
+    feat_field = '{}_val'.format(att)
+    arcpy.CreateFeatureclass_management(basedir, name_out, "POINT")
+    arcpy.AddField_management(fp_out, feat_field, "TEXT")
+    cursor = arcpy.da.InsertCursor(fp_out, [feat_field, 'SHAPE@XY'])
+    for pt, id in zip(points, index):
+        cursor.insertRow((id, pt))
+    del cursor
+
+def centroid_to_index(table_in, id_att, template_str, feet=True, **kwargs):
+    '''
+    To be used in a series with centroid_from_attribute.  Get centroids -either
+    from multiple inputs like coho_salvage figures for RES, or most likley from
+    single points like before.  Format table_in to include fields 'index_scale',
+    and id_add field
+    ARGS
+    table_in        centroid fc
+    id_att          attribute name for id field i.e. 'Name' - basically the
+                    ddp index page name
+    template_str    to pull scale factors from csv lookup table - i.e. 11x17_landscape
+    feet            if true, horiz unit convert to feet.  default of false assumes map
+                    units horiz in meters
+    '''
+
+    # GRAB FIRST in case naming convention not obsrved and function fails
+    basedir = os.path.split(table_in)[0]
+    feat_name = os.path.split(table_in)[1]
+    index_fc_name = '{}_index2'.format(feat_name.replace('_centroid',''))
+    fp_out = os.path.join(basedir, index_fc_name)
+
+    # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
+    reference_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_RES\2021_09_14\centroid_generator.csv'
+    df = pd.read_csv(reference_csv, index_col = 'template_str')
+
+    if feet:
+        cm_m = .01
+        m_ft = 3.28084
+        unit_conv = cm_m * m_ft
+    else:
+        cm_m = 0.1
+        unit_conv = cm_m
+    width_cent = df.loc[template_str, 'width_cent']
+    ht_cent = df.loc[template_str, 'height_cent']
+    e_len_base = width_cent * unit_conv
+    n_len_base = ht_cent * unit_conv
+
+    att_list = []
+    poly = []
+    with arcpy.da.SearchCursor(table_in, [id_att, 'SHAPE@XY', 'index_scale']) as cursor:
+        for row in cursor:
+            x = row[1][0]
+            y = row[1][1]
+            scale = row[2]
+            e_w = scale * (e_len_base/2)
+            n_s = scale * (n_len_base/2)
+            ul = arcpy.Point(x - e_w, y + n_s)
+            ur = arcpy.Point(x + e_w, y + n_s)
+            ll = arcpy.Point(x - e_w, y - n_s)
+            lr = arcpy.Point(x + e_w, y - n_s)
+            extent = arcpy.Array([ul,ur,lr,ll])
+            poly.append(arcpy.Polygon(extent))
+            # get id_name to add below
+            att_list.append(row[0])
+
+    arcpy.CreateFeatureclass_management(basedir, index_fc_name, "POLYGON")
+    arcpy.AddField_management(fp_out, id_att, "TEXT")
+
+    # CREATE INDEX FC
+    cursor = arcpy.da.InsertCursor(fp_out, [id_att, 'SHAPE@'])
+    for id, p in enumerate(poly):
+        id_val = att_list[id]
+        cursor.insertRow((id_val, p))
+    del cursor
 
 
 # # NOTES

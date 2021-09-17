@@ -92,37 +92,33 @@ class metaData(object):
         # PRJ FILE
         self.prj_file = prj_file
 
-    def fcs_to_shp_agol_prep(self, df_str, base_dir_shp, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+    def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
         for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
 
         ARGS:
         df_str              df for example
-        base_dir_shp        path/to/dir/with/agol_Uploads/2020_10_05
         target_col          col name for  col with file path to fcs for conversion
         '''
-        # 1) create subfolder for each shapefiles
+
         df = getattr(self, df_str)
-        yyyy_mm_dd = os.path.basename(base_dir_shp)
-        # create subdir JUST for shapefiles
-        inDir = os.path.join(base_dir_shp, yyyy_mm_dd)
-        # shp subdir does not exist
-        if not os.path.exists(inDir):
-            os.mkdir(inDir)
-        # 2) Convert FCS to SHAPEFILE
         ct = 0
         for indice in self.indices:
+            inDir = df.loc[indice, 'AGOL_DIR']
+            # shp subdir does not exist
+            if not os.path.exists(inDir):
+                os.mkdir(inDir)
             fp_fcs_in = df.loc[indice][target_col]
             symb = '-'*20
-            shp_name = os.path.join(inDir, indice + '.shp')
-            if not arcpy.Exists(shp_name):
+            fp_shp = os.path.join(inDir, indice + '.shp')
+            if not arcpy.Exists(fp_shp):
                 print('{}  CONVERTING  {}\nInput FCS: {}\nOutput SHP: {}'.format
                                 (symb, symb, fp_fcs_in, '{}.shp'.format(indice)))
                 arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_in, inDir, indice)
                 print('{}  CONVERSION COMPLETE  {}'.format(symb, symb))
             else:
-                print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(shp_name))
+                print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(fp_shp))
 
     def zip_shp_agol_prep(self, base_dir_shp, **kwargs):
         '''
@@ -437,11 +433,11 @@ class metaData(object):
             # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
             # NOTE fp_base is refering to base name for shapefiles (since multiple file extensions
             # under same BASE name)
-            fp_base = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
+            fp_shp = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
             index_names = df.loc[self.indices].index.to_list()
             # glob strings will create the string to pass to  glob.glob which
             # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-            glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
+            glob_strings = ['{}*.xml'.format(fp_shp) for fp_shp in fp_shp]
             # ...(glob_string)[0] because it is a list of list - [[path/to/file]]
             # for item in glob_strings:
             #     print('NAME {}\nTYPE: {}'.format(item, type(item)))
@@ -608,6 +604,8 @@ class metaData(object):
             try:
                 abstract_new = df.loc[indice]['ABSTRACT']
                 print('abstact  ENGAGE')
+                print(abstract_new)
+                print(type(abstract_new))
                 if isinstance(abstract_new, str):
                     el = ET.SubElement(dataIdInfo, 'idAbs')
                     print(el.text)
@@ -885,6 +883,7 @@ class metaData(object):
 
         elif action_type in ['rename']:
             for index in self.indices:
+                print('did we make it here?')
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 # create new filename components
@@ -905,6 +904,8 @@ class metaData(object):
 
                 msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
                 arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+                # Now fp is renamed, so change alias on NEW fcs
+                arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
 
                 # RENAME label
                 df = df.rename(index = {index:fc_new_name})
@@ -1074,11 +1075,11 @@ class metaData(object):
                             arcpy_msg = 'RENAME: True FC to FC: True DELETE: False'
                             arcpy.Delete_management(fp_fcs_renamed)
                         else:
-                            print('Delete Protocol GO!!!')
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
                             arcpy_msg = 'FC to FC True DELETE False'
                             # delete if file is moved
                             if action_type == 'move':
+                                print('Delete Protocol GO!!!')
                                 arcpy.Delete_management(fp_fcs_current)
                                 arcpy_msg = 'df_source.drop FAILED, index does not exist'
                                 df_source.drop(index, inplace = True)
@@ -1696,7 +1697,7 @@ class AgolAccess(metaData):
         df.at[index, 'ACTION'] = updated_vals
         return(df)
 
-    def add_agol_upload(self, df_str, target_col = 'DATA_LOCATION_ZIP', **kwargs):
+    def add_agol_upload(self, df_str, target_col = 'AGOL_DIR', **kwargs):
         '''
         currently passing snippets as kwarg but could be drawn from column in
         csv in future.  shapefiles need to be zipped and in file structure
@@ -1750,7 +1751,7 @@ class AgolAccess(metaData):
 
         # need indices from self.selection_idx
         # YES this is correct.  Each shapefile gets its OWN zip folder
-        upload_folders = self.df.loc[titles]['DATA_LOCATION_ZIP'].values.tolist()
+        upload_folders = self.df.loc[titles]['AGOL_DIR'].values.tolist()
         parent_zip_folder = ['{}_zip'.format(upload_folder) for upload_folder in upload_folders]
         zipped_folders = [os.path.join(zip_folder, title) for zip_folder, title in zip(parent_zip_folder, titles)]
         zipped_folders = ['{}.zip'.format(zip_folder) for zip_folder in zipped_folders]

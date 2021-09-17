@@ -317,3 +317,43 @@ def parse_gdb_dsets(fp_gdb, **kwargs):
         pass
     # return fcs_names
     return(fcs_names)
+
+def summarize_fc(fc_in, summary_fields, fields = 'all'):
+    '''
+    nice foundation, but unfinished.  instead of returning ser_count (series)
+    return a multi-index which summarizes multiple fields or smash multiple
+    dfs , one per field, into a single fc report. ZU 20210916
+    ARGS
+    fc_in               feature class to summarize
+    summary_fields      list of fields to summarize. NEEDS WORK at the end for
+                        multiindex
+    fields              vestigal. probably remove
+    '''
+    if fields == 'all':
+        fields = arcpy.ListFields(fc_in)
+    elif isinstance(fields, list):
+        pass
+    d1_num_feat = arcpy.GetCount_management(fc_in)
+
+    n_sum_f = len(summary_fields)
+    f_name, val = [], []
+    df_fields = pd.DataFrame(np.column_stack([f_name, val]), columns = ['field_name', 'val'])
+    with arcpy.da.SearchCursor(fc_in, summary_fields) as cursor:
+        for rw_idx, rw in enumerate(cursor):
+            for f_idx, f in enumerate(summary_fields):
+                rw_idx2 = (rw_idx * 2) + f_idx
+                df_fields.at[rw_idx2, 'field_name'] = f
+                try:
+                    df_fields.at[rw_idx2, 'val'] = rw[f_idx]
+                except ValueError:
+                    df_fields = df_fields.astype({'val':str})
+                    df_fields.at[rw_idx2, 'val'] = rw[f_idx]
+
+    del cursor
+    del rw
+    ser_count = df_fields.groupby('val')['val'].count()
+    return(ser_count)
+
+    # vals = ser_count.values
+    # f_names = ser_count.index.to_list()
+    # df_summary = pd.DataFrame(np.column_stack())

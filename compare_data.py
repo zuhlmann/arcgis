@@ -183,9 +183,17 @@ def file_paths_arc(folder_or_gdb, want_df, **kwargs):
         # returns a dataframe for manually comparing tables with changed feature names
         path_to_feat.append(os.path.join(folder_or_gdb, feat))
 
+    nrows = len(feats_df)
+    blank = [None] * nrows
     if want_df:
-        df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat]),
-                            columns = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS'])
+        df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat,
+                                            blank, blank, blank, blank, blank,
+                                            blank, blank, blank, blank]),
+                            columns = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
+                                        'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
+                                        'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
+                                        'MOVE_LOCATION_DSET','RENAME','DSET_LOWER_CASE',
+                                        'COL_NAME_ARCHIVAL'])
     return(df)
 
 def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):

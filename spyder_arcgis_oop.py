@@ -74,6 +74,7 @@ class metaData(object):
         except KeyError:
             path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
                             'master_gdb': utilities.get_path('fp_master', 'csv'),
+                            'orders_gdb': utilities.get_path('fp_orders', 'csv'),
                             'mapping_gdb': utilities.get_path('fp_mapping', 'csv'),
                             'archive_gdb': utilities.get_path('fp_archive', 'csv')}
             self.path_csv_dict = path_csv_dict
@@ -343,55 +344,6 @@ class metaData(object):
         #     print(idx, ' ', item)
         return(parsed_csl_temp)
 
-    def assemble_metadata(self):
-        '''
-        Create new metadata formatted in csv for updating element tree elements
-        in write_xml.  If metadata already exists and we just want to append
-        more data to idPurp then skip this step.
-        '''
-        # index of last column bracketing Purpose statement items
-        idx_purpose = self.df.columns.get_loc('PURPOSE') -1
-        # create string from columns with \\n delimeters
-        purp = []
-        # loop through columns which created or will create Purpose Statement
-        for rw in self.df.iterrows():
-            # rw = tuple of len 2 - rw[0] = row index beginning with 0. rw[1] = series of particular row
-            # so this is a series with the columns as rows
-            row_full = rw[1]
-            dict = row_full[1:idx_purpose].dropna().to_dict()
-            # create list of strings i.e. ['key1: val1', 'key2: val2']
-            purp_indiv = ['{}: {}'.format(key, val) for key, val in zip(dict.keys(), dict.values())]
-            # make string from list with \\n between items
-            purp_indiv = '\n'.join(purp_indiv)
-            purp.append(purp_indiv)
-            # # now append abstract and credits if exist
-            # abstract.append(row_full.ABSTRACT)
-            # credits.append(row_full.CREDITS)
-
-        # get purpose, abstract, credits from csv
-        purpose_new = copy.copy(purp)
-        abstract_new = self.df['ABSTRACT'].to_list()
-        credits_new = self.df['CREDITS'].to_list()
-
-        # escape characters not follow prob due to i don't know.
-        credits_new_temp = []
-        for cred in credits_new:
-            try:
-                # fixes escape character issue
-                cred = cred.replace('\\n', '\n')
-            except AttributeError:
-                pass
-            credits_new_temp.append(cred)
-
-        # create new df to grab these elements the same indexing as main df
-        index_df = self.df.index.tolist()
-        self.df_meta_add = pd.DataFrame(np.column_stack(
-                            [index_df, purpose_new, credits_new_temp, abstract_new]),
-                            columns = ['index', 'purpose_new', 'credits_new', 'abstract'],
-                            index = index_df)
-
-
-
     def write_xml(self, df_str, shp = False, **kwargs):
         '''
         Update metadata to include assemble_metadata() statement or skip that
@@ -478,17 +430,22 @@ class metaData(object):
             # search for element <idPurp> - consult python doc for more methods. find
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
-            if not pd.isnull(dataIdInfo):
-                purp = dataIdInfo.find('idPurp')
-                abstract = dataIdInfo.find('idAbs')
-                credits = dataIdInfo.find('idCredit')
-            else:
-                print('\ndataIdInfo Mucking it up!!!!!\n')
+            if pd.isnull(dataIdInfo):
+                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\prj_files\xml_template_source.xml'
+                print('\n{} contained no Item Desc - \nTemplate used instead: \n{}\n'.format(indice, fp_xml_template))
+                tree = ET.parse(fp_xml_template)
+                # root is the root ELEMENT of a tree
+                root = tree.getroot()
+                dataIdInfo = root.find('dataIdInfo')
+
+
+            purp = dataIdInfo.find('idPurp')
+            abstract = dataIdInfo.find('idAbs')
+            credits = dataIdInfo.find('idCredit')
 
 
             # ADD NEW PURP
             new_purp_items = add_new_purp_list[indice_iloc]
-            print('iloc {} new purp: {}'.format(indice_iloc, new_purp_items))
             # SUBTRACT NEW PURP
             subtract_purp_items = subtract_new_purp_list[indice_iloc]
 
@@ -499,7 +456,6 @@ class metaData(object):
             # if is a string this means there is a value.  if empty value it will be
             # a float for dumb reason.
             if not isinstance(new_purp_items[0], str):
-                print('nothing to append')
                 # Marks To Do if - do NOT update purp unless subtract_lines_purp specified below
                 update_purp = False
                 pass
@@ -515,8 +471,6 @@ class metaData(object):
                 if purp is None:
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
-                # needed if text deleted manaully in arc (i.e. Edit Metadata)
-                # for some reason purp will NOT be None, but purp.text will be None
                 elif purp.text is None:
                     purpose_new = ['{}: {}'.format(key, val) for key, val in zip(purp_item, purp_value)]
                     purpose_new = '\n'.join(purpose_new)
@@ -526,7 +480,6 @@ class metaData(object):
                     sub_item_lst = purp.text.splitlines()
                     # ADDING lines
                     for key, val in zip(purp_item, purp_value):
-                        print(key, val)
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, val)
 
                     # once the list is scoured and new items are either added or replaced
@@ -540,12 +493,10 @@ class metaData(object):
 
             # Nan from pd.dataframe.read_csv == dtype float
             if isinstance(subtract_purp_items[0], str):
-                print('did we make it here')
                 if purp is None:
                     # no purpose to extract
                     pass
                 elif purp.text is None:
-                    # no purpose to subtract
                     pass
                 else:
                     # Did not update Add
@@ -556,8 +507,6 @@ class metaData(object):
                         sub_item_lst = purpose_new.splitlines()
                     # Update Subtract
                     for key in subtract_purp_items:
-                        print('subitem list: {}'.format(sub_item_lst))
-                        print('SUBTRACT {}'.format(key))
                         sub_item_lst = utilities.parse_item_desc(sub_item_lst, key, '', False)
                         purpose_new = '\n'.join(sub_item_lst)
 
@@ -590,7 +539,7 @@ class metaData(object):
                             # purp = purpose.text
                             el = ET.SubElement(dataIdInfo, el_title)
                             el.text = el_text
-                            ET.dump(dataIdInfo)
+                            # ET.dump(dataIdInfo)
                             # OPTIONAL: this adds an attribute - a key, val pair
                             el.set('updated', 'ZRU_{}'.format(datetime.datetime.today().strftime('%d, %b %Y')))
 
@@ -603,17 +552,14 @@ class metaData(object):
             # ABSTRACT
             try:
                 abstract_new = df.loc[indice]['ABSTRACT']
-                print('abstact  ENGAGE')
-                print(abstract_new)
-                print(type(abstract_new))
                 if isinstance(abstract_new, str):
-                    el = ET.SubElement(dataIdInfo, 'idAbs')
-                    print(el.text)
-                    print('add abstract {}'.format(abstract_new))
-                    el.text = abstract_new
-                    print(el.text)
-                    ET.dump(dataIdInfo)
-                    df.at[indice, 'ABSTRACT'] = ''
+                    if abstract is not None:
+                        abstract.text = abstract_new
+                    else:
+                        abstract = ET.SubElement(dataIdInfo, 'idAbs')
+                        abstract.text = abstract_new
+                        # ET.dump(datIdInfo)
+                        df.at[indice, 'ABSTRACT'] = ''
                 elif math.isnan(abstract_new):
                     print('this means nan float for thing')
                     pass
@@ -625,18 +571,15 @@ class metaData(object):
             credits_stamp = 'Zachary Uhlmann\nMcMillen Jacobs\nuhlmann@mcmjac.com'
             try:
                 #   NEEDS WORK - doesn't erase existimng --> see RAMP_restoration_bdry
-                print('CREDITS')
                 credits_new = df.loc[indice]['CREDITS']
                 if isinstance(credits_new, str):
                     el = ET.SubElement(dataIdInfo, 'idCredit')
                     # stamp with standard credits or use specific
                     if credits_new == 'standard':
-                        print('stamp STANDARD')
                         credits_new = copy.copy(credits_stamp)
                     else:
                         pass
                     el.text = credits_new
-                    ET.dump(dataIdInfo)
                     df.at[indice, 'CREDITS'] = ''
                 elif math.isnan(credits_new):
                     print('this means nan float for thing')
@@ -1121,6 +1064,33 @@ class metaData(object):
                         msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                         logging.info(msg_str)
                         logging.info(e)
+        elif action_type in  ['create_poly', 'create_line', 'create_point']:
+            # For adding new item to maestro and take_action(action_type = create_<type>...)
+            for index in self.indices:
+                df_item = df.loc[index]
+                tgt_gdb_or_dir_str = df_item['MOVE_LOCATION']
+                dir_gdb = self.path_gdb_dict[tgt_gdb_or_dir_str]
+                dset = df_item['MOVE_LOCATION_DSET']
+                if not math.isnan(dset):
+                    dir_gdb = os.path.join(dir_gdb, dset)
+                feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
+                                    'create_point':'POINT'}
+                feat_type = feat_type_dict[action_type]
+                fp_fcs = os.path.join(dir_gdb, index)
+                msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, index, fp_fcs)
+                print(msg_str)
+                # flag_index
+                arcpy.CreateFeatureclass_management(dir_gdb, index, feat_type,
+                                                    spatial_reference = self.prj_file,
+                                                    has_m = 'No', has_z = 'No')
+                # NEW COL VALUES
+                df.at[index, target_col] = fp_fcs
+                df.at[index, 'ACTION'] = ''
+                df.at[index, 'MOVE_LOCATION'] = ''
+                df.at[index, 'MOVE_LOCATION_DSET'] = ''
+                setattr(self, df_str, df)
+
+                logging.info(msg_str)
 
     def df_sets(self, df_list, col_list):
         '''
@@ -1261,6 +1231,8 @@ class metaData(object):
             indices_iloc = self.indices_iloc
             fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN_JACOBS.to_list()
             print(fp_fcs)
+            # flag_index
+            # example of zip syntax for indices_iloc
             for idx, item in zip(indices_iloc, fp_fcs):
                 path, ext = os.path.splitext(item)
                 new_indice = os.path.split(path)[-1]

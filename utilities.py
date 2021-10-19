@@ -284,7 +284,7 @@ def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     except KeyError:
         print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
-def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/csv'):
+def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
     '''
     Fixed up to include add list of text to new field as option 2.
     the default is adding sequential numbers (for page_num) ZU 20210304
@@ -312,12 +312,54 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
     else:
         df = pd.read_csv(fp_csv)
         text_field = df[field].to_list()
-        arcpy.AddField_management(fp_fcs, field, 'TEXT')
+        # CHECK IF FIELD EXISTS BEFORE CREATING
+        existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
+        if field not in existing_fields:
+            try:
+                data_type = kwargs['data_type']
+                arcpy.AddField_management(fp_fcs, field, data_type)
+            except KeyError:
+                arcpy.AddField_management(fp_fcs, field, 'TEXT', field_length = 254)
+            print(r'----Adding field {} ----'.format(field))
+        else:
+            pass
         field = [field]
         with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
+            print('----Updating Cursor ---')
+            ct = 1
             for row, text_val in zip(cursor, text_field):
+                print(r'{}. Original Val: {} ---- New Val: {}'.format(ct, row[0], text_val))
                 row[0] = text_val
+                ct+=1
                 cursor.updateRow(row)
+
+def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
+    """
+    Previously located in arcpy_script_tools_uhlmann/field_mapping_fc_to_fc
+    ZU 20211019
+    Required:
+        in_fc -- input feature class
+        out_fc -- output feature class
+        keep_fields -- names of fields to keep in output
+
+    Optional:
+        where -- optional where clause to filter records
+    """
+    fmap = arcpy.FieldMappings()
+    fmap.addTable(in_fc)
+
+    # get all fields
+    fields = {f.name: f for f in arcpy.ListFields(in_fc)}
+
+    # clean up field map
+    for fname, fld in fields.items():
+        if fld.type not in ('OID', 'Geometry') and 'shape' not in fname.lower():
+            if fname not in keep_fields:
+                fmap.removeFieldMap(fmap.findFieldMapIndex(fname))
+
+    # copy features
+    path, name = os.path.split(out_fc)
+    arcpy.conversion.FeatureClassToFeatureClass(in_fc, path, name, where, fmap)
 
 def buffer_and_create_feat(fp_line, fp_out, buff_dist, line_end_type = 'ROUND', dissolve_option = 'NONE'):
     '''
@@ -947,27 +989,31 @@ def parse_item_desc(sub_item_list, target_key, target_val, add = True):
     for idx, sub_item in enumerate(sub_item_list):
         # if empty sub_items shrunk the list, idx will be notched back one at a time
         idx_adjusted = idx - idx_offset
-        # if empty string need to remove
-        if sub_item != '':
-            temp_idx = sub_item.index(':')
-            # get exact sub_item_key i.e. SOURCE_CONTACT_MCMILEN
-            sub_item_key = sub_item[:temp_idx]
-            # if already present, then replace and return new list
-            if target_key == sub_item_key:
-                # if ADDING purp lines
-                if add:
-                    print('replacing subitem {} with value {}'.format(sub_item_key, target_val))
-                    sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
-                    replaced_sub_item = True
-                # if REMOVING purp items
-                else:
-                    print('Removed {}'.format(sub_item_list[idx_adjusted]))
-                    sub_item_list.remove(sub_item_list[idx_adjusted])
-        # if empty string in sub items, remove
-        else:
-            idx_adjusted = idx - idx_offset
-            sub_item_list = [item for idx2, item in enumerate(sub_item_list) if idx_adjusted != idx2]
-            idx_offset += 1
+        try:
+            # if empty string need to remove
+            if sub_item != '':
+                temp_idx = sub_item.index(':')
+                # get exact sub_item_key i.e. SOURCE_CONTACT_MCMILEN
+                sub_item_key = sub_item[:temp_idx]
+                # if already present, then replace and return new list
+                if target_key == sub_item_key:
+                    # if ADDING purp lines
+                    if add:
+                        print('replacing subitem {} with value {}'.format(sub_item_key, target_val))
+                        sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
+                        replaced_sub_item = True
+                    # if REMOVING purp items
+                    else:
+                        print('Removed {}'.format(sub_item_list[idx_adjusted]))
+                        sub_item_list.remove(sub_item_list[idx_adjusted])
+            # if empty string in sub items, remove
+            else:
+                idx_adjusted = idx - idx_offset
+                sub_item_list = [item for idx2, item in enumerate(sub_item_list) if idx_adjusted != idx2]
+                idx_offset += 1
+        # non-AECOM standard summary.  skip lines without :
+        except ValueError:
+            pass
     # if no matched sub items were found, then simply add to list
     if add:
         if not replaced_sub_item:
@@ -1544,6 +1590,79 @@ def centroid_to_index(table_in, id_att, template_str, feet=True, **kwargs):
         id_val = att_list[id]
         cursor.insertRow((id_val, p))
     del cursor
+
+def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, **kwargs):
+    '''
+    Makes feature layer(s) for the map based off ref_csv.  refer to
+    GIS_Request_Tracking//GIS_Requests_RES//2021_09_14
+    folder for selection_table.csv and order for reference.  csv will have a column
+    with source_col - string for dictionary to reference file paths and field title.
+    CSV also includes values to use in sql_statement. ZU 20210917
+    ARGS
+    ref_csv                 csv with source_str and values to match
+    source_dict             dictionary with source_str matching fp_source in dict
+    field_dict              dict with source_str matching field to match vals
+                            in sql statment.  Note that these field titles are NOT
+                            present in table.
+    source_col             string val of column containing...strings for source_dict
+    val_col                 vals to create field_name in (val) in sql_str.  So the
+                            values in column to select from table
+    '''
+
+    df = pd.read_csv(ref_csv)
+    # only select keys
+    try:
+        fc_str = kwargs['select_keys']
+        fc_str = [fc_str]
+    # use all keys
+    except KeyError:
+        fc_str = list(source_dict.keys())
+    for s in fc_str:
+        fp = source_dict[s]
+        field = field_dict[s]
+        # .all is a hack towards unique vals
+        vals = df[df[source_col] == s].groupby(val_col).all().index.to_list()
+        sql_str = "','".join(vals)
+        sql_str = "('{}')".format(sql_str)
+        sql_str = '"{}" IN {}'.format(field, sql_str)
+        print(sql_str)
+        arcpy.MakeFeatureLayer_management(fp, '{}_lyr'.format(s), sql_str)
+
+def calc_acreage(fp_in, units, geodesic = False):
+    '''
+    Add acreage field populated with proper stuff. 20210921
+    ARGS:
+    fp_in               field to operate upon
+    units               str Feet Miles Acres, etc
+    geodesic            Read link below for info on choosing
+    '''
+    # https://community.esri.com/t5/new-to-gis-questions/planar-vs-geodesic-area-length/td-p/350368
+    # existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
+    # if 'acres' not in existing_fields:
+    #     arcpy.AddField_management(fp_fcs, 'acres', 'TEXT')
+    # else:
+    #     pass
+    if geodesic:
+        area_str = ['AREA_GEODESIC', 'LENGTH_GEODESIC']
+    else:
+        area_str= ['AREA', 'LENGTH']
+    shape_type = arcpy.da.Describe(fp_in)['shapeType']
+    if shape_type == 'Polygon':
+        arcpy.AddGeometryAttributes_management(fp_in, area_str[0], '',units,'')
+        fname = 'POLY_AREA'
+        units_lc = units.lower()
+        new_fname = 'area_{}'.format(units_lc)
+    if shape_type == 'Polyline':
+        arcpy.AddGeometryAttributes_management(fp_in, area_str[1], units,'','')
+        fname = 'LENGTH'
+        units_lc = units.replace('(United States)','').replace(' ','_').lower()
+        new_fname = 'length_{}'.format(units_lc)
+    arcpy.AlterField_management(fp_in, fname, new_fname, new_fname)
+
+def union_z(feat1, feat2, fp_out, where1 = '', where2 = ''):
+        lyr1 = arcpy.MakeFeatureLayer_management(feat1, where1)
+        lyr2 = arcpy.MakeFeatureLayer_management(feat2, where2)
+        arcpy.Union_analysis([lyr1,lyr2], fp_out)
 
 
 # # NOTES

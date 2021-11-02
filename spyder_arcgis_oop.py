@@ -107,6 +107,7 @@ class metaData(object):
         ct = 0
         for indice in self.indices:
             inDir = df.loc[indice, 'AGOL_DIR']
+            inDir = os.path.join(inDir, indice)
             # shp subdir does not exist
             if not os.path.exists(inDir):
                 os.mkdir(inDir)

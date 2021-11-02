@@ -298,22 +298,24 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
     fp_csv              pass this if adding text field to fp_fcs
     '''
 
+    existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
     if sequential:
-        if isinstance(field, list):
-            pass
-        else:
-            field = [field]
+        if field not in existing_fields:
+            arcpy.AddField_management(fp_fcs, field, 'SHORT')
+            print(r'----Adding field {} ----'.format(field))
+
+        field = [field]
         with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
             ct = 1
             for row in cursor:
                 row[0] = ct
                 cursor.updateRow(row)
                 ct += incr
+        del cursor
     else:
         df = pd.read_csv(fp_csv)
         text_field = df[field].to_list()
         # CHECK IF FIELD EXISTS BEFORE CREATING
-        existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
         if field not in existing_fields:
             try:
                 data_type = kwargs['data_type']
@@ -332,6 +334,7 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
                 row[0] = text_val
                 ct+=1
                 cursor.updateRow(row)
+        del cursor
 
 def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
     """
@@ -1526,7 +1529,7 @@ def centroid_from_attribute(table_in, att):
         cursor.insertRow((id, pt))
     del cursor
 
-def centroid_to_index(table_in, id_att, template_str, feet=True, **kwargs):
+def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  **kwargs):
     '''
     To be used in a series with centroid_from_attribute.  Get centroids -either
     from multiple inputs like coho_salvage figures for RES, or most likley from
@@ -1544,11 +1547,12 @@ def centroid_to_index(table_in, id_att, template_str, feet=True, **kwargs):
     # GRAB FIRST in case naming convention not obsrved and function fails
     basedir = os.path.split(table_in)[0]
     feat_name = os.path.split(table_in)[1]
-    index_fc_name = '{}_index2'.format(feat_name.replace('_centroid',''))
+    index_fc_name = '{}_index'.format(feat_name.replace('_centroid',''))
+    index_fc_name = idx_name
     fp_out = os.path.join(basedir, index_fc_name)
 
     # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
-    reference_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Request_Tracking\GIS_Requests_RES\2021_09_14\centroid_generator.csv'
+    reference_csv = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\centroid_generator.csv'
     df = pd.read_csv(reference_csv, index_col = 'template_str')
 
     if feet:
@@ -1663,6 +1667,28 @@ def union_z(feat1, feat2, fp_out, where1 = '', where2 = ''):
         lyr1 = arcpy.MakeFeatureLayer_management(feat1, where1)
         lyr2 = arcpy.MakeFeatureLayer_management(feat2, where2)
         arcpy.Union_analysis([lyr1,lyr2], fp_out)
+
+def find_gdb_dir(df, target_col):
+    new_col_list = []
+    orig_fp_list = df[target_col]
+    for fp in orig_fp_list:
+        try:
+            comp = fp.split('//')
+            comp_len = len(comp)
+            ct = 1
+            gdb_found = False
+            for gd in comp:
+                if '.gdb' in gd:
+                    new_col_list.append(gd[:-4])
+                    gdb_found = True
+                elif (ct == comp_len) and not gdb_found:
+                    new_col_list.append('ADD_DIR_MANUALLY')
+                ct+=1
+        except AttributeError:
+            new_col_list.append('NO_GDB_YET')
+    print(len(new_col_list))
+    df['GDB_OR_DIR']=new_col_list
+    return(df)
 
 
 # # NOTES

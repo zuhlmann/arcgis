@@ -314,8 +314,12 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
         del cursor
     else:
         df = pd.read_csv(fp_csv)
-        text_field = df[field].to_list()
+        val_list = df[field].to_list()
         # CHECK IF FIELD EXISTS BEFORE CREATING
+        # Arc will replace spaces with _
+        field = field.replace(' ','_').replace('.','')
+        print(field)
+        print(existing_fields)
         if field not in existing_fields:
             try:
                 data_type = kwargs['data_type']
@@ -329,9 +333,17 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
         with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
             print('----Updating Cursor ---')
             ct = 1
-            for row, text_val in zip(cursor, text_field):
-                print(r'{}. Original Val: {} ---- New Val: {}'.format(ct, row[0], text_val))
-                row[0] = text_val
+            for row, val in zip(cursor, val_list):
+                try:
+                    data_type = kwargs['data_type']
+                    if data_type in ['SHORT', 'LONG']:
+                        val = int(val)
+                    elif data_type in ['FLOAT', 'DOUBLE']:
+                        val = float(val)
+                except:
+                    pass
+                print(r'{}. Original Val: {} ---- New Val: {}'.format(ct, row[0], val))
+                row[0] = val
                 ct+=1
                 cursor.updateRow(row)
         del cursor
@@ -1529,7 +1541,7 @@ def centroid_from_attribute(table_in, att):
         cursor.insertRow((id, pt))
     del cursor
 
-def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  **kwargs):
+def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc = '', **kwargs):
     '''
     To be used in a series with centroid_from_attribute.  Get centroids -either
     from multiple inputs like coho_salvage figures for RES, or most likley from
@@ -1542,6 +1554,9 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  **kw
     template_str    to pull scale factors from csv lookup table - i.e. 11x17_landscape
     feet            if true, horiz unit convert to feet.  default of false assumes map
                     units horiz in meters
+    wc              pass a dict with {attribute name: [val1, val2, ...n]}
+    kwargs          update_rows --> if updating the ddp polygons directly after their
+                    creation.  Doesn't matter the val, just passing the kwarg
     '''
 
     # GRAB FIRST in case naming convention not obsrved and function fails
@@ -1567,33 +1582,70 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  **kw
     e_len_base = width_cent * unit_conv
     n_len_base = ht_cent * unit_conv
 
-    att_list = []
-    poly = []
-    with arcpy.da.SearchCursor(table_in, [id_att, 'SHAPE@XY', 'index_scale']) as cursor:
-        for row in cursor:
-            x = row[1][0]
-            y = row[1][1]
-            scale = row[2]
-            e_w = scale * (e_len_base/2)
-            n_s = scale * (n_len_base/2)
-            ul = arcpy.Point(x - e_w, y + n_s)
-            ur = arcpy.Point(x + e_w, y + n_s)
-            ll = arcpy.Point(x - e_w, y - n_s)
-            lr = arcpy.Point(x + e_w, y - n_s)
-            extent = arcpy.Array([ul,ur,lr,ll])
-            poly.append(arcpy.Polygon(extent))
-            # get id_name to add below
-            att_list.append(row[0])
+    if wc != '':
+        [(k,v)] = wc.items()
+        if not isinstance(v[0], str):
+            v = [str(vi) for vi in v]
+        # now create wc
+        v_str = ','.join(v)
+        wc = '{} in ({})'.format(k, v_str)
+        print('WHERE_CLAUSE', wc)
+    # if updating
+    try:
+        kwargs['update_rows']
+        with arcpy.da.UpdateCursor(fp_out, ['SHAPE@XY', 'SHAPE@', 'index_scale'], where_clause = wc) as cursor:
+            for row in cursor:
+                # centroids
+                x = row[0][0]
+                y = row[0][1]
+                scale = row[2]
+                e_w = scale * (e_len_base/2)
+                n_s = scale * (n_len_base/2)
+                ul = arcpy.Point(x - e_w, y + n_s)
+                ur = arcpy.Point(x + e_w, y + n_s)
+                ll = arcpy.Point(x - e_w, y - n_s)
+                lr = arcpy.Point(x + e_w, y - n_s)
+                extent = arcpy.Array([ul,ur,lr,ll])
+                p = arcpy.Polygon(extent)
+                row[1]=p
+                cursor.updateRow(row)
+        del cursor
+    #if proceeding normally
+    except KeyError:
+        att_list = []
+        poly = []
+        index_scale = []
+        with arcpy.da.SearchCursor(table_in, [id_att, 'SHAPE@XY', 'index_scale','action'], where_clause = wc) as cursor:
+            for row in cursor:
+                # unable to add boolean value to table to indicate 'skip', so created
+                # action col for multiple
+                if row[3] != 'skip':
+                    x = row[1][0]
+                    y = row[1][1]
+                    scale = row[2]
+                    e_w = scale * (e_len_base/2)
+                    n_s = scale * (n_len_base/2)
+                    ul = arcpy.Point(x - e_w, y + n_s)
+                    ur = arcpy.Point(x + e_w, y + n_s)
+                    ll = arcpy.Point(x - e_w, y - n_s)
+                    lr = arcpy.Point(x + e_w, y - n_s)
+                    extent = arcpy.Array([ul,ur,lr,ll])
+                    poly.append(arcpy.Polygon(extent))
+                    # get id_name to add below
+                    att_list.append(row[0])
+                    index_scale.append(int(row[2]))
 
-    arcpy.CreateFeatureclass_management(basedir, index_fc_name, "POLYGON")
-    arcpy.AddField_management(fp_out, id_att, "TEXT")
+        arcpy.CreateFeatureclass_management(basedir, index_fc_name, "POLYGON")
+        arcpy.AddField_management(fp_out, id_att, "TEXT")
+        arcpy.AddField_management(fp_out, 'index_scale', "LONG")
 
-    # CREATE INDEX FC
-    cursor = arcpy.da.InsertCursor(fp_out, [id_att, 'SHAPE@'])
-    for id, p in enumerate(poly):
-        id_val = att_list[id]
-        cursor.insertRow((id_val, p))
-    del cursor
+        # CREATE INDEX FC
+        cursor = arcpy.da.InsertCursor(fp_out, [id_att, 'index_scale','SHAPE@'])
+        for id, p in enumerate(poly):
+            id_val = att_list[id]
+            scale = index_scale[id]
+            cursor.insertRow((id_val, scale, p))
+        del cursor
 
 def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, **kwargs):
     '''
@@ -1690,6 +1742,87 @@ def find_gdb_dir(df, target_col):
     df['GDB_OR_DIR']=new_col_list
     return(df)
 
+def aprx_inventory(aprx_dir, csv_dir_out):
+    '''
+    List layers and properties used in aprx.  ZU 11/16/2021
+    ARGS:
+    fp_aprx            path/to/pro_dir/<filename>.aprx
+    fp_csv_out          full path - path/to/dir/<filename>.csv
+
+    '''
+    aprx = arcpy.mp.ArcGISProject(aprx_dir)
+    # maps = aprx.listMaps()
+    lyts = aprx.listLayouts()
+    maps_active = []
+    for l in lyts:
+        mapframe_present = False
+        lyt_map_names = []
+        el_list = l.listElements()
+        for el in el_list:
+            if el.type == 'MAPFRAME_ELEMENT':
+                mapframe_present = True
+                map = el.map
+                map_name = map.name
+                if len(maps_active) == 0:
+                    maps_active.append(map)
+                else:
+                    mn_list = [m.name for m in maps_active]
+                    if map_name not in mn_list:
+                        maps_active.append(map)
+                lyt_map_names.append(map_name)
+        # Because layouts without mapframes will break this if not conditional
+        if mapframe_present:
+            if 'lyt_map_dict' not in locals():
+                lyt_map_dict = {l.name:lyt_map_names}
+            else:
+                lyt_map_dict.update({l.name:lyt_map_names})
+        # remove layouts without mapframes
+        else:
+            lyts.remove(l)
+
+    # names = [m.name for m in maps]
+    for m in maps_active:
+        lyrs = m.listLayers()
+        c1,c2,c3,c4,c5 = [],[],[],[],[]
+        print('INVENTORYING map: {}'.format(m.name))
+        for lyr in lyrs:
+            if not lyr.isBasemapLayer:
+                c1.append(lyr.name)
+                try:
+                    c2.append(lyr.dataSource)
+                except NameError:
+                    c2.append('')
+                try:
+                    c3.append(lyr.visible)
+                except NameError:
+                    c3.append('')
+                try:
+                    c4.append(lyr.isRasterLayer)
+                except NameError:
+                    c4.append('')
+                try:
+                    c5.append(lyr.definitionQuery)
+                except NameError:
+                    c5.append('')
+        df_cols = np.column_stack([c1, c2, c3, c4, c5])
+        df_col_names = ['layer_name','data_source','visible','raster','def_query']
+        df = pd.DataFrame(df_cols, columns = df_col_names)
+        if 'df_map_dict' not in locals():
+            df_map_dict = {m.name:df}
+        else:
+            df_map_dict.update({m.name:df})
+
+    for l in lyts:
+        ln = l.name
+        fp_csv_out = os.path.join(csv_dir_out, '{}_aprx_inventory.csv'.format(ln))
+        map_name_list = lyt_map_dict[ln]
+        for mn in map_name_list:
+            if 'df_lyt' not in locals():
+                df_lyt = df_map_dict[mn]
+            else:
+                df_lyt = df_lyt.append(df_map_dict[mn])
+        pd.DataFrame.to_csv(df_lyt, fp_csv_out)
+        del df_lyt
 
 # # NOTES
 # # getting path componenets

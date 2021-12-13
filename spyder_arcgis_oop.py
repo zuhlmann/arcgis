@@ -33,6 +33,14 @@ class metaData(object):
     '''
     def __init__(self,  prj_file, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv',
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
+        '''
+        KEYWORD ARGS:
+        pro_project_dict:       dict formated as such {'gdb':{gdb_str:fp_gdb},
+                                                        'csv':{gdb_str:fp_csv},
+                                                        'df_str':{gdb_str:df_str}}
+        non_klamath_<df/csv/df_str>_dict        A replacement for default/hard-coded
+                                                klamath_dict.
+        '''
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -60,13 +68,19 @@ class metaData(object):
         # GDB PATHS
         try:
             self.path_gdb_dict = kwargs['non_klamath_df_dict']
-
         except KeyError:
             path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
                         'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
                         'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
                         'master_gdb': utilities.get_path('fp_master', 'gdb'),
                         'archive_gdb': utilities.get_path('fp_archive', 'gdb')}
+            # Dec 2021
+            # Pro protocol with project gdb
+            try:
+                kv_scratch_gdb = kwargs['pro_project_dict']['gdb']
+                path_gdb_dict.update(kv_scratch_gdb)
+            except KeyError:
+                pass
             self.path_gdb_dict = path_gdb_dict
         # CSV PATHS
         try:
@@ -77,6 +91,11 @@ class metaData(object):
                             'orders_gdb': utilities.get_path('fp_orders', 'csv'),
                             'mapping_gdb': utilities.get_path('fp_mapping', 'csv'),
                             'archive_gdb': utilities.get_path('fp_archive', 'csv')}
+            try:
+                kv_scratch_csv = kwargs['pro_project_dict']['csv']
+                path_csv_dict.update(kv_scratch_csv)
+            except KeyError:
+                pass
             self.path_csv_dict = path_csv_dict
 
         # DF STRINGS
@@ -88,7 +107,14 @@ class metaData(object):
                             'orders_gdb':'df_orders',
                             'master_gdb':'df_master',
                             'archive_gdb':'df_archive'}
+            try:
+                kv_scratch_df_str = kwargs['pro_project_dict']['df_str']
+                df_str_dict.update(kv_scratch_df_str)
+            except KeyError:
+                pass
+
             self.df_str_dict = df_str_dict
+
 
         # PRJ FILE
         self.prj_file = prj_file

@@ -50,6 +50,19 @@ def get_path(idx, path_type):
         path_out = df.loc[idx][col_name]
     return(path_out)
 
+def update_path_dict(idx_list, path_type, paths_table):
+
+    kv_scratch_gdb = kwargs['pro_project_dict']['gdb']
+    path_gdb_dict.update(kv_scratch_gdb)
+    df = pd.read_csv(paths_table, index_col = 1)
+    # if passing index with iloc
+    col_dict = {'gdb':'path_gdb',
+                'csv':'path_csv'}
+    col_name = col_dict[path_type]
+    for idx in idx_list:
+        path_out = df.loc[idx][col_name]
+
+
 def add_table_entry(alias, desc, fp):
     '''
     can add table entry by passing three required args
@@ -1782,8 +1795,9 @@ def aprx_inventory(aprx_dir, csv_dir_out):
 
     # names = [m.name for m in maps]
     for m in maps_active:
+        map_name = m.name
         lyrs = m.listLayers()
-        c1,c2,c3,c4,c5 = [],[],[],[],[]
+        c0,c1,c2,c3,c4,c5 = [],[],[],[],[],[]
         print('INVENTORYING map: {}'.format(m.name))
         for lyr in lyrs:
             if not lyr.isBasemapLayer:
@@ -1804,8 +1818,10 @@ def aprx_inventory(aprx_dir, csv_dir_out):
                     c5.append(lyr.definitionQuery)
                 except NameError:
                     c5.append('')
-        df_cols = np.column_stack([c1, c2, c3, c4, c5])
-        df_col_names = ['layer_name','data_source','visible','raster','def_query']
+                # get map name
+                c0.append(map_name)
+        df_cols = np.column_stack([c0, c1, c2, c3, c4, c5])
+        df_col_names = ['map','layer_name','data_source','visible','raster','def_query']
         df = pd.DataFrame(df_cols, columns = df_col_names)
         if 'df_map_dict' not in locals():
             df_map_dict = {m.name:df}
@@ -1823,6 +1839,37 @@ def aprx_inventory(aprx_dir, csv_dir_out):
                 df_lyt = df_lyt.append(df_map_dict[mn])
         pd.DataFrame.to_csv(df_lyt, fp_csv_out)
         del df_lyt
+
+def df_to_df_transfer(df_source, df_target, match_col_list, replace_col_list, target_val):
+    '''
+    Taken from spyder_arcgis_oop.  Should be incorprated into that module and this
+    funtionality removed and abstracted here. ZU 20211208
+    ARGS:
+    df_target               dataframe to add values to based off other arguments
+    df_source               dataframe to transfer values from
+    match_col_list          columns to match from table to table [col_source_str, col_target_str]
+    replace_col_list        col we are searching for value in df_source and
+                            col where we are replacing in target
+    target_val              val to search for in replace_col
+    RETURNS:
+    df_target              target_df with transferred target_vals
+    '''
+    match_col_source = match_col_list[0]
+    match_col_target = match_col_list[1]
+    replace_col_source = replace_col_list[0]
+    replace_col_target = replace_col_list[1]
+    # indices that match target_val in source
+    source_indices = df_source.index[df_source[replace_col_source]==target_val]
+    # file paths most likely
+    vals_match = df_source.loc[source_indices][match_col_source].to_list()
+    # indices in df_target matching source indices
+
+
+    target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
+
+    for indice in target_indices:
+        df_target.at[indice, replace_col_target] = target_val
+    return(df_target)
 
 # # NOTES
 # # getting path componenets

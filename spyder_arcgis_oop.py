@@ -35,11 +35,7 @@ class metaData(object):
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
         '''
         KEYWORD ARGS:
-        pro_project_dict:       dict formated as such {'gdb':{gdb_str:fp_gdb},
-                                                        'csv':{gdb_str:fp_csv},
-                                                        'df_str':{gdb_str:df_str}}
-        non_klamath_<df/csv/df_str>_dict        A replacement for default/hard-coded
-                                                klamath_dict.
+        fill in now that reworked
         '''
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
@@ -63,62 +59,10 @@ class metaData(object):
         # adds fp_log, csv_archive, csv_temp, etc.
         self.create_base_properties(df_str)
 
-        # change at some point to pass a json for whatever dbase is in use
-        # i.e. all four properties contained in a metadata_props_dbase.json
-        # GDB PATHS
-        try:
-            self.path_gdb_dict = kwargs['non_klamath_df_dict']
-        except KeyError:
-            path_gdb_dict = {'working_gdb': utilities.get_path('fp_working', 'gdb'),
-                        'mapping_gdb': utilities.get_path('fp_mapping', 'gdb'),
-                        'orders_gdb': utilities.get_path('fp_orders', 'gdb'),
-                        'master_gdb': utilities.get_path('fp_master', 'gdb'),
-                        'archive_gdb': utilities.get_path('fp_archive', 'gdb')}
-            # Dec 2021
-            # Pro protocol with project gdb
-            try:
-                kv_scratch_gdb = kwargs['pro_project_dict']['gdb']
-                path_gdb_dict.update(kv_scratch_gdb)
-            except KeyError:
-                pass
-            self.path_gdb_dict = path_gdb_dict
-        # CSV PATHS
-        try:
-            self.path_csv_dict = kwargs['non_klamath_csv_dict']
-        except KeyError:
-            path_csv_dict = {'working_gdb': utilities.get_path('fp_working', 'csv'),
-                            'master_gdb': utilities.get_path('fp_master', 'csv'),
-                            'orders_gdb': utilities.get_path('fp_orders', 'csv'),
-                            'mapping_gdb': utilities.get_path('fp_mapping', 'csv'),
-                            'archive_gdb': utilities.get_path('fp_archive', 'csv')}
-            try:
-                kv_scratch_csv = kwargs['pro_project_dict']['csv']
-                path_csv_dict.update(kv_scratch_csv)
-            except KeyError:
-                pass
-            self.path_csv_dict = path_csv_dict
-
-        # DF STRINGS
-        try:
-            self.df_str_dict = kwargs['non_klamath_df_str_dict']
-        except KeyError:
-            df_str_dict = {'working_gdb':'df_working',
-                            'mapping_gdb':'df_mapping',
-                            'orders_gdb':'df_orders',
-                            'master_gdb':'df_master',
-                            'archive_gdb':'df_archive'}
-            try:
-                kv_scratch_df_str = kwargs['pro_project_dict']['df_str']
-                df_str_dict.update(kv_scratch_df_str)
-            except KeyError:
-                pass
-
-            self.df_str_dict = df_str_dict
-
-
         # PRJ FILE
         self.prj_file = prj_file
-
+        fp_csv_lookup = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\path_list_updated.csv'
+        self.lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str')
     def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
@@ -804,6 +748,8 @@ class metaData(object):
                                 'staging':'DATA_LOCATION_MCM_STAGING',
                                 'previous':'DATA_LOCATION_MCM_PREVIOUS'}
 
+        lookup_table = copy.copy(self.lookup_table)
+
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in self.indices:
@@ -830,8 +776,8 @@ class metaData(object):
                                 # No gdb found == shapefile passed - use dir/folder
                                 src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
                         # Get SOURCE DF/CSV/STR
-                        fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
-                        df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                        fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
+                        df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                         # Only grabs TargetGDB once per gdb
                         try:
                             df_source = getattr(self, df_str_source)
@@ -896,8 +842,8 @@ class metaData(object):
                         # No gdb found == shapefile passed - use dir/folder
                         src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
                 # Get SOURCE DF/CSV/STR
-                fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
-                df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
+                df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_source = getattr(self, df_str_source)
@@ -921,7 +867,7 @@ class metaData(object):
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
-                fp_move = os.path.normpath(self.path_gdb_dict[df_item['MOVE_LOCATION']])
+                fp_move = os.path.normpath(self.lookup_table.loc[df_item['MOVE_LOCATION'], 'fp_gdb'])
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 fc_new_name = df_item['RENAME']
                 notes = df_item['NOTES']
@@ -974,8 +920,8 @@ class metaData(object):
                 # GDB as target
                 else:
                     tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
-                fp_csv_target = self.path_csv_dict[tgt_gdb_or_dir_str]
-                df_str_target = self.df_str_dict[tgt_gdb_or_dir_str]
+                fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_csv']
+                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_target = getattr(self, df_str_target)
@@ -989,8 +935,8 @@ class metaData(object):
                     self.save_archive_csv(df_str_target)
 
                 # Get SOURCE DF/CSV/STR
-                fp_csv_source = self.path_csv_dict[src_gdb_or_dir_str]
-                df_str_source = self.df_str_dict[src_gdb_or_dir_str]
+                fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
+                df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_source = getattr(self, df_str_source)
@@ -1026,9 +972,7 @@ class metaData(object):
                 fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
                 # print('fp fcs new: \n{}'.format(fp_fcs_new))
                 # print('fp current: \n{}'.format(fp_fcs_current))
-                # To document whether fp_fcs_current = Staging, Previous, Original
-                col_name_original = df_item['COL_NAME_ARCHIVAL']
-                col_name_original = dict_col_name_orig[col_name_original]
+
                 try:
                     if not dry_run:
                         # Should only trigger if move not copy (i.e. move into same gdb)
@@ -1056,7 +1000,6 @@ class metaData(object):
                                 setattr(self, df_str_source, df_source)
 
                     df.at[index, target_col] = fp_fcs_new
-                    df.at[index, col_name_original] = fp_fcs_current
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
@@ -1065,13 +1008,28 @@ class metaData(object):
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
                     print('did we make it here above the append')
-                    d = {col_name_original: fp_fcs_current, 'FEATURE_DATASET':dset_move,
-                        'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
-                    ser_append = pd.Series(data = d,
-                                 index = [col_name_original, 'FEATURE_DATASET',
-                                        'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                 name = feat_name)
-                    print('DID WE MAKE IT HERE')
+
+                    # To document whether fp_fcs_current = Staging, Previous, Original
+                    col_name_original = df_item['COL_NAME_ARCHIVAL']
+                    if not pd.isnull(col_name_original):
+                        col_name_original = dict_col_name_orig[col_name_original]
+                        df.at[index, col_name_original] = fp_fcs_current
+                        d = {col_name_original: fp_fcs_current, 'FEATURE_DATASET':dset_move,
+                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
+                        ser_append = pd.Series(data = d,
+                                     index = [col_name_original, 'FEATURE_DATASET',
+                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
+                                     name = feat_name)
+                    # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
+                    # to master, and now decide to move back to archival.
+                    else:
+                        d = {'FEATURE_DATASET':dset_move,
+                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
+                        ser_append = pd.Series(data = d,
+                                     index = ['FEATURE_DATASET',
+                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
+                                     name = feat_name)
+
                     # append new row from Series
                     df_target = df_target.append(ser_append)
                     if update_label:
@@ -1096,7 +1054,7 @@ class metaData(object):
             for index in self.indices:
                 df_item = df.loc[index]
                 tgt_gdb_or_dir_str = df_item['MOVE_LOCATION']
-                dir_gdb = self.path_gdb_dict[tgt_gdb_or_dir_str]
+                dir_gdb = lookup_table.loc[src_gdb_or_dir_str, fp_gdb]
                 dset = df_item['MOVE_LOCATION_DSET']
                 if not math.isnan(dset):
                     dir_gdb = os.path.join(dir_gdb, dset)

@@ -1840,7 +1840,7 @@ def aprx_inventory(aprx_dir, csv_dir_out):
         pd.DataFrame.to_csv(df_lyt, fp_csv_out)
         del df_lyt
 
-def df_to_df_transfer(df_source, df_target, match_col_list, replace_col_list, target_val):
+def df_to_df_transfer(df_source, df_target, match_col_list, replace_col_list, **kwargs):
     '''
     Taken from spyder_arcgis_oop.  Should be incorprated into that module and this
     funtionality removed and abstracted here. ZU 20211208
@@ -1858,18 +1858,41 @@ def df_to_df_transfer(df_source, df_target, match_col_list, replace_col_list, ta
     match_col_target = match_col_list[1]
     replace_col_source = replace_col_list[0]
     replace_col_target = replace_col_list[1]
-    # indices that match target_val in source
-    source_indices = df_source.index[df_source[replace_col_source]==target_val]
-    # file paths most likely
-    vals_match = df_source.loc[source_indices][match_col_source].to_list()
+    # If only transfering column values with specific value.
+    df_source[match_col_source] = df_source[match_col_source].apply(lambda x: os.path.normpath(x))
+    df_target[match_col_target] = df_target[match_col_target].apply(lambda x: os.path.normpath(x))
+    try:
+        target_val = kwargs['target_val']
+        source_indices = df_source.index[df_source[replace_col_source]==target_val]
+        # file paths most likely
+        vals_match = df_source.loc[source_indices][match_col_source].to_list()
+        replace_vals = df_source.loc[source_indices][replace_col_source].to_list()
+    # bulk transfer of replace_col_source to replace_col_target
+    except KeyError:
+        df_select = df_source[df_source[replace_col_source].notnull()]
+        print(df_select[df_select[replace_col_source] != ''])
+        # print(df_select[df_select[replace_col_source] != ''][replace_col_source])
+
     # indices in df_target matching source indices
-
-
-    target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
-
-    for indice in target_indices:
-        df_target.at[indice, replace_col_target] = target_val
+    for row in df_select.itertuples():
+        idx = getattr(row, match_col_source)
+        val = getattr(row, replace_col_source)
+        idx = df_target[df_target[match_col_target]==idx].index.values
+        if len(idx)==1:
+            idx = idx[0]
+        df_target.loc[idx, replace_col_target]=val
     return(df_target)
+        # target_indices = idx + df_target[df_target[match_col_target==val]].index.to_list()
+    # target_indices = [df_target[df_target[match_col_target]==val] for val in vals_match]
+
+def update_df_col(df, col, fp_csv_update, **kwargs):
+    try:
+        index_column = kwargs['index_column']
+        df_update = pd.read_csv(fp_csv_update, index_col = index_column)
+    except KeyError:
+        df_update = pd.read_csv(fp_csv_update)
+    df[col] = df_update[col]
+    return(df)
 
 # # NOTES
 # # getting path componenets

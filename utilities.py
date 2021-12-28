@@ -12,6 +12,7 @@ import datetime
 import time
 import glob
 import copy
+import compare_data
 # from compare_data import *
 
 def show_table(display_preference):
@@ -1894,6 +1895,50 @@ def update_df_col(df, col, fp_csv_update, **kwargs):
     df[col] = df_update[col]
     return(df)
 
+
+def norm_file_path_df(df, **kwargs):
+    '''
+    assumes that path/to/folders columns are not Index cols
+    '''
+    # Update path
+    print('did norm path update?')
+    try:
+        target_cols = kwargs['target_col']
+    except KeyError:
+        target_cols = ['DATA_LOCATION_MCMILLEN_JACOBS',
+                    'DATA_LOCATION_MCM_ORIGINAL',
+                    'DATA_LOCTION_MCM_STAGING']
+
+    cols_existing = df.columns.to_list()
+    for c in target_cols:
+        if c in cols_existing:
+            print(c)
+            df[c] = df[c].apply(lambda x: os.path.normpath(x))
+    return(df)
+
+def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+    '''
+    ZU 20211223.  Update data inventories if changed.  Does not account for deleted
+    feature classes from version to version, just additions.
+    '''
+    # Inventory all specified gdbs in maestro
+    for gdb in gdb_dir_list:
+        df_current = compare_data.file_paths_arc(gdb, True)
+
+    # standardize paths
+    df_current = norm_file_path_df(df_current, target_col = tc)
+    df_orig = norm_file_path_df(df_orig, target_col = tc)
+    idx1 = df_current.columns.get_loc(tc)
+    print(df_current.iloc[0,idx1])
+    idx2 = df_orig.columns.get_loc(tc)
+    print(df_orig.iloc[0,idx2])
+
+    # drop duplicates
+    df_current['ASSIMILATED']=True
+    df_combined = df_orig.append(df_current)
+    df_combined = df_combined.drop_duplicates(subset = 'DATA_LOCATION_MCMILLEN_JACOBS',keep='first')
+
+    return(df_combined)
 # # NOTES
 # # getting path componenets
 # # 20210409

@@ -31,12 +31,15 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv',
+    def __init__(self,  prj_file, project_str = 'item_desc',
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
         '''
         KEYWORD ARGS:
         fill in now that reworked
         '''
+        fp_data_management = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\data_management_paths.csv'
+        lookup_table_data_mgmt = pd.read_csv(fp_data_management, index_col = 'PROJECT')
+        fp_csv = lookup_table_data_mgmt.loc[project_str, 'FP_MAESTRO_CSV']
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -700,7 +703,7 @@ class metaData(object):
 
     def take_action(self, df_str, action_type,
                     target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
-                    dry_run = False, replace_action = ''):
+                    dry_run = False, replace_action = '', save_df = False, **kwargs):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
@@ -774,7 +777,7 @@ class metaData(object):
                             elif idx == (len(fp_components) - 1):
                                 # Get Source STR
                                 # No gdb found == shapefile passed - use dir/folder
-                                src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+                                src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
                         # Get SOURCE DF/CSV/STR
                         fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
                         df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
@@ -840,7 +843,7 @@ class metaData(object):
                     elif idx == (len(fp_components)-1):
                         # Get Source STR
                         # No gdb found == shapefile passed - use dir/folder
-                        src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+                        src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
                 # Get SOURCE DF/CSV/STR
                 fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
                 df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
@@ -904,7 +907,7 @@ class metaData(object):
 
                         # Get Source STR
                         # No gdb found == shapefile passed - use dir/folder
-                        src_gdb_or_dir_str = '{}_dir'.format(fp_components[-2])
+                        src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
 
                     # either find gdb or it's a shape.  pass until then
                     else:
@@ -1049,33 +1052,82 @@ class metaData(object):
                         msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
                         logging.info(msg_str)
                         logging.info(e)
-        elif action_type in  ['create_poly', 'create_line', 'create_point']:
-            # For adding new item to maestro and take_action(action_type = create_<type>...)
-            for index in self.indices:
-                df_item = df.loc[index]
-                tgt_gdb_or_dir_str = df_item['MOVE_LOCATION']
-                dir_gdb = lookup_table.loc[src_gdb_or_dir_str, fp_gdb]
-                dset = df_item['MOVE_LOCATION_DSET']
-                if not math.isnan(dset):
-                    dir_gdb = os.path.join(dir_gdb, dset)
-                feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
-                                    'create_point':'POINT'}
-                feat_type = feat_type_dict[action_type]
-                fp_fcs = os.path.join(dir_gdb, index)
-                msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, index, fp_fcs)
-                print(msg_str)
-                # flag_index
-                arcpy.CreateFeatureclass_management(dir_gdb, index, feat_type,
-                                                    spatial_reference = self.prj_file,
-                                                    has_m = 'No', has_z = 'No')
-                # NEW COL VALUES
-                df.at[index, target_col] = fp_fcs
-                df.at[index, 'ACTION'] = ''
-                df.at[index, 'MOVE_LOCATION'] = ''
-                df.at[index, 'MOVE_LOCATION_DSET'] = ''
-                setattr(self, df_str, df)
+        else:
+            if action_type in  ['create_poly', 'create_line', 'create_point']:
+                # For adding new item to maestro and take_action(action_type = create_<type>...)
+                for index in self.indices:
+                    df_item = df.loc[index]
+                    tgt_gdb_or_dir_str = df_item['MOVE_LOCATION']
+                    dir_gdb = lookup_table.loc[src_gdb_or_dir_str, fp_gdb]
+                    dset = df_item['MOVE_LOCATION_DSET']
+                    if not math.isnan(dset):
+                        dir_gdb = os.path.join(dir_gdb, dset)
+                    feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
+                                        'create_point':'POINT'}
+                    feat_type = feat_type_dict[action_type]
+                    fp_fcs = os.path.join(dir_gdb, index)
+                    msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, index, fp_fcs)
+                    print(msg_str)
+                    # flag_index
+                    arcpy.CreateFeatureclass_management(dir_gdb, index, feat_type,
+                                                        spatial_reference = self.prj_file,
+                                                        has_m = 'No', has_z = 'No')
+                    # NEW COL VALUES
+                    df.at[index, target_col] = fp_fcs
+                    df.at[index, 'ACTION'] = ''
+                    df.at[index, 'MOVE_LOCATION'] = ''
+                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
+                    setattr(self, df_str, df)
 
-                logging.info(msg_str)
+                    logging.info(msg_str)
+            elif action_type in ['fc_to_fc_conv']:
+                var_dict = kwargs['var_dict']
+                fp_in = var_dict['feat_in']
+                out_loc = var_dict['out_loc']
+                feat_name = var_dict['fname_out']
+
+                msg_str = 'FC to FC conversion: \n'
+                msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_in)
+                msg_str = '{}  OUT_LOC:   ---  {}\n'.format(msg_str, out_loc)
+                msg_str = '{}  FEAT_NAME: ---  {}\n'.format(msg_str, feat_name)
+                if not dry_run:
+                    arcpy.FeatureClassToFeatureClass_conversion(fp_in, out_loc, feat_name)
+                    logging.info(msg_str)
+
+            # documentation to add to table
+            notes = kwargs['new_fc_notes']
+            fp_fcs = os.path.join(out_loc, feat_name)
+            d = {'DATE_CREATED':self.todays_date,
+                'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs,'NOTES':notes}
+            ser_append = pd.Series(data = d,
+                         index = ['DATE_CREATED',
+                                'DATA_LOCATION_MCMILLEN_JACOBS','NOTES'],
+                         name = feat_name)
+
+             # GET DF AND STRs
+            fp_components = fp_fcs.split(os.sep)
+            for idx, comp in enumerate(fp_components):
+                if '.gdb' in comp:
+                    tgt_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                    fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_csv']
+                    df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+            # Only grabs TargetGDB once per gdb
+            try:
+                df_target = getattr(self, df_str_target)
+                # if dataframe NOT already added via self.add_df
+            except AttributeError:
+                print('populating target')
+                self.add_df(fp_csv_target, df_str_target, 'ITEM')
+
+            df_target = getattr(self, df_str_target)
+            df_target = df_target.append(ser_append)
+            df = df.append(ser_append)
+            setattr(self, df_str_target, df_target)
+            setattr(self, df_str, df)
+            if save_df:
+                pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                pd.DataFrame.to_csv(df_target, fp_csv_target)
+
 
     def df_sets(self, df_list, col_list):
         '''

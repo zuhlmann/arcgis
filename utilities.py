@@ -12,7 +12,6 @@ import datetime
 import time
 import glob
 import copy
-import compare_data
 # from compare_data import *
 
 def show_table(display_preference):
@@ -1922,6 +1921,7 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     feature classes from version to version, just additions.
     '''
     # Inventory all specified gdbs in maestro
+    import compare_data
     for gdb in gdb_dir_list:
         df_current = compare_data.file_paths_arc(gdb, True)
 

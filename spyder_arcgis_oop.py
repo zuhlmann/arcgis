@@ -40,6 +40,7 @@ class metaData(object):
         fp_data_management = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\data_management_paths.csv'
         lookup_table_data_mgmt = pd.read_csv(fp_data_management, index_col = 'PROJECT')
         fp_csv = lookup_table_data_mgmt.loc[project_str, 'FP_MAESTRO_CSV']
+        setattr(self, 'project_str', project_str)
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -752,6 +753,11 @@ class metaData(object):
                                 'previous':'DATA_LOCATION_MCM_PREVIOUS'}
 
         lookup_table = copy.copy(self.lookup_table)
+        # if gdb not in viable subproject, then add to poo poo platter
+        lookup_table_project = lookup_table[lookup_table['project']==self.project_str]
+        # standdard stuff
+        viable_gdbs = lookup_table_project.index.to_list()
+        inventory_dir = lookup_table_project.inventory_dir.to_list()[0]
 
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
@@ -771,16 +777,25 @@ class metaData(object):
                             if '.gdb' in comp:
                                 # Get Source STR
                                 src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                                if src_gdb_or_dir_str in viable_gdbs:
+                                    standalone = False
+                                else:
+                                    standalone = True
                                 # Once gdb is found in path, then break
                                 break
                             # translation - there was no gdb in fp_fcs_orig
                             elif idx == (len(fp_components) - 1):
-                                # Get Source STR
                                 # No gdb found == shapefile passed - use dir/folder
-                                src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
-                        # Get SOURCE DF/CSV/STR
-                        fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
-                        df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                                standalone = True
+                        if not standalone:
+                            fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
+                            df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                        else:
+                            # clunky way of grabbing any inventory dir value
+                            fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                            fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                            df_str_source = 'df_{}_standalone'.format(self.project_str)
+
                         # Only grabs TargetGDB once per gdb
                         try:
                             df_source = getattr(self, df_str_source)
@@ -837,16 +852,26 @@ class metaData(object):
                     if '.gdb' in comp:
                         # Get Source STR
                         src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                        if src_gdb_or_dir_str in viable_gdbs:
+                            standalone = False
+                        else:
+                            standalone = True
                         # Once gdb is found in path, then break
                         break
                     # translation - there was no gdb in fp_fcs_orig
-                    elif idx == (len(fp_components)-1):
-                        # Get Source STR
+                    elif idx == (len(fp_components) - 1):
                         # No gdb found == shapefile passed - use dir/folder
-                        src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
-                # Get SOURCE DF/CSV/STR
-                fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
-                df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                        standalone = True
+                if not standalone:
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                else:
+                    # clunky way of grabbing any inventory dir value
+                    fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    df_str_source = 'df_{}_standalone'.format(self.project_str)
+
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_source = getattr(self, df_str_source)
@@ -880,7 +905,6 @@ class metaData(object):
                 fp_components = fp_fcs_current.split(os.sep)
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
-                        # recreated path to gdb
                         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
                         dset_orig = fp_components[idx + 1]
                         # annoying realitey - same gdb cannot have features with the same name
@@ -896,22 +920,25 @@ class metaData(object):
                         # Get Source STR
                         src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
 
+                        if src_gdb_or_dir_str in viable_gdbs:
+                            standalone = False
+                        else:
+                            standalone = True
                         # Once gdb is found in path, then break
                         break
-
-                    # translation - there was no gdb in fp_fcs_current
+                    # translation - there was no gdb in fp_fcs_orig
                     elif idx == (len(fp_components) - 1):
-                        logging.info('original location of {} had no dataset' \
-                        'but no move dset was provided. Moved to gdb standalone' \
-                        .format(index))
-
-                        # Get Source STR
                         # No gdb found == shapefile passed - use dir/folder
-                        src_gdb_or_dir_str = '{}_shp'.format(self.project_str)
-
-                    # either find gdb or it's a shape.  pass until then
-                    else:
-                        pass
+                        standalone = True
+                if not standalone:
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                else:
+                    # clunky way of grabbing any inventory dir value
+                    fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    df_str_source = 'df_{}_standalone'.format(self.project_str)
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -923,7 +950,9 @@ class metaData(object):
                 # GDB as target
                 else:
                     tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
-                fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_csv']
+
+                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                fp_csv_target = os.path.join(inventory_dir, fname_csv)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -937,9 +966,6 @@ class metaData(object):
                     # save a base archive if NEVER saved and a daily archive if never saved
                     self.save_archive_csv(df_str_target)
 
-                # Get SOURCE DF/CSV/STR
-                fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
-                df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_source = getattr(self, df_str_source)
@@ -1002,7 +1028,7 @@ class metaData(object):
                                 df_source.drop(index, inplace = True)
                                 setattr(self, df_str_source, df_source)
 
-                    df.at[index, target_col] = fp_fcs_new
+                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
@@ -1037,7 +1063,7 @@ class metaData(object):
                     df_target = df_target.append(ser_append)
                     if update_label:
                         df_target = df_target.rename(index = {index:feat_name})
-                    print('now legs set attribute')
+                    print('now lets set attribute')
                     # SAVE TO TARGET_DF every Iter in case Exception
                     setattr(self, df_str_target, df_target)
                     setattr(self, df_str, df)

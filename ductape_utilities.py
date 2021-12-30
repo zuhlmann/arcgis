@@ -82,3 +82,26 @@ def csv_to_dict(fp_transfer_csv, fp_dict_csv, target_col):
         trans_tags_str = ', '.join(trans_tags)
         df_transfer.at[i, 'UPDATED_TAGS2']=trans_tags_str
     return(df_transfer)
+
+def base_dir_str(fp_in):
+    '''
+    Abstracting base dir finding for spyder_agol.
+    returns gdb or base dir for file path of feature.
+    ZU 20211230
+    ARGS:
+    fp_in               path/to/feature
+    RETURN:
+    gdb_or_dir_str      old variable name for spyder_agol functionality
+    '''
+    fp_components = fp_in.split(os.sep)
+    comp_len = len(fp_components)
+    ct = 0
+    for idx, comp in enumerate(fp_components):
+        ct+=1
+        if '.gdb' in comp:
+            # Get Source STR
+            gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+            break
+        elif ct == comp_len:
+            gdb_or_dir_str = fp_components[-2]
+    return(gdb_or_dir_str)

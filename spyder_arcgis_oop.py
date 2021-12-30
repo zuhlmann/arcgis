@@ -31,16 +31,17 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, project_str = 'item_desc',
+    def __init__(self,  prj_file, subproject_str,
                 df_str = 'df', df_index_col = 'ITEM', **kwargs):
         '''
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        fp_data_management = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\data_management_paths.csv'
-        lookup_table_data_mgmt = pd.read_csv(fp_data_management, index_col = 'PROJECT')
-        fp_csv = lookup_table_data_mgmt.loc[project_str, 'FP_MAESTRO_CSV']
-        setattr(self, 'project_str', project_str)
+        fp_csv_lookup = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\path_list_updated.csv'
+        lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str')
+        setattr(self, 'lookup_table', lookup_table)
+        fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
+        setattr(self, 'subproject_str', subproject_str)
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -65,8 +66,6 @@ class metaData(object):
 
         # PRJ FILE
         self.prj_file = prj_file
-        fp_csv_lookup = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\path_list_updated.csv'
-        self.lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str')
     def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
@@ -754,7 +753,8 @@ class metaData(object):
 
         lookup_table = copy.copy(self.lookup_table)
         # if gdb not in viable subproject, then add to poo poo platter
-        lookup_table_project = lookup_table[lookup_table['project']==self.project_str]
+        project_str = lookup_table[lookup_table.subproject == self.subproject_str].project.values[0]
+        lookup_table_project = lookup_table[lookup_table['project']==project_str]
         # standdard stuff
         viable_gdbs = lookup_table_project.index.to_list()
         inventory_dir = lookup_table_project.inventory_dir.to_list()[0]
@@ -762,7 +762,7 @@ class metaData(object):
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in self.indices:
-                fp_fcs_current = df.loc[index][target_col]
+                fp_fcs_current = os.path.normpath(df.loc[index][target_col])
                 if arcpy.Exists(fp_fcs_current):
                     logging.info(fp_fcs_current)
                     try:
@@ -831,8 +831,8 @@ class metaData(object):
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
 
                 # NEW COL VALUES
-                df.at[index, target_col] = fp_fcs_new
-                df.at[index, col_name_original] = fp_fcs_current
+                df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
+                df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 df.at[index, 'ACTION'] = ''
                 df.at[index, 'RENAME'] = ''
 
@@ -883,8 +883,8 @@ class metaData(object):
                     df_source = getattr(self, df_str_source)
                     # save a base archive if NEVER saved and a daily archive if never saved
                     self.save_archive_csv(df_str_source)
-                df_source.at[index, target_col] = fp_fcs_new
-                df_source.at[index, col_name_original] = fp_fcs_current
+                df_source.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
+                df_source.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 setattr(self, df_str_source, df_source)
 
                 print(msg_str)
@@ -1028,7 +1028,7 @@ class metaData(object):
                                 df_source.drop(index, inplace = True)
                                 setattr(self, df_str_source, df_source)
 
-                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
+                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new.replace(os.sep, '//')
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
@@ -1042,9 +1042,11 @@ class metaData(object):
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
                     if not pd.isnull(col_name_original):
                         col_name_original = dict_col_name_orig[col_name_original]
-                        df.at[index, col_name_original] = fp_fcs_current
-                        d = {col_name_original: fp_fcs_current, 'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
+                        df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
+                        d = {col_name_original: fp_fcs_current.replace(os.sep, '//'),
+                            'FEATURE_DATASET':dset_move,
+                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new.replace(os.sep, ''),
+                            'NOTES_APPEND':notes}
                         ser_append = pd.Series(data = d,
                                      index = [col_name_original, 'FEATURE_DATASET',
                                             'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
@@ -1053,7 +1055,8 @@ class metaData(object):
                     # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,'NOTES_APPEND':notes}
+                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new.replace(os.sep, '//'),
+                            'NOTES_APPEND':notes}
                         ser_append = pd.Series(data = d,
                                      index = ['FEATURE_DATASET',
                                             'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
@@ -1099,7 +1102,7 @@ class metaData(object):
                                                         spatial_reference = self.prj_file,
                                                         has_m = 'No', has_z = 'No')
                     # NEW COL VALUES
-                    df.at[index, target_col] = fp_fcs
+                    df.at[index, target_col] = fp_fcs.replace(os.sep, '//')
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
@@ -1124,7 +1127,8 @@ class metaData(object):
             notes = kwargs['new_fc_notes']
             fp_fcs = os.path.join(out_loc, feat_name)
             d = {'DATE_CREATED':self.todays_date,
-                'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs,'NOTES':notes}
+                'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs.replace(os.sep, '//'),
+                'NOTES':notes}
             ser_append = pd.Series(data = d,
                          index = ['DATE_CREATED',
                                 'DATA_LOCATION_MCMILLEN_JACOBS','NOTES'],

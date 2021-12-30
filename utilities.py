@@ -1027,12 +1027,10 @@ def parse_item_desc(sub_item_list, target_key, target_val, add = True):
                 if target_key == sub_item_key:
                     # if ADDING purp lines
                     if add:
-                        print('replacing subitem {} with value {}'.format(sub_item_key, target_val))
                         sub_item_list[idx_adjusted] = '{}: {}'.format(target_key, target_val)
                         replaced_sub_item = True
                     # if REMOVING purp items
                     else:
-                        print('Removed {}'.format(sub_item_list[idx_adjusted]))
                         sub_item_list.remove(sub_item_list[idx_adjusted])
             # if empty string in sub items, remove
             else:

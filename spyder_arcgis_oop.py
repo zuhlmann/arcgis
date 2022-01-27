@@ -1114,6 +1114,11 @@ class metaData(object):
                 fp_in = var_dict['feat_in']
                 out_loc = var_dict['out_loc']
                 feat_name = var_dict['fname_out']
+                try:
+                    dset = var_dict['out_dset']
+                    out_loc = os.path.join(out_loc, dset)
+                except KeyError:
+                    pass
 
                 msg_str = 'FC to FC conversion: \n'
                 msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_in)
@@ -1134,22 +1139,43 @@ class metaData(object):
                                 'DATA_LOCATION_MCMILLEN_JACOBS','NOTES'],
                          name = feat_name)
 
-             # GET DF AND STRs
+            # Get TARGET DF/CSV/STR
             fp_components = fp_fcs.split(os.sep)
             for idx, comp in enumerate(fp_components):
                 if '.gdb' in comp:
+                    # Get Source STR
                     tgt_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
-                    fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_csv']
-                    df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+
+                    if tgt_gdb_or_dir_str in viable_gdbs:
+                        standalone = False
+                    else:
+                        standalone = True
+                    # Once gdb is found in path, then break
+                    break
+                # translation - there was no gdb in fp_fcs_orig
+                elif idx == (len(fp_components) - 1):
+                    # No gdb found == shapefile passed - use dir/folder
+                    standalone = True
+            if not standalone:
+                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+            else:
+                # clunky way of grabbing any inventory dir value
+                fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                df_str_target = 'df_{}_standalone'.format(self.project_str)
+
             # Only grabs TargetGDB once per gdb
             try:
                 df_target = getattr(self, df_str_target)
-                # if dataframe NOT already added via self.add_df
+            # if dataframe NOT already added via self.add_df
             except AttributeError:
                 print('populating target')
+                # note this also creates fp_csv_archive
                 self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                df_target = getattr(self, df_str_target)
 
-            df_target = getattr(self, df_str_target)
             df_target = df_target.append(ser_append)
             df = df.append(ser_append)
             setattr(self, df_str_target, df_target)

@@ -914,7 +914,11 @@ def write_folder_contents(fp):
     fname_readme = 'README_{}.txt'.format(folder_name)
     fp_out = os.path.join(fp, fname_readme)
     files = os.listdir(fp)
-    basic_str = '\n'.join(files)
+    files_fp = [os.path.join(fp, f) for f in files]
+    files_fp.sort(key=os.path.getctime)
+    files_fp.reverse()
+    files_formatted = [os.path.split(fp)[-1] for fp in files_fp]
+    basic_str = '\n'.join(files_formatted)
     todays_date = datetime.datetime.today().strftime('%B %d %Y')
     signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
     file_name = 'README_{}'.format(folder_name)
@@ -1260,10 +1264,12 @@ def copy_all_feats(fp_in, fp_out):
 #         else:
 #             pass
 
-def sql_str(val_list, field, logic_str = 'Or'):
-    where_clause_list = ["({0}={1})".format(field, val) for val in val_list]
+def sql_str(val_list, field, out_dir, logic_str = 'Or'):
+    where_clause_list = ['"{0}"={1}'.format(field, val) for val in val_list]
+    print(where_clause_list)
     where_clause = logic_str.join(where_clause_list)
-    fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\new_data_downloads\labelset_creation_MPs\sql_temp.txt'
+    fp_out = os.path.join(out_dir, r'sql_temp.txt')
+    print(where_clause)
     with open(fp_out, 'w') as out_file:
         out_file.write(where_clause)
 
@@ -1578,7 +1584,7 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc =
     fp_out = os.path.join(basedir, index_fc_name)
 
     # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
-    reference_csv = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\centroid_generator.csv'
+    reference_csv = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\python_df_docs\df_utility_csvs\centroid_generator.csv'
     df = pd.read_csv(reference_csv, index_col = 'template_str')
 
     if feet:
@@ -1610,6 +1616,7 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc =
                 x = row[0][0]
                 y = row[0][1]
                 scale = row[2]
+                print(scale)
                 e_w = scale * (e_len_base/2)
                 n_s = scale * (n_len_base/2)
                 ul = arcpy.Point(x - e_w, y + n_s)
@@ -1674,6 +1681,10 @@ def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, *
     source_col             string val of column containing...strings for source_dict
     val_col                 vals to create field_name in (val) in sql_str.  So the
                             values in column to select from table
+    KWARGS
+    select_keys             if only using select fc_str, then use this.  For example
+                            if there are multiple keys in dictionary, specify which to
+                            select
     '''
 
     df = pd.read_csv(ref_csv)
@@ -1687,14 +1698,24 @@ def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, *
     for s in fc_str:
         fp = source_dict[s]
         field = field_dict[s]
+        # turn on off without deleting rows - set to true or false in 'use' col
+        df = df[df.use]
         # .all is a hack towards unique vals
         vals = df[df[source_col] == s].groupby(val_col).all().index.to_list()
+        print(vals)
         sql_str = "','".join(vals)
         sql_str = "('{}')".format(sql_str)
         sql_str = '"{}" IN {}'.format(field, sql_str)
-        print(sql_str)
-        arcpy.MakeFeatureLayer_management(fp, '{}_lyr'.format(s), sql_str)
-
+        try:
+            kwargs['make_feature_layer']
+            arcpy.MakeFeatureLayer_management(fp, '{}_lyr'.format(s), sql_str)
+        except KeyError:
+            pass
+        try:
+            kwargs['return_sql_statement']
+            return(sql_str)
+        except:
+            pass
 def calc_acreage(fp_in, units, geodesic = False):
     '''
     Add acreage field populated with proper stuff. 20210921
@@ -1882,16 +1903,6 @@ def df_to_df_transfer(df_source, df_target, match_col_list, replace_col_list, **
     return(df_target)
         # target_indices = idx + df_target[df_target[match_col_target==val]].index.to_list()
     # target_indices = [df_target[df_target[match_col_target]==val] for val in vals_match]
-
-def update_df_col(df, col, fp_csv_update, **kwargs):
-    try:
-        index_column = kwargs['index_column']
-        df_update = pd.read_csv(fp_csv_update, index_col = index_column)
-    except KeyError:
-        df_update = pd.read_csv(fp_csv_update)
-    df[col] = df_update[col]
-    return(df)
-
 
 def norm_file_path_df(df, **kwargs):
     '''

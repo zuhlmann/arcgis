@@ -405,7 +405,7 @@ class metaData(object):
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
             if pd.isnull(dataIdInfo):
-                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\prj_files\xml_template_source.xml'
+                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
                 print('\n{} contained no Item Desc - \nTemplate used instead: \n{}\n'.format(indice, fp_xml_template))
                 tree = ET.parse(fp_xml_template)
                 # root is the root ELEMENT of a tree
@@ -788,13 +788,16 @@ class metaData(object):
                                 # No gdb found == shapefile passed - use dir/folder
                                 standalone = True
                         if not standalone:
-                            fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_csv']
+                            fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                            inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                            fp_csv_source = os.path.join(inventory_dir, fname_csv)
                             df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                         else:
                             # clunky way of grabbing any inventory dir value
                             fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                            inventory_dir = inventory_dir = lookup_table.loc[self.subproject_str, 'inventory_dir']
                             fp_csv_source = os.path.join(inventory_dir, fname_csv)
-                            df_str_source = 'df_{}_standalone'.format(self.project_str)
+                            df_str_source = 'df_{}_standalone'.format(self.subproject_str)
 
                         # Only grabs TargetGDB once per gdb
                         try:
@@ -1082,38 +1085,33 @@ class metaData(object):
                         logging.info(msg_str)
                         logging.info(e)
         else:
+            # change eventually - need var_dict for all remaining
+            var_dict = kwargs['var_dict']
             if action_type in  ['create_poly', 'create_line', 'create_point']:
                 # For adding new item to maestro and take_action(action_type = create_<type>...)
                 for index in self.indices:
                     df_item = df.loc[index]
                     tgt_gdb_or_dir_str = df_item['MOVE_LOCATION']
-                    dir_gdb = lookup_table.loc[src_gdb_or_dir_str, fp_gdb]
+                    dir_gdb = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_gdb']
                     dset = df_item['MOVE_LOCATION_DSET']
-                    if not math.isnan(dset):
-                        dir_gdb = os.path.join(dir_gdb, dset)
+                    dir_gdb = os.path.join(dir_gdb, dset)
                     feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
                                         'create_point':'POINT'}
                     feat_type = feat_type_dict[action_type]
                     fp_fcs = os.path.join(dir_gdb, index)
-                    msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, index, fp_fcs)
-                    print(msg_str)
+                    feat_name = copy.copy(index)
+                    msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs)
                     # flag_index
-                    arcpy.CreateFeatureclass_management(dir_gdb, index, feat_type,
-                                                        spatial_reference = self.prj_file,
-                                                        has_m = 'No', has_z = 'No')
-                    # NEW COL VALUES
-                    df.at[index, target_col] = fp_fcs.replace(os.sep, '//')
-                    df.at[index, 'ACTION'] = ''
-                    df.at[index, 'MOVE_LOCATION'] = ''
-                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
-                    setattr(self, df_str, df)
+                    if not dry_run:
+                        arcpy.CreateFeatureclass_management(dir_gdb, feat_name, feat_type,
+                                                            spatial_reference = self.prj_file,
+                                                            has_m = 'No', has_z = 'No')
 
-                    logging.info(msg_str)
             elif action_type in ['fc_to_fc_conv']:
-                var_dict = kwargs['var_dict']
                 fp_in = var_dict['feat_in']
                 out_loc = var_dict['out_loc']
                 feat_name = var_dict['fname_out']
+                fp_fcs = os.path.join(out_loc, feat_name)
                 try:
                     dset = var_dict['out_dset']
                     out_loc = os.path.join(out_loc, dset)
@@ -1126,17 +1124,27 @@ class metaData(object):
                 msg_str = '{}  FEAT_NAME: ---  {}\n'.format(msg_str, feat_name)
                 if not dry_run:
                     arcpy.FeatureClassToFeatureClass_conversion(fp_in, out_loc, feat_name)
-                    logging.info(msg_str)
 
             # documentation to add to table
-            notes = kwargs['new_fc_notes']
-            fp_fcs = os.path.join(out_loc, feat_name)
+            logging.info(msg_str)
+            notes = var_dict['notes']
+
+            # Dict will be UPDATED below if kwarg specified
             d = {'DATE_CREATED':self.todays_date,
                 'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs.replace(os.sep, '//'),
                 'NOTES':notes}
+            try:
+                col_name_archival = var_dict['col_name_archival']
+                col_name_archival = dict_col_name_orig[col_name_archival]
+                d.update(col_name_archival, fp_in)
+                # Add column to index since dictionary has been updated with added att
+                add_cols = ['DATE_CREATED', 'DATA_LOCATION_MCMILLEN_JACOBS',
+                        'NOTES', col_name_archival]
+            except KeyError:
+                add_cols = ['DATE_CREATED', 'DATA_LOCATION_MCMILLEN_JACOBS', 'NOTES']
+
             ser_append = pd.Series(data = d,
-                         index = ['DATE_CREATED',
-                                'DATA_LOCATION_MCMILLEN_JACOBS','NOTES'],
+                         index = add_cols,
                          name = feat_name)
 
             # Get TARGET DF/CSV/STR
@@ -1158,11 +1166,13 @@ class metaData(object):
                     standalone = True
             if not standalone:
                 fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
                 fp_csv_target = os.path.join(inventory_dir, fname_csv)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
             else:
                 # clunky way of grabbing any inventory dir value
-                fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
+                inventory_dir = lookup_table.loc[self.subproject_str, 'inventory_dir']
+                fname_csv = '{}_standalone_data_inventory.csv'.format(self.subproject_str)
                 fp_csv_target = os.path.join(inventory_dir, fname_csv)
                 df_str_target = 'df_{}_standalone'.format(self.project_str)
 
@@ -1215,41 +1225,6 @@ class metaData(object):
         df_name = '{}_{}_symmetric_difference'.format(df1_str, df2_str)
         setattr(self, df_name, df_symm_diff)
         print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
-    def mark_duplicate_rows(self, df_str, target_col, ispath = False):
-        '''
-        function for finding duplicates from "seen = set()" to "seen.add()"
-        should be decomposed into utilities and imported here.
-        This funciton was used when cleaning up the Klamath mess to find duplicate
-        files used so I would not delete a fc that was turned off (unnecessary)
-        in one map, but present in another 200 rows down.  ZU 20210302
-        ARGUMENTS
-        df_str                  string to access dataframe attribute.  Note: use
-                                self.add_df(fp_csv_target) to add dataframe to
-                                object
-        target_col              column in dataframe to find duplicates
-        '''
-        df = getattr(self, df_str)
-        # adapted from here:
-        # https://stackoverflow.com/questions/9835762/how-do-i-find-the-duplicates-in-a-list-and-create-another-list-with-them
-        seen = set()
-        dup = []
-        target_lst = df[target_col].to_list()
-        if ispath:
-            target_lst = [os.path.realpath(item) for item in target_lst]
-        for x in target_lst:
-            if x in seen:
-                dup.append(x)
-            else:
-                seen.add(x)
-        # remove duplicate duplicates
-        dup = list(set(dup))
-        # initiate new column
-        df['duplicate'] = math.nan
-        for idx, item in enumerate(dup):
-            loc = df.index[df[target_col] == item]
-            df.loc[loc, 'duplicate'] = idx
-        # setattr to replace original dataframe with new df with added col
-        setattr(self, df_str, df)
 
     def merge_feats(self, df_str, target_fc, action = 'merge', **kwargs):
         '''

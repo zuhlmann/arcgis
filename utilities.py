@@ -1264,7 +1264,7 @@ def copy_all_feats(fp_in, fp_out):
 #         else:
 #             pass
 
-def sql_str(val_list, field, out_dir, logic_str = 'Or'):
+def sql_str(val_list, field, out_dir, logic_str = ' Or '):
     where_clause_list = ['"{0}"={1}'.format(field, val) for val in val_list]
     print(where_clause_list)
     where_clause = logic_str.join(where_clause_list)
@@ -1404,24 +1404,53 @@ def extract_cursor(fp_csv, feat_name_out, arc_env):
                     lst.append(row)
     return(lst)
 
-def fix_fp(df, target_col_list, fp_csv_out):
+def fix_fp(path_orig, delim_style = 'os_sep'):
     '''
-    Not sure how robust this is - only used with dataframe use case with mixed
-    linux windows single and double delimeters.  ZU 20210525
-    Used to fix delimeters to Item Description in AGOL does not get butchered.
+    Abstracted function to pass single path to for formatting to os.sep of some
+    specified sort.  ZU 20220211
+    ARGS
+    path_orig           path/to/format with delimiters
+    delim_style         os_sep = 2x backslash
+                        agol   = 2x forward slash
     '''
+
+    if delim_style == 'agol':
+        try:
+            path_orig = path_orig.replace('\\', '//')
+            path_orig = path_orig.replace('////','//')
+            path_orig = path_orig.replace('/','//')
+            path_orig = path_orig.replace('////','//')
+        except AttributeError:
+            pass
+    if delim_style == 'os_sep':
+        try:
+            path_orig = path_orig.replace('/','\\')
+            path_orig = path_orig.replace('\\\\', '\\')
+            path_orig = path_orig.replace('//','\\')
+        except AttributeError:
+            pass
+    return(path_orig)
+
+def fix_fp_df(df, target_col_list, fp_csv_out, delim_style = 'os_sep'):
+    '''
+    Used to change delimeters from linux to windows or in my case, AGOL to the os.
+    If not converted to agol_delim, the Item Description in AGOL gets butchered.
+    ZU 20220211 updated
+    ARGS
+    df                  dataframe to fix, in this case with indices compatible with
+                        .at (not integers)
+    target_col_list     the col titles of dataframe containing rows to fix
+    fp_csv_out          path to csv_out
+    delim_style         double backslash for windows, double forward for agol
+    '''
+
+
     for tc in target_col_list:
         for idx in df.index.to_list():
-            # from pd dataframe should load in with double for sep '\\' and single '/'
             path_orig = df.at[idx, tc]
-            try:
-                path_orig = path_orig.replace('\\', '//')
-                path_orig = path_orig.replace('////','//')
-                path_orig = path_orig.replace('/','//')
-                path_orig = path_orig.replace('////','//')
-                df.at[idx, tc] = path_orig
-            except AttributeError:
-                print('No value in col {}\nFor Item {}'.format(tc, idx))
+            path_formatted = fix_fp(path_orig, delim_style)
+            df.at[idx, tc] = path_formatted
+
     pd.DataFrame.to_csv(df, fp_csv_out)
 
 def check_layer_source(fp_mxd, fp_csv_inventory, fp_csv_out,
@@ -1908,10 +1937,13 @@ def norm_file_path_df(df, **kwargs):
     '''
     assumes that path/to/folders columns are not Index cols
     '''
-    # Update path
-    print('did norm path update?')
+
     try:
         target_cols = kwargs['target_col']
+        print('in try')
+        if not isinstance(target_cols, list):
+            target_cols = [target_cols]
+            print('in not')
     except KeyError:
         target_cols = ['DATA_LOCATION_MCMILLEN_JACOBS',
                     'DATA_LOCATION_MCM_ORIGINAL',
@@ -1919,6 +1951,7 @@ def norm_file_path_df(df, **kwargs):
 
     cols_existing = df.columns.to_list()
     for c in target_cols:
+        print('for loop')
         if c in cols_existing:
             print(c)
             df[c] = df[c].apply(lambda x: os.path.normpath(x))
@@ -1926,8 +1959,18 @@ def norm_file_path_df(df, **kwargs):
 
 def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS'):
     '''
-    ZU 20211223.  Update data inventories if changed.  Does not account for deleted
-    feature classes from version to version, just additions.
+    ZU 20220201.  Update data inventories if changed.  Finds omitted (deleted),
+    comitted (existing) and added (new) feature classes. NOTE!! need to make
+    df['ASSIMILATE'] = conditional.  If already contains "added_<date>" or
+    "predates_<date>", then do not replace with "predates_<current_date"
+
+    ARGS
+    df_orig             dataframe of current non-updated gdb - i.e. mapping_gdb_inventory.csv
+    gdb_dir_or_list     path/to/gdb or [path/to/gdb]
+                        note - currently only functions with len = 1 list of fp_gdb
+    RETURNS
+    df_assim            dataframe combining current inventory with newly created
+                        dataframe of current gdb contents (compare_data.file_paths_arc)
     '''
     # Inventory all specified gdbs in maestro
     import compare_data
@@ -1937,17 +1980,33 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     # standardize paths
     df_current = norm_file_path_df(df_current, target_col = tc)
     df_orig = norm_file_path_df(df_orig, target_col = tc)
-    idx1 = df_current.columns.get_loc(tc)
-    print(df_current.iloc[0,idx1])
-    idx2 = df_orig.columns.get_loc(tc)
-    print(df_orig.iloc[0,idx2])
+    df_current = df_current.set_index(tc)
+    df_orig = df_orig.set_index(tc)
 
-    # drop duplicates
-    df_current['ASSIMILATED']=True
-    df_combined = df_orig.append(df_current)
-    df_combined = df_combined.drop_duplicates(subset = 'DATA_LOCATION_MCMILLEN_JACOBS',keep='first')
+    # Added, Omited and Comitted
+    dloc_o = df_orig.index.to_list()
+    dloc_c = df_current.index.to_list()
+    so = set(dloc_o)
+    sc = set(dloc_c)
 
-    return(df_combined)
+    # update updates the series and will NOT assign to variable
+    added = list(sc - so)
+    omitted = list(so - sc)
+    comitted = copy.copy(so)
+    comitted = list(comitted.intersection(sc))
+
+    # APPEND and remove duplicates
+    df_assim = df_orig.append(df_current)
+    # oddly, keep first will Flag the last duplicates as True, the first
+    # duplicates as false, and non-duplicates as false ZU 20220202
+    df_assim = df_assim[~df_assim.index.duplicated(keep='first')]
+
+    todays_date = datetime.datetime.today().strftime('%Y%m%d')
+    df_assim.loc[added, 'ASSIMILATED'] = todays_date
+    df_assim.loc[omitted, 'ASSIMILATED'] = 'removed'
+    df_assim.loc[comitted, 'ASSIMILATED'] = 'predates_{}'.format(todays_date)
+
+    return(df_assim)
 
 def mark_duplicate_rows(df, target_col, ispath = False):
     '''
@@ -1988,3 +2047,23 @@ def mark_duplicate_rows(df, target_col, ispath = False):
 # # 20210409
 # pathnorm = os.path.normpath(fp_desired)
 # path_components = pathnorm.split(os.sep)
+
+def rectify_source_maestro(df_source, df_maestro, dir_out, fname_source, fname_maestro):
+    '''
+    Used to rectify a maestro and source (kauai_offline_gdb_inentory for instance)
+    to each other.  Add items missing from one to the other and vice versa. 20220308
+    '''
+    if '.csv' not in fname_source:
+        fname_source = '{}.csv'.format(fname_source)
+    if '.csv' not in fname_maestro:
+        fname_maestro = '{}.csv'.format(fname_maestro)
+    index_source = df_source.index
+    index_maestro = df_maestro.index
+    add_source_index = index_maestro.difference(index_source)
+    add_maestro_index = index_source.difference(index_maestro)
+    append_source = df_maestro.loc[add_source_index]
+    append_maestro = df_source.loc[add_maestro_index]
+    df_source = df_source.append(append_source)
+    df_maestro = df_maestro.append(append_maestro)
+    df_source.to_csv(os.path.join(dir_out, fname_source))
+    df_maestro.to_csv(os.path.join(dir_out, fname_maestro))

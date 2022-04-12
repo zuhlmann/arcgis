@@ -903,7 +903,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     # ADD 3/10/2021
     # lyr.minScale, lyr.maxScale, lyr.definitionQuery, lyr.transparency, showLable
 
-def write_folder_contents(fp):
+def write_folder_contents(fp, **kwargs):
     '''
     simple readme that lists all items and files in fp argument.  Filename will
     be README_<folder_name>_<date>.txt.  Will indicate date in file
@@ -917,6 +917,12 @@ def write_folder_contents(fp):
     files_fp = [os.path.join(fp, f) for f in files]
     files_fp.sort(key=os.path.getctime)
     files_fp.reverse()
+    try:
+        kwargs['shp']
+        files_fp = [f for f in files_fp if '.shp' in f]
+        files_fp = [f for f in files_fp if '.lock' not in f]
+    except KeyError:
+        pass
     files_formatted = [os.path.split(fp)[-1] for fp in files_fp]
     basic_str = '\n'.join(files_formatted)
     todays_date = datetime.datetime.today().strftime('%B %d %Y')
@@ -1727,11 +1733,13 @@ def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, *
     for s in fc_str:
         fp = source_dict[s]
         field = field_dict[s]
-        # turn on off without deleting rows - set to true or false in 'use' col
-        df = df[df.use]
         # .all is a hack towards unique vals
         vals = df[df[source_col] == s].groupby(val_col).all().index.to_list()
         print(vals)
+        if isinstance(vals[0], str):
+            pass
+        else:
+            vals = [str(v) for v in vals]
         sql_str = "','".join(vals)
         sql_str = "('{}')".format(sql_str)
         sql_str = '"{}" IN {}'.format(field, sql_str)
@@ -1953,8 +1961,14 @@ def norm_file_path_df(df, **kwargs):
     for c in target_cols:
         print('for loop')
         if c in cols_existing:
-            print(c)
-            df[c] = df[c].apply(lambda x: os.path.normpath(x))
+            for i in df.index:
+                try:
+                    fp_orig = df.loc[i, c]
+                    fp_new = os.path.normpath(fp_orig)
+                # If no value in row, then a float will be rejected by os.path.normpath
+                except TypeError:
+                    fp_new = df.loc[i,c]
+                df.at[i,c] = fp_new
     return(df)
 
 def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS'):

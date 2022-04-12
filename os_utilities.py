@@ -11,3 +11,12 @@ def format_names(indir):
         for k,v in replace_dict.items():
             fn = fn.replace(k, v)
             os.rename(fp_in, os.path.join(indir, fn))
+
+def check_open(fp_csv):
+    try:
+        myfile = open("myfile.csv", "r+") # or "a+", whatever you
+        return(False)                    
+    # exit the loop
+    except IOError:
+        print("Could not open file! Please close Excel. Press Enter to retry.")
+        return(True)

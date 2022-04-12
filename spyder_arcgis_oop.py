@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 import utilities
 import ductape_utilities
+import os_utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
@@ -80,12 +81,11 @@ class metaData(object):
         df_str              df for example
         target_col          col name for  col with file path to fcs for conversion
         '''
-
+        arcpy.env.addOutputsToMap = False
         df = getattr(self, df_str)
         ct = 0
         for indice in self.indices:
             inDir = df.loc[indice, 'AGOL_DIR']
-            inDir = os.path.join(inDir, indice)
             # shp subdir does not exist
             if not os.path.exists(inDir):
                 os.mkdir(inDir)
@@ -398,7 +398,7 @@ class metaData(object):
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
             if pd.isnull(dataIdInfo):
-                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
+                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\3.0 - Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
                 print('\n{} contained no Item Desc - \nTemplate used instead: \n{}\n'.format(indice, fp_xml_template))
                 tree = ET.parse(fp_xml_template)
                 # root is the root ELEMENT of a tree
@@ -731,6 +731,7 @@ class metaData(object):
 
         '''
 
+
         # load dataframe
         df = getattr(self, df_str)
 
@@ -767,21 +768,41 @@ class metaData(object):
         lookup_table_project = lookup_table[lookup_table['project']==project_str]
         # standdard stuff
         viable_gdbs = lookup_table_project.index.to_list()
+        # long path to ensuring csv inentory is closed
+        viable_csv_inv = lookup_table_project.fname_csv.to_list()
+        viable_csv_inv.extend(lookup_table_project.fp_maestro_csv.to_list())
+        viable_csv_inv = [os.path.normpath(f) for f in viable_csv_inv]
+        viable_csv_inv = list(set(viable_csv_inv))
+        # NOW FIND OUT HOW TO DETERMINE IF CSV IS OPEN!!! ZU 20220314
+
+        if offline:
+            csv = lookup_table_project[lookup_table_project.subproject == self.subproject_str].offline_lookup_table.values[0]
+            offline_lookup_table = pd.read_csv(csv, index_col = 'gdb_str')
+        else:
+            pass
 
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in self.indices:
                 fp_fcs_current = os.path.normpath(df.loc[index][target_col])
+                fp_components = fp_fcs_current.split(os.sep)
+                if offline:
+                    # save for later
+                    fp_fcs_current_online = copy.copy(fp_fcs_current)
+                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+                    offline_base = offline_lookup_table.loc[gdb_str, 'offline']
+                    online_base = offline_lookup_table.loc[gdb_str, 'online']
+                    fp_fcs_current = fp_gdb_orig.replace(online_base, offline_base)
+                else:
+                    pass
                 if arcpy.Exists(fp_fcs_current):
                     logging.info(fp_fcs_current)
                     try:
-                        arcpy.Delete_management(fp_fcs_current)
+                        if not dry_run:
+                            arcpy.Delete_management(fp_fcs_current)
                         df.drop(index, inplace = True)
                         setattr(self, df_str, df)
 
-                        # UPDATE SOURCE inventory
-                        # ABSTRACT into FUNCTION someday 20210819 ZU
-                        fp_components = fp_fcs_current.split(os.sep)
                         for idx, comp in enumerate(fp_components):
                             if '.gdb' in comp:
                                 # Get Source STR
@@ -824,6 +845,12 @@ class metaData(object):
 
                     except Exception as e:
                         logging.info(e)
+
+                    # Save to DF
+                    if save_df:
+                        pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                        pd.DataFrame.to_csv(df_source, fp_csv_source)
+
                 else:
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
 
@@ -842,16 +869,17 @@ class metaData(object):
                 # full path to new fcs
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
 
+                if not dry_run:
+                    msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
+                    arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+                    # Now fp is renamed, so change alias on NEW fcs
+                    arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
+
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
                 df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 df.at[index, 'ACTION'] = ''
                 df.at[index, 'RENAME'] = ''
-
-                msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
-                arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
-                # Now fp is renamed, so change alias on NEW fcs
-                arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
 
                 # RENAME label
                 df = df.rename(index = {index:fc_new_name})
@@ -901,7 +929,11 @@ class metaData(object):
                 df_source.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 setattr(self, df_str_source, df_source)
 
-                print(msg_str)
+                # Save to DF
+                if save_df:
+                    pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                    pd.DataFrame.to_csv(df_source, fp_csv_source)
+
                 logging.info(msg_str)
 
         elif action_type in ['move','copy']:
@@ -909,7 +941,6 @@ class metaData(object):
             for index in self.indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
-                fp_move = os.path.normpath(lookup_table.loc[df_item['MOVE_LOCATION'], 'fp_gdb'])
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 fc_new_name = df_item['RENAME']
                 notes = df_item['NOTES']
@@ -917,6 +948,22 @@ class metaData(object):
                 # DETERMINE DSET
                 rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
+
+                if offline:
+                    # save for later
+                    fp_fcs_current_online = copy.copy(fp_fcs_current)
+                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+                    offline_base = os.path.normpath(offline_lookup_table.loc[gdb_str, 'offline'])
+                    online_base = os.path.normpath(offline_lookup_table.loc[gdb_str, 'online'])
+                    print('fp_fcs_current {}'.format(fp_fcs_current))
+                    fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
+                    print('ONLINE BASE {}'.format(online_base))
+                    print('OFFLINE BASE {}'.format(offline_base))
+                    fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'offline']
+                else:
+                    fp_move = os.path.normpath(lookup_table.loc[df_item['MOVE_LOCATION'], 'fp_gdb'])
+
+
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
                         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
@@ -1014,7 +1061,7 @@ class metaData(object):
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
                 fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
-
+                debug_idx = 0
                 try:
                     if not dry_run:
                         # Should only trigger if move not copy (i.e. move into same gdb)
@@ -1024,12 +1071,16 @@ class metaData(object):
                             fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
                             fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
                             debug_idx = 1
+                            msg_substr = copy.copy(fp_fcs_current)
+                            msg_substr2 = copy.copy(os.pat.join(fp_dset, feat_name))
                             arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
                             debug_idx = 2
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_dset, feat_name)
                             debug_idx = 3
                             arcpy.Delete_management(fp_fcs_renamed)
                         else:
+                            msg_substr = copy.copy(fp_fcs_current)
+                            msg_substr2 = copy.copy(os.path.join(fp_dset, feat_name))
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
                             debug_idx = 4
                             # delete if file is moved
@@ -1040,6 +1091,17 @@ class metaData(object):
                                 df_source.drop(index, inplace = True)
                                 debug_idx = 6
                                 setattr(self, df_str_source, df_source)
+
+                    # TRANSFORM
+                    if offline:
+                        fp_components = fp_fcs_new.split(os.sep)
+                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+                        online_base = offline_lookup_table.loc[gdb_str, 'online'].value[0]
+                        offline_base = offline_lookup_table.loc[gdb_str, 'offline'].value[0]
+                        fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
+                        fp_fcs_current = copy.copy(fp_fcs_current_online)
+                    else:
+                        pass
 
                     df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
                     df.at[index, 'ACTION'] = ''
@@ -1080,20 +1142,26 @@ class metaData(object):
                         df = df.rename(index = {index:feat_name})
                         df_target = df_target.rename(index = {index:feat_name})
                     debug_idx = 8
+
+                    if not dry_run:
+                        msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
+                        logging.info(msg_str)
+
                     # SAVE TO TARGET_DF every Iter in case Exception
                     setattr(self, df_str_target, df_target)
                     setattr(self, df_str, df)
-                    debug_idx = 9
-                    if not dry_run:
-                        msg_str = '\nMOVING:  {}\nTO:      {}'.format(fp_fcs_current, fp_fcs_new)
-                        logging.info(msg_str)
-
                 except Exception as e:
                     if not dry_run:
                         logging.info(debug_idx)
-                        msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(fp_fcs_current, arcpy_msg)
+                        msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(msg_substr, debug_idx)
                         logging.info(msg_str)
                         logging.info(e)
+
+                    # Save to DF
+                    if save_df:
+                        pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                        pd.DataFrame.to_csv(df_source, fp_csv_source)
+
         else:
             # change eventually - need var_dict for all remaining
             var_dict = kwargs['var_dict']
@@ -1536,11 +1604,11 @@ class AgolAccess(metaData):
     Basic init for AGOL access
     '''
 
-    def __init__(self, credentials, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
+    def __init__(self, prj_file, subproject_str):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
-        super().__init__(fp_csv)
+        super().__init__(prj_file, subproject_str)
         u_name = 'uhlmann@mcmjac.com'
         u_name2 = 'zuhlmann@mcmjac.com'
         p_word = 'Gebretekle24!'

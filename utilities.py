@@ -1619,7 +1619,7 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc =
     fp_out = os.path.join(basedir, index_fc_name)
 
     # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
-    reference_csv = r'C:\Users\uhlmann\Box\WR Users\Employees\zuhlmann\python_df_docs\df_utility_csvs\centroid_generator.csv'
+    reference_csv = r'C:\Users\uhlmann\Box\WR Users\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\centroid_generator.csv'
     df = pd.read_csv(reference_csv, index_col = 'template_str')
 
     if feet:
@@ -1687,6 +1687,7 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc =
                     # get id_name to add below
                     att_list.append(row[0])
                     index_scale.append(int(row[2]))
+            del cursor
 
         arcpy.CreateFeatureclass_management(basedir, index_fc_name, "POLYGON")
         arcpy.AddField_management(fp_out, id_att, "TEXT")

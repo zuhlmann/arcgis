@@ -580,7 +580,7 @@ def zipShapefilesInDir(inDir, outDir, **kwarg):
         # if shp not yet zipped, zip it.
         else:
             zipShapefile(inShp, outZip)
-    return True
+
 
 def zipShapefile(inShapefile, newZipFN):
     '''
@@ -921,6 +921,7 @@ def write_folder_contents(fp, **kwargs):
         kwargs['shp']
         files_fp = [f for f in files_fp if '.shp' in f]
         files_fp = [f for f in files_fp if '.lock' not in f]
+        files_fp = [f for f in files_fp if '.xml' not in f]
     except KeyError:
         pass
     files_formatted = [os.path.split(fp)[-1] for fp in files_fp]
@@ -1736,7 +1737,7 @@ def sql_from_csv_to_lyr(ref_csv, source_dict, field_dict, source_col, val_col, *
         field = field_dict[s]
         # .all is a hack towards unique vals
         vals = df[df[source_col] == s].groupby(val_col).all().index.to_list()
-        print(vals)
+        # print(vals)
         if isinstance(vals[0], str):
             pass
         else:
@@ -1972,7 +1973,7 @@ def norm_file_path_df(df, **kwargs):
                 df.at[i,c] = fp_new
     return(df)
 
-def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS', offline = True, **kwargs):
     '''
     ZU 20220201.  Update data inventories if changed.  Finds omitted (deleted),
     comitted (existing) and added (new) feature classes. NOTE!! need to make
@@ -1983,18 +1984,46 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     df_orig             dataframe of current non-updated gdb - i.e. mapping_gdb_inventory.csv
     gdb_dir_or_list     path/to/gdb or [path/to/gdb]
                         note - currently only functions with len = 1 list of fp_gdb
+    dset_ll             list of lists of dsets per gdb
     RETURNS
     df_assim            dataframe combining current inventory with newly created
                         dataframe of current gdb contents (compare_data.file_paths_arc)
     '''
     # Inventory all specified gdbs in maestro
     import compare_data
-    for gdb in gdb_dir_list:
-        df_current = compare_data.file_paths_arc(gdb, True)
+    for idx, gdb in enumerate(gdb_dir_list):
+        try:
+            dsets = kwargs['dsets_desired']
+            df_current = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+        except KeyError:
+            df_current = compare_data.file_paths_arc(gdb, True)
 
     # standardize paths
     df_current = norm_file_path_df(df_current, target_col = tc)
     df_orig = norm_file_path_df(df_orig, target_col = tc)
+
+    # since all FCs from same gdb, just grab first path/to/gdb
+    # Get column iloc id of DATA_LOCATION
+    col_id = df_current.columns.get_loc(tc)
+    fp_fcs_current = os.path.normpath(df_current.iloc[0, col_id])
+    fp_components = fp_fcs_current.split(os.sep)
+    print(fp_components)
+    if offline:
+        csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\offline_lookup_table.csv'
+        olt = pd.read_csv(csv, index_col = 'gdb_str')
+
+        try:
+            gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+            offline_base = olt.loc[gdb_str, 'offline']
+            online_base = olt.loc[gdb_str, 'online']
+        except IndexError:
+            pass
+        # Translate to online path/to... and replace in df
+        tc_online = [fp.replace(offline_base, online_base) for fp in df_current[tc].to_list()]
+        df_current[tc] = tc_online
+    else:
+        pass
+
     df_current = df_current.set_index(tc)
     df_orig = df_orig.set_index(tc)
 

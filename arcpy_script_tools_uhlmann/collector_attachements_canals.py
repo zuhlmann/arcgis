@@ -89,6 +89,7 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
         del row
         del attachment
 
+del cursor
 # 3) PHOTO LOG CSV for Microsoft Publisher photo logs
 df_right = pd.DataFrame(np.column_stack([globid_formatted_list, fname_photo, fp_photo]),
                         columns = ['globalid', 'fname_photo', 'fp_photo'],

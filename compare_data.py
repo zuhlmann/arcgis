@@ -362,6 +362,73 @@ def summarize_fc(fc_in, summary_fields, fields = 'all'):
     ser_count = df_fields.groupby('val')['val'].count()
     return(ser_count)
 
-    # vals = ser_count.values
-    # f_names = ser_count.index.to_list()
-    # df_summary = pd.DataFrame(np.column_stack())
+def field_mapping_csv(fp_source, fp_target, fp_out, fld_csv):
+    fm = arcpy.FieldMappings()
+    fm.addTable(fp_source)
+    fm.addTable(fp_target)
+    df = pd.read_csv(fld_csv)
+    df_subset = df[df.keep]
+    for s,t,m in zip(df_subset['source'], df_subset['target'], df_subset['mapped']):
+        fld_map_temp = arcpy.FieldMap()
+        fld_map_temp.addInputField(fp_source, s)
+        print(s, t, m)
+        fld_map_temp.addInputField(fp_target, t)
+        mapped_name = fld_map_temp.outputField
+        mapped_name.name = m
+        print(m)
+        fld_map_temp.outputField = mapped_name
+        fm.addFieldMap(fld_map_temp)
+
+    tgt_fields = df.source.to_list()
+    for fld in fm.fields:
+        if fld.type not in ('OID', 'Geometry') and 'shape' not in fld.name.lower():
+            if fld.name not in tgt_fields:
+                fm.removeFieldMap(fm.findFieldMapIndex(fld.name))
+    arcpy.Merge_management([fp_source, fp_target], fp_out, fm)
+    return(fm)
+
+def field_mapping_retain_src(fp_source, fp_target, fld_csv):
+    '''
+    Return a field map specifically for merging one table into another wherein
+    the name in source table will be retained and target field will be remapped
+    to that name.  For instance if roads_boise will be merged into roads_idaho,
+    if roads_idaho has street_name and roads_boise has NAME we would map NAME to
+    streets_name. This could easily be adapted (along with fld_csv) to change the
+    mapped name for both.
+    ARGS
+    fp_source       path/to/source (or TOC name) feature class
+    fp_target       path/to/target (or TOC name) feature class
+    fld_csv         path/to/input csv with configuration for this function
+    '''
+    fm = arcpy.FieldMappings()
+    # This will add ALL Fields from both source and target
+    fm.addTable(fp_source)
+    fm.addTable(fp_target)
+    df = pd.read_csv(fld_csv)
+    # find where mapping occurs
+    idx = [pd.notnull(v) for v in df.target_fld]
+    df_temp = df[idx]
+    rmv_fld = df_temp.source_fld.to_list()
+
+    for src, tgt in zip(df_temp['source_fld'], df_temp['target_fld']):
+        fld_map_temp = arcpy.FieldMap()
+        fld_map_temp.addInputField(fp_source, src)
+        fld_map_temp.addInputField(fp_target, tgt)
+        mapped_name = fld_map_temp.outputField
+        mapped_name.name = src
+        fld_map_temp.outputField = mapped_name
+        fm.addFieldMap(fld_map_temp)
+
+    # Remove source field mapping since we now have two for each mapped field
+    for fld in rmv_fld:
+        idx = fm.findFieldMapIndex(fld)
+        fm.removeFieldMap(idx)
+
+    # only retain fields from both target and source retained in csv
+    retain_fld =  df.source_fld.to_list()
+    for fld in fm.fields:
+        if fld.type not in ('OID', 'Geometry') and 'shape' not in fld.name.lower():
+            if fld.name not in retain_fld:
+                fm.removeFieldMap(fm.findFieldMapIndex(fld.name))
+
+    return(fm)

@@ -145,6 +145,16 @@ class metaData(object):
         '''
         # SELECT BY TAGS
         df = getattr(self, df_str)
+
+        if df_str == 'df':
+            prop_str_fp_logfile = 'fp_log'
+            prop_str_indices_iloc = 'indices_iloc'
+        else:
+            df_base_str = df_str.replace('df_','')
+            prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
+            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
+
         try:
             target_tag = kwargs['target_tag']
             # list will be passed for multiple target tags
@@ -170,7 +180,7 @@ class metaData(object):
             # if multiple target_tags using set will slim down duplicate indices
             iloc_tag = list(set(iloc_temp))
             # get index names from iloc vals
-            self.indices_iloc = copy.copy(iloc_tag)
+            setattr(self, prop_str_indices_iloc, iloc_tag)
             self.indices = df.iloc[iloc_tag].index.tolist()
         # see if another target keyword is passed
         except KeyError:
@@ -206,7 +216,7 @@ class metaData(object):
             iloc_action = list(set(iloc_temp))
             iloc_action.sort()
             # get index names from iloc vals
-            self.indices_iloc = copy.copy(iloc_action)
+            setattr(self, prop_str_indices_iloc, iloc_action)
             self.indices = df.iloc[iloc_action].index.tolist()
             print('iloc')
             print(' --- '.join([str(i) for i in iloc_action]))
@@ -340,12 +350,12 @@ class metaData(object):
             df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
-            prop_str_indices_iloc = '{}_indices_iloc'.format(df_str)
+            prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
 
         lookup_table = copy.copy(self.lookup_table)
         # if gdb not in viable subproject, then add to poo poo platter
         offline_csv = lookup_table[lookup_table.subproject == self.subproject_str].offline_lookup_table[0]
-        offline_lookup_table = pd.read_csv(offline_csv, index_col = 'gdb_str')
+        olt = pd.read_csv(offline_csv, index_col = 'gdb_str')
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
@@ -383,13 +393,13 @@ class metaData(object):
                 fp_xml = fp_xml_orig_shp[ct]
                 temp_path = copy.copy(fp_xml)
             elif not shp:
-                fp_fcs = df.loc[indice]['DATA_LOCATION_MCMILLEN_JACOBS']
+                fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN_JACOBS'])
+                fp_components = fp_fcs.split(os.sep)
+                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+                offline_base = olt.loc[gdb_str, 'offline']
+                online_base = olt.loc[gdb_str, 'online']
 
                 if offline:
-                    fp_components = fp_fcs.split(os.sep)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                    offline_base = offline_lookup_table.loc[gdb_str, 'offline']
-                    online_base = offline_lookup_table.loc[gdb_str, 'online']
                     fp_fcs= fp_fcs.replace(online_base, offline_base)
 
                 temp_path = copy.copy(fp_fcs)
@@ -456,6 +466,11 @@ class metaData(object):
                     if item in file_path_columns:
                         # format file path to agol 2x forward slash
                         val = utilities.fix_fp(val, 'agol')
+                    # Replace offline path with online path
+                    if item == 'DATA_LOCATION_MCMILLEN_JACOBS':
+                        val = os.path.normpath(val)
+                        val = val.replace(offline_base, online_base)
+                        print('WORKING : {}'.format(val))
                     purp_value.append(val)
 
                 # If add_purp but no purp exists(blank item desc) add new sub items
@@ -781,16 +796,10 @@ class metaData(object):
         lookup_table_project = lookup_table[lookup_table['project']==project_str]
         # standdard stuff
         viable_gdbs = lookup_table_project.index.to_list()
-        # long path to ensuring csv inentory is closed
-        viable_csv_inv = lookup_table_project.fname_csv.to_list()
-        viable_csv_inv.extend(lookup_table_project.fp_maestro_csv.to_list())
-        viable_csv_inv = [os.path.normpath(f) for f in viable_csv_inv]
-        viable_csv_inv = list(set(viable_csv_inv))
-        # NOW FIND OUT HOW TO DETERMINE IF CSV IS OPEN!!! ZU 20220314
 
         if offline_source | offline_target:
             csv = lookup_table_project[lookup_table_project.subproject == self.subproject_str].offline_lookup_table.values[0]
-            offline_lookup_table = pd.read_csv(csv, index_col = 'gdb_str')
+            olt = pd.read_csv(csv, index_col = 'gdb_str')
         else:
             pass
 
@@ -802,10 +811,13 @@ class metaData(object):
                 if offline_source:
                     # save for later
                     fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                    offline_base = offline_lookup_table.loc[gdb_str, 'offline']
-                    online_base = offline_lookup_table.loc[gdb_str, 'online']
-                    fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
+                    try:
+                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
+                        offline_base = olt.loc[gdb_str, 'offline']
+                        online_base = olt.loc[gdb_str, 'online']
+                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
+                    except IndexError:
+                        pass
                 else:
                     pass
                 if arcpy.Exists(fp_fcs_current):
@@ -837,10 +849,8 @@ class metaData(object):
                             df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                         else:
                             # clunky way of grabbing any inventory dir value
-                            fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
-                            inventory_dir = inventory_dir = lookup_table.loc[self.subproject_str, 'inventory_dir']
-                            fp_csv_source = os.path.join(inventory_dir, fname_csv)
-                            df_str_source = 'df_{}_standalone'.format(self.subproject_str)
+                            fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
+                            df_str_source = 'df_{}_standalone'.format(project_str)
 
                         # Only grabs TargetGDB once per gdb
                         try:
@@ -874,13 +884,36 @@ class metaData(object):
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 # create new filename components
                 fc_new_name = df_item['RENAME']
-                col_name_original = df_item['COL_NAME_ARCHIVAL']
-                col_name_original = dict_col_name_orig[col_name_original]
+                try:
+                    col_name_original = df_item['COL_NAME_ARCHIVAL']
+                    col_name_original = dict_col_name_orig[col_name_original]
+                except KeyError:
+                    pass
                 fp_components = fp_fcs_current.split(os.sep)
                 # all but original file name
                 fp_base = os.sep.join(fp_components[:-1])
                 # full path to new fcs
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
+
+                if offline_source:
+                    # save for later
+                    fp_fcs_current_online = copy.copy(fp_fcs_current)
+                    fp_fcs_new_online = copy.copy(fp_fcs_new)
+                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
+                    # check if gdb in filepath
+                    try:
+                        offline_idx = gdb_str[0]
+                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
+                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
+                        print('fp_fcs_current {}'.format(fp_fcs_current))
+                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
+                        fp_fcs_new = fp_fcs_new.replace(online_base, offline_base)
+                        print('ONLINE BASE {}'.format(online_base))
+                        print('OFFLINE BASE {}'.format(offline_base))
+                    except IndexError:
+                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
+                        # from gdb_str[0]  ---> standalone shapefile with no gdb
+                        pass
 
                 if not dry_run:
                     msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
@@ -888,11 +921,19 @@ class metaData(object):
                     # Now fp is renamed, so change alias on NEW fcs
                     arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
 
+                # TRANSFORM
+                if offline_source:
+                    fp_fcs_current = copy.copy(fp_fcs_current_online)
+                    fp_fcs_new = copy.copy(fp_fcs_new_online)
+
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
-                df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 df.at[index, 'ACTION'] = ''
                 df.at[index, 'RENAME'] = ''
+                try:
+                    df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
+                except KeyError:
+                    pass
 
                 # RENAME label
                 df = df.rename(index = {index:fc_new_name})
@@ -922,10 +963,8 @@ class metaData(object):
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
-                    fname_csv = '{}_standalone_data_inventory.csv'.format(self.project_str)
-                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
-                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
-                    df_str_source = 'df_{}_standalone'.format(self.project_str)
+                    fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
+                    df_str_source = 'df_{}_standalone'.format(project_str)
 
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -939,7 +978,10 @@ class metaData(object):
                     # save a base archive if NEVER saved and a daily archive if never saved
                     self.save_archive_csv(df_str_source)
                 df_source.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
-                df_source.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
+                try:
+                    df_source.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
+                except KeyError:
+                    pass
                 setattr(self, df_str_source, df_source)
 
                 # Save to DF
@@ -956,6 +998,12 @@ class metaData(object):
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
                 fc_new_name = df_item['RENAME']
+
+                if not pd.isnull(fc_new_name):
+                    update_label = True
+                else:
+                    update_label = False
+
                 notes = df_item['NOTES']
 
                 # DETERMINE DSET
@@ -968,19 +1016,21 @@ class metaData(object):
                     gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
                     # check if gdb in filepath
                     try:
-                        gdb_str = gdb_str[0]
-                        offline_base = os.path.normpath(offline_lookup_table.loc[gdb_str, 'offline'])
-                        online_base = os.path.normpath(offline_lookup_table.loc[gdb_str, 'online'])
+                        offline_idx = gdb_str[0]
+                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
+                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
                         print('fp_fcs_current {}'.format(fp_fcs_current))
                         fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
                         print('ONLINE BASE {}'.format(online_base))
                         print('OFFLINE BASE {}'.format(offline_base))
                     except IndexError:
+                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
+                        # from gdb_str[0]  ---> standalone shapefile with no gdb
                         pass
                 if offline_target:
-                    fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'offline']
+                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
                 else:
-                    fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'online']
+                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
                 for idx, comp in enumerate(fp_components):
@@ -988,7 +1038,7 @@ class metaData(object):
                         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
                         dset_orig = fp_components[idx + 1]
                         # same gdb cannot have features with the same name even in diff dsets.;
-                        if fp_gdb_orig == fp_move:
+                        if (fp_gdb_orig == fp_move) & (not update_label):
                             rename_delete_protocol = True
 
                         # Get Source STR
@@ -1013,6 +1063,7 @@ class metaData(object):
                     # clunky way of grabbing any inventory dir value
                     fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
                     df_str_source = 'df_{}_standalone'.format(project_str)
+
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -1064,7 +1115,7 @@ class metaData(object):
                     arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
                 # print('fp new: \n{}'.format(fp_dset))
                 # if rename specified
-                if not pd.isnull(fc_new_name):
+                if update_label:
                     feat_name = copy.copy(fc_new_name)
                     # flag to change index label
                     update_label = True
@@ -1073,8 +1124,6 @@ class metaData(object):
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
 
-
-                    update_label = False
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
                 fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
@@ -1089,7 +1138,7 @@ class metaData(object):
                             fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
                             debug_idx = 1
                             msg_substr = copy.copy(fp_fcs_current)
-                            msg_substr2 = copy.copy(os.pat.join(fp_dset, feat_name))
+                            msg_substr2 = copy.copy(os.path.join(fp_dset, feat_name))
                             arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
                             debug_idx = 2
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_dset, feat_name)
@@ -1104,8 +1153,6 @@ class metaData(object):
                             if action_type == 'move':
                                 print('Delete Protocol GO!!!')
                                 arcpy.Delete_management(fp_fcs_current)
-                                debug_idx = 5
-                                df_source.drop(index, inplace = True)
                                 debug_idx = 6
                                 setattr(self, df_str_source, df_source)
 
@@ -1115,8 +1162,8 @@ class metaData(object):
                     if offline_target:
                         fp_components = fp_fcs_new.split(os.sep)
                         gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                        online_base = offline_lookup_table.loc[gdb_str, 'online']
-                        offline_base = offline_lookup_table.loc[gdb_str, 'offline']
+                        online_base = olt.loc[gdb_str, 'online']
+                        offline_base = olt.loc[gdb_str, 'offline']
                         fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
                     df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
@@ -1153,17 +1200,26 @@ class metaData(object):
 
                     # append new row from Series
                     debug_idx = 7
+                    # first drop index in case multiple times running due to error
+                    try:
+                        df_target.drop(index, inplace=True)
+                    except KeyError:
+                        pass
+
                     df_target = df_target.append(ser_append)
                     if update_label:
                         df = df.rename(index = {index:feat_name})
                         df_target = df_target.rename(index = {index:feat_name})
+                        # Replace indice with new feat name
+                        self.indices[self.indices.index[index]] = feat_name
                     debug_idx = 8
 
-                    # drop if Move and move index exists (i.e. in standalone or original download)
-                    try:
-                        df_source.drop(index, inplace = True)
-                    except KeyError:
-                        pass
+                    if action_type == 'MOVE':
+                        # drop if Move and move index exists (i.e. in standalone or original download)
+                        try:
+                            df_source.drop(index, inplace = True)
+                        except KeyError:
+                            pass
 
                     if not dry_run:
                         msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
@@ -1190,6 +1246,8 @@ class metaData(object):
                         logging.info(e)
 
                     # Save to DF
+        elif action_type == 'gp':
+            pass
 
         else:
             if action_type in  ['create_poly', 'create_line', 'create_point']:
@@ -1199,9 +1257,9 @@ class metaData(object):
                     df_item = df.loc[index]
 
                     if offline_target:
-                        fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'offline']
+                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
                     else:
-                        fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'online']
+                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                     dset = df_item['MOVE_LOCATION_DSET']
                     # NO DSET passed
@@ -1230,9 +1288,9 @@ class metaData(object):
                 df_item = df.loc[index]
 
                 if offline_target:
-                    fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'offline']
+                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
                 else:
-                    fp_move = offline_lookup_table.loc[df_item['MOVE_LOCATION'], 'online']
+                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
                 dset = df_item['MOVE_LOCATION_DSET']
@@ -1257,26 +1315,16 @@ class metaData(object):
             if offline_target:
                 fp_components = fp_fcs_new.split(os.sep)
                 gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                online_base = offline_lookup_table.loc[gdb_str, 'online']
-                offline_base = offline_lookup_table.loc[gdb_str, 'offline']
+                online_base = olt.loc[gdb_str, 'online']
+                offline_base = olt.loc[gdb_str, 'offline']
                 fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
             # Dict will be UPDATED below if kwarg specified
-            d = {'DATE_CREATED':self.todays_date,
-                'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new.replace(os.sep, '//')}
-            try:
-                col_name_archival = df_item['col_name_archival']
-                col_name_archival = dict_col_name_orig[col_name_archival]
-                d.update(col_name_archival, fp_in)
-                # Add column to index since dictionary has been updated with added att
-                add_cols = ['DATE_CREATED', 'DATA_LOCATION_MCMILLEN_JACOBS',
-                        col_name_archival]
-            except KeyError:
-                add_cols = ['DATE_CREATED', 'DATA_LOCATION_MCMILLEN_JACOBS']
+            d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
+                'DATA_LOCATION_MCMILLEN_JACOBS':[fp_fcs_new.replace(os.sep, '//')]}
 
-            ser_append = pd.Series(data = d,
-                         index = add_cols,
-                         name = feat_name)
+            df_append = pd.DataFrame(d)
+            df_append = df_append.set_index('ITEM')
 
             # Get TARGET DF/CSV/STR
             fp_components = fp_fcs_new.split(os.sep)
@@ -1297,15 +1345,15 @@ class metaData(object):
                     standalone = True
             if not standalone:
                 fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                print(fname_csv)
                 inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                print(inventory_dir)
                 fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                print(fp_csv_target)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
             else:
-                # clunky way of grabbing any inventory dir value
-                inventory_dir = lookup_table.loc[self.subproject_st, 'inventory_dir']
-                fname_csv = '{}_standalone_data_inventory.csv'.format(self.subproject_str)
-                fp_csv_target = os.path.join(inventory_dir, fname_csv)
-                df_str_target = 'df_{}_standalone'.format(self.project_str)
+                fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
+                df_str_target = 'df_{}_standalone'.format(self.subproject_str)
 
             # Only grabs TargetGDB once per gdb
             try:
@@ -1317,13 +1365,15 @@ class metaData(object):
                 self.add_df(fp_csv_target, df_str_target, 'ITEM')
                 df_target = getattr(self, df_str_target)
 
-            df_target = df_target.append(ser_append)
-
-            # REMOVE rows uwed to create new and replace with populated series rows
-            # are appending
-            if action_type in  ['create_poly', 'create_line', 'create_point']:
-                df.drop(self.indices, inplace = True)
-            df = df.append(ser_append)
+            # Since adding new row, it's append
+            df_target = df_target.append(df_append)
+            # since updating existing NOT append
+            print(df)
+            print('\n')
+            print(df_append)
+            df.update(df_append)
+            print('AFTERWARDS/n')
+            print(df)
             setattr(self, df_str_target, df_target)
             setattr(self, df_str, df)
 
@@ -1504,7 +1554,7 @@ class metaData(object):
         if not os.path.exists(fp_csv_archive_temp):
             print('save a time stamped archive:\n{}'.format(fp_csv_archive_temp))
             # determine if temporary archive is necessary
-            pd.DataFrame.to_csv(getattr(self, df_str, fp_csv_archive_temp))
+            pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive_temp)
 
         # # perhaps useful later for cleanup?
         # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]

@@ -2111,3 +2111,46 @@ def rectify_source_maestro(df_source, df_maestro, dir_out, fname_source, fname_m
     df_maestro = df_maestro.append(append_maestro)
     df_source.to_csv(os.path.join(dir_out, fname_source))
     df_maestro.to_csv(os.path.join(dir_out, fname_maestro))
+
+def assim_df_cols(df_target, df_append, col_mapping_list):
+    '''
+    assimilating notes from maestro to gdb i.e. item_desc to gdb_master.
+    Used for notes, but could be used for any text column.  I used this to combine
+    notes from two df (df_target - gdb / df_append - maestro) into notes_assim
+    20220608.
+    ARGS
+    df_target                 dataframe 1 to assimilate columns
+    df_append                 dataframe 2 to grab column text and add to col from
+                                df_target
+    col_mapping_list    list with cols from d1 and d2 respectively to combine
+    RETURN
+    df_assim            datatrame df1_target with assimilated column
+    '''
+
+    col_target = col_mapping_list[0]
+    col_append = col_mapping_list[1]
+    #
+    df_append = df_append[[col_append]].copy()
+    df_append = df_append.rename(columns = {col_target:'{}_TARGET'.format(col_target)})
+    df_assim = df_target.join(df_append)
+
+    notes_comb=[]
+    for n, n2 in zip(df_assim['NOTES'], df_assim['NOTES_TARGET']):
+        n_null = pd.isnull(n)
+        n2_null = pd.isnull(n2)
+        if n_null:
+            if n2_null:
+                temp = ''
+            else:
+                temp = n2
+        elif n2_null:
+            if not n_null:
+                temp = n
+        else:
+            if not (n == n2):
+                temp = '{}\n{}'.format(n, n2)
+            else:
+                temp = n
+        notes_comb.append(temp)
+    df_assim['NOTES_ASSIM'] = notes_comb
+    return(df_assim)

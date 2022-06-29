@@ -100,7 +100,7 @@ class metaData(object):
             else:
                 print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(fp_shp))
 
-    def zip_shp_agol_prep(self, inDir, **kwargs):
+    def zip_shp_agol_prep(self, df_str, **kwargs):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
         for one fell swoop within function as opposed to calling within for loop.
@@ -112,22 +112,49 @@ class metaData(object):
                                 to exclude from zipping (already zipped)
         '''
 
+        df = getattr(self, df_str)
         yyyymmdd = datetime.datetime.today().strftime('%B %d %Y')
 
-        outDir = '{}_zip'.format(inDir)
-        # ensure shp_dir does not already exist
-        if not os.path.exists(outDir):
-            os.mkdir(outDir)
+        inDir = list(set(self.df.loc[self.indices,'AGOL_DIR'].to_list()))
+        for id in inDir:
+            outDir = '{}_zip'.format(id)
+            # ensure shp_dir does not already exist
+            if not os.path.exists(outDir):
+                os.mkdir(outDir)
 
-        # 3) ZIP all Files at once
-        try:
-            # exclude files if already zipped
-            exclude_files = kwargs['exclude_files']
-            utilities.zipShapefilesInDir(inDir, outDir, exclude_files = exclude_files)
-        except KeyError:
-            utilities.zipShapefilesInDir(inDir, outDir)
-        setattr(self, 'outDir', outDir)
+            # 3) ZIP all Files at once
+            try:
+                # exclude files if already zipped
+                exclude_files = kwargs['exclude_files']
+                utilities.zipShapefilesInDir(id, outDir, exclude_files = exclude_files)
+            except KeyError:
+                utilities.zipShapefilesInDir(id, outDir)
 
+    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN_JACOBS', **kwargs):
+        '''
+        To zip all the indices.  If zipped exist already, they will be ignored.
+        20220610
+        '''
+        for index in self.indices:
+            fp_in = self.df.loc[index, tc]
+            dir_out = self.df.loc[index, 'AGOL_DIR']
+            shp_dir = os.path.join(dir_out, 'shp')
+            zip_dir = os.path.join(dir_out, 'zip')
+            for d in [shp_dir, zip_dir]:
+                if not os.path.exists(d):
+                    os.mkdir(d)
+                else:
+                    pass
+            print('FC to FC: {}'.format(fp_in))
+            arcpy.FeatureClassToFeatureClass_conversion(fp_in, shp_dir, index)
+        # zip
+        incl_files = copy.copy(self.indices)
+        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
+        excl_files = list(set(exist_file) - set(incl_files))
+        if len(excl_files)>0:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
+        else:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir)
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -192,8 +219,14 @@ class metaData(object):
             print('now we are in target action')
             if not isinstance(target_action, list):
                 target_action = [target_action]
+            # Provide column to match action values i.e. ACTION_agol (from join)
+            try:
+                fld = kwargs['alt_action_field']
+            except KeyError:
+                fld = 'ACTION'
             # pull tags column from df (list)
-            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ACTION')
+
+            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = fld)
 
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
@@ -1202,16 +1235,24 @@ class metaData(object):
                     debug_idx = 7
                     # first drop index in case multiple times running due to error
                     try:
+                        print('1205')
                         df_target.drop(index, inplace=True)
                     except KeyError:
                         pass
 
                     df_target = df_target.append(ser_append)
                     if update_label:
+                        print('1212')
                         df = df.rename(index = {index:feat_name})
+                        print('1214')
                         df_target = df_target.rename(index = {index:feat_name})
                         # Replace indice with new feat name
-                        self.indices[self.indices.index[index]] = feat_name
+                        print('1217')
+                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        idt = idt[0]
+                        print('index = {}'.format(idt))
+                        self.indices[idt] = feat_name
+                        print('we did it')
                     debug_idx = 8
 
                     if action_type == 'MOVE':
@@ -1696,7 +1737,7 @@ class AgolAccess(metaData):
     Basic init for AGOL access
     '''
 
-    def __init__(self, prj_file, subproject_str):
+    def __init__(self, prj_file, subproject_str, fp_csv_agol):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
@@ -1710,10 +1751,18 @@ class AgolAccess(metaData):
         # dictionary that can be expanded upon
         # FOUND NO difference between feature layer collection and feature layer.  All feature layers were
         # detected as both with mcmjac_gis.content.search(item_type = <collection or layer>)
-        self.item_type_dict = {'shapefile': 'Shapefile', 'feature': 'Feature Layer Collection', 'feature2': 'Feature Layer'}
+        self.item_type_dict = {'shapefile': 'Shapefile',
+                                'feature_layer': 'Feature Layer',
+                                'webmap': 'Web Map',
+                                'vector_tile': 'Vector Tile Service',
+                                'web_map':'Web Map'}
         group_id_dict = {'KRRP_Geospatial': 'a6384c0909384a43bfd91f5d9723912b',
-                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
+                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
+                        'mcmjac_everyone': 'b61fb4a0c0a944ebb3dd1558d4887e7f'}
         self.group_id_dict = group_id_dict
+        df_agol = pd.read_csv(fp_csv_agol, index_col = 'ITEM')
+        setattr(self, 'df_agol', df_agol)
+        setattr(self, 'fp_csv_agol', fp_csv_agol)
 
     def get_group(self, group_key):
         '''
@@ -1721,7 +1770,8 @@ class AgolAccess(metaData):
         DELETE ZU 20210827
         '''
         group_id_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
-                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09'}
+                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
+                        }
         group_id = group_id_dict[group_key]
         krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
         setattr(self, group_key, krrp_geospatial)
@@ -1739,7 +1789,7 @@ class AgolAccess(metaData):
             pass
         else:
             itemType = [itemType]
-
+        print(itemType)
         # QUERY STRING
         # If Group (default KRRC_Geospatial), add to query str
         if group_name is not None:
@@ -1747,6 +1797,11 @@ class AgolAccess(metaData):
             query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
         else:
             query_str = 'owner: uhlmann@mcmjac.com'
+        try:
+            title = kwargs['title']
+            query_str = '{} AND title: {}'.format(title)
+        except KeyError:
+            pass
 
         # GET ITEMS
         for item in itemType:
@@ -1773,12 +1828,13 @@ class AgolAccess(metaData):
             print(query_str)
             print(itemType)
             print(content_str)
+            setattr(self,'content_string',content_str)
             items = self.mcmjac_gis.content.search(query_str,
                                             item_type = itemType, max_items = 250)
             setattr(self, content_str, items)
             # filtered tags attribute
 
-    def take_action_agol(self, df_str, action_type, user_content_str,
+    def take_action_agol(self, df_agol_str, action_type, user_content_str,
                             group = 'KRRP_Geospatial', **kwargs):
         '''
         perform applicable actions from action column. ZU 202102025.  Thus far
@@ -1798,42 +1854,48 @@ class AgolAccess(metaData):
                                 as val in key/val pair of kwarg update_aaction
 
         '''
-        df = getattr(self, df_str)
+        df_agol = getattr(self, df_agol_str)
         ct = 1
         # ACCESS AGOL items
         user_content = getattr(self, user_content_str)
-        if action_type == 'agol_status':
-            titles = [content_item.title for content_item in user_content]
-            for indice in self.indices:
-                if indice in titles:
-                    df.at[indice, 'AGOL_STATUS'] = True
-                    # print('TITLE:{}TYPE:{}'.format(title, type(title)))
-                else:
-                    df.at[indice, 'AGOL_STATUS'] = False
+        if action_type == 'added_item':
+            # Ensure shapefile not feature
+            if not 'shapefile' in user_content_str:
+                print('user content needs to be shapefile\nNOT RUNNING method')
+            else:
+                titles = [content_item.title for content_item in user_content]
+                for indice in self.indices:
+                    if indice in titles:
+                        df_agol.at[indice, 'ADDED_AGOL'] = True
+                        # print('TITLE:{}TYPE:{}'.format(title, type(title)))
+                    else:
+                        df_agol.at[indice, 'ADDED_AGOL'] = False
 
-                # if we want to remove vals in ACTION col
-                try:
-                    col_val = kwargs['update_action']
-                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
-                except:
-                    pass
+                    # if we want to remove vals in ACTION col
+                    try:
+                        col_val = kwargs['update_action']
+                        df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                    except:
+                        pass
         if action_type == 'share_status':
-            substr = group.replace('-','_').replace(' ','_').lower()
-            group_str = 'user_content_feature_layer_collection_{}'.format(substr)
-            user_content_group = getattr(self, group_str)
+            group_str = 'user_content_{}_feature_layer_collection'.format(group)
+            # Get group content
+            try:
+                user_content_group = getattr(self, group_str)
+            except AttributeError:
+                self.identify_items_online(['feature'])
+                user_content_group = getattr(self, group_str)
             list1 = copy.copy(self.indices)
             list2 = [item.title for item in user_content_group]
             set1 = set(list1)
             set2 = set(list2)
             df1_present_df2_absent = set1.difference(set2)
-            # To add someday for content in Group NOT owned by uhlmann@mcmjac.com
-            df2_present_df1_absent = set2.difference(set1)
             # SET all to True then REPLACE with False
             for indice in self.indices:
-                df.at[indice, 'SHARED_GROUP'] = True
+                df_agol.at[indice, 'SHARED'] = True
             # REPLACE with False
             for indice in list(df1_present_df2_absent):
-                df.at[indice, 'SHARED_GROUP'] = False
+                df_agol.at[indice, 'SHARED'] = False
         if action_type == 'publish_status':
             user_content_shp = getattr(self, 'user_content_shapefile')
             user_content_feat = getattr(self, 'user_content_feature_layer_collection')
@@ -1843,10 +1905,10 @@ class AgolAccess(metaData):
             not_published = list(set1.difference(set2))
             # SET all to True then REPLACE with False
             for indice in self.indices:
-                df.at[indice, 'PUBLISHED'] = False
+                df_agol.at[indice, 'PUBLISHED'] = True
             # REPLACE with False
             for indice in not_published:
-                df.at[indice, 'PUBLISHED'] = False
+                df_agol.at[indice, 'PUBLISHED'] = False
 
         if action_type == 'remove':
             for content_item in user_content:
@@ -1859,27 +1921,52 @@ class AgolAccess(metaData):
                     # idloc = (self.df_working.ITEM == title).idxmax()
                     # fancy method to value for action at idloc
                     # OFFLINE set status to offline
-                    df.at[title, 'AGOL_STATUS'] = False
+                    df_agol.at[title, 'PUBLISHED'] = False
 
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
-                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                    df_agol = update_comma_sep_vals(df_agol, title, 'ACTION', col_val)
                 except:
                     pass
+        if action_type == 'add_data':
+            for indice, indice_iloc in zip(self.indices, self.indices_iloc):
+                agol_dir = self.df_agol.loc[indice, 'AGOL_DIR']
+                zip_dir = r'{}_zip'.format(agol_dir)
+                shp = os.path.join(zip_dir, '{}.zip'.format(indice))
+
+                # TAGS
+                tags_df = self.parse_comma_sep_list('df_agol', 'TAGS')
+                # subset tags in index
+                tags = tags_df[indice_iloc]
+                snippet = self.df_agol.loc[indice,'SNIPPET']
+
+                print(tags)
+                properties_dict = {'type':'Shapefile',
+                                    'title':indice,
+                                    'tags':tags,
+                                    'snippet':snippet}
+                print('ADDING TO AGOL: \n{}'.format(shp))
+                fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
+                # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
+                print('iloc = {} \\n fc_item {} '.format(indice_iloc, fc_item))
 
         if action_type == 'publish':
             for content_item in user_content:
                 title = content_item.title
                 if title in self.indices:
                     print('PUBLISHING: {}'.format(title))
-                    content_item.publish()
+                    d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
+                            "targetSR":{"wkid":6416}}
+                    # d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
+                    #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
+                    content_item.publish(publish_parameters=d)
                 else:
                     print('item title {} did not match queried result on agol --> did NOT publish'.format(title))
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
-                    df = update_comma_sep_vals(df, title, 'ACTION', col_val)
+                    df_agol = update_comma_sep_vals(df_agol, title, 'ACTION', col_val)
                 except:
                     pass
         if action_type == 'share':
@@ -1895,14 +1982,14 @@ class AgolAccess(metaData):
                 if title in self.indices:
                     print('SHARING: {}'.format(content_item))
                     content_item.share(groups = [self.krrp_geospatial], org = True)
-                    df.at[title, 'SHARED_GROUP'] = True
+                    df_agol.at[title, 'SHARED'] = True
                     indices_remaining.remove(title)
                 else:
                     pass
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
-                    df = update_comma_sep_vals(df, indice, 'ACTION', col_val)
+                    df_agol = update_comma_sep_vals(df_agol, indice, 'ACTION', col_val)
                 except:
                     pass
             # Print out indices unaccounted for
@@ -1915,26 +2002,55 @@ class AgolAccess(metaData):
                 item_tags = content_item.tags
                 tags_str = ', '.join(item_tags)
                 try:
-                    df.at[item_title, 'TAGS_CURRENT'] = tags_str
+                    df_agol.at[item_title, 'TAGS_CURRENT'] = tags_str
                 except KeyError:
                     print('Item {} is not present in DF'.format(item_title))
-        if action_type == 'update_tags':
+        if action_type in ['update_tags']:
             content_items = [item for item in user_content if item.title in self.indices]
             for content_item in content_items:
                 title = content_item.title
                 try:
-                    new_tags = df.loc[title, 'TAGS']
+                    new_tags = df_agol.loc[title, 'TAGS']
                     # Get list from string
                     new_tags = ductape_utilities.parse_csl(new_tags, False)
+                    print(new_tags)
                     update_dict = {'tags':new_tags}
-                    log_str = 'TAGS update for: {}'.format(title)
                     content_item.update(update_dict)
                 except KeyError:
                     print('Item {} is not present in DF'.format(item_title))
+        if action_type in ['update_group_categories']:
+            # Create a JSON array with categories from dataframe to pass to
+            # assign_to_items method
+            # ZU 20220626
+            matched = [c for c in user_content if c.title in self.indices]
+            dict_final = []
+            for it in matched:
+                title = it.title
+                cats = self.df_agol.loc[title, 'CATEGORIES']
+                try:
+                    cats = cats.split(',')
 
+                    cats = [c.replace(' ','') for c in cats]
+                    cats_full = ['/Categories/{}'.format(c) for c in cats]
+                    id = it.itemid
+                    dc = {id:{'categories':cats_full}}
+                    if 'dict_final' not in locals():
+                        dict_final = [dc]
+                    else:
+                        dict_final.append(dc)
+                    # Should exist if running this function, but check
+                    try:
+                        group_item = getattr(self, 'krrp_geospatial')
+                    except AttributeError:
+                        print('run getgroup with krrp_geospatial first')
+                    # pass JSON Array to assign_to_items method
+                    # FYI to access help  >>>help(group_item.assign...) Could not find online documentation
+                    group_item.categories.assign_to_items(items=dict_final)
+                except AttributeError:
+                    print('{} Has no categories to set'.format(title.upper()))
         # keep count going for item_type
         ct += 1
-        setattr(self, df_str, df)
+        setattr(self, df_agol_str, df_agol)
 
     def update_comma_sep_vals(self, df, index, col_name, col_val):
         # UPDATE comma-sep list
@@ -2036,6 +2152,47 @@ class AgolAccess(metaData):
             fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
+
+    def create_df_agol(self, it_vals_key = ['web_map', 'vector_tile'],
+                        prop_name = 'df_agol_raw'):
+        '''
+        Needs work.  Currently just creats a new df based on it_vals_key.
+        Refer to gh item_type_dict for more options. 20220627
+        ARGS
+        it_vals_key         list of item type keys to get item types for search
+        prop_name           setattr(prop_name, df_agol_raw)
+        '''
+        df_agol = getattr(self, 'df_agol')
+        it_vals = [self.item_type_dict[it] for it in it_vals_key]
+
+        group_id = self.group_id_dict['KRRP_Geospatial']
+        query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
+
+        for idx, it in enumerate(it_vals):
+            items = self.mcmjac_gis.content.search(query_str,
+                                            item_type = it, max_items = 500)
+            n = [i.title for i in items]
+            nv = [i.numViews for i in items]
+            tg = [i.tags for i in items]
+            sn = [i.snippet for i in items]
+            dsc = [i.description for i in items]
+            it = [it_vals_key[idx]] * len(items)
+            if not it == 'Shapefile':
+                shp = [False] * len(items)
+                pb = [True] * len(items)
+            else:
+                shp = [True] * len(items)
+                pb = [False] * len(items)
+            df_temp = df = pd.DataFrame(np.column_stack([n, nv, tg, sn, dsc, shp, pb, it]),
+                                columns = ['ITEM', 'NUM_VIEWS', 'TAGS', 'SNIPPET',
+                                            'DESCRIPTION', 'SHAPEFILE', 'PUBLISHED',
+                                            'ITEM_TYPE'])
+            if 'df_agol_raw' in locals():
+                df_agol_raw = df_agol_raw.append(df_temp)
+            else:
+                df_agol_raw = copy.copy(df_temp)
+        df_agol_raw = df_agol_raw.set_index('ITEM')
+        setattr(self, 'df_agol_raw', df_agol_raw)
 
     def email_group(self):
         signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmjac.com'

@@ -1330,8 +1330,10 @@ class metaData(object):
 
                 if offline_target:
                     fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
+                    print('in offline: ', fp_move)
                 else:
                     fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
+                    print('in online: ', fp_move)
 
 
                 dset = df_item['MOVE_LOCATION_DSET']
@@ -1878,7 +1880,7 @@ class AgolAccess(metaData):
                     except:
                         pass
         if action_type == 'share_status':
-            group_str = 'user_content_{}_feature_layer_collection'.format(group)
+            group_str = 'user_content_{}_feature_layer'.format(group)
             # Get group content
             try:
                 user_content_group = getattr(self, group_str)
@@ -1898,7 +1900,7 @@ class AgolAccess(metaData):
                 df_agol.at[indice, 'SHARED'] = False
         if action_type == 'publish_status':
             user_content_shp = getattr(self, 'user_content_shapefile')
-            user_content_feat = getattr(self, 'user_content_feature_layer_collection')
+            user_content_feat = getattr(self, 'user_content_feature_layer')
             list1 = [item.title for item in user_content_shp]
             list2 = [item.title for item in user_content_feat]
             set1, set2 = set(list1), set(list2)

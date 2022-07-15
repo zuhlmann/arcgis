@@ -1434,6 +1434,7 @@ def fix_fp(path_orig, delim_style = 'os_sep'):
             path_orig = path_orig.replace('/','\\')
             path_orig = path_orig.replace('\\\\', '\\')
             path_orig = path_orig.replace('//','\\')
+            print('here')
         except AttributeError:
             pass
     return(path_orig)
@@ -1594,7 +1595,7 @@ def centroid_from_attribute(table_in, att):
         cursor.insertRow((id, pt))
     del cursor
 
-def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc = '', **kwargs):
+def centroid_to_index(table_in, id_att, template_str, feet=True,  wc = '', **kwargs):
     '''
     To be used in a series with centroid_from_attribute.  Get centroids -either
     from multiple inputs like coho_salvage figures for RES, or most likley from
@@ -1615,8 +1616,11 @@ def centroid_to_index(table_in, id_att, template_str, idx_name, feet=True,  wc =
     # GRAB FIRST in case naming convention not obsrved and function fails
     basedir = os.path.split(table_in)[0]
     feat_name = os.path.split(table_in)[1]
-    index_fc_name = '{}_index'.format(feat_name.replace('_centroid',''))
-    index_fc_name = idx_name
+    try:
+        idx_name = kwargs['idx_name']
+        index_fc_name = idx_name
+    except KeyError:
+        index_fc_name = '{}_index'.format(feat_name.replace('_centroid',''))
     fp_out = os.path.join(basedir, index_fc_name)
 
     # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
@@ -1859,14 +1863,21 @@ def aprx_inventory(aprx_dir, csv_dir_out):
         print('INVENTORYING map: {}'.format(m.name))
         for lyr in lyrs:
             if not lyr.isBasemapLayer:
-                c1.append(lyr.name)
+                try:
+                    c1.append(lyr.name)
+                except AttributeError:
+                    c1.append('')
                 try:
                     c2.append(lyr.dataSource)
                 except NameError:
                     c2.append('')
+                except AttributeError:
+                    c2.append('')
                 try:
                     c3.append(lyr.visible)
                 except NameError:
+                    c3.append('')
+                except AttributeError:
                     c3.append('')
                 try:
                     c4.append(lyr.isRasterLayer)
@@ -1875,6 +1886,8 @@ def aprx_inventory(aprx_dir, csv_dir_out):
                 try:
                     c5.append(lyr.definitionQuery)
                 except NameError:
+                    c5.append('')
+                except AttributeError:
                     c5.append('')
                 # get map name
                 c0.append(map_name)
@@ -1994,9 +2007,17 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     for idx, gdb in enumerate(gdb_dir_list):
         try:
             dsets = kwargs['dsets_desired']
-            df_current = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+            if 'df_current' not in locals():
+                df_current = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+            else:
+                temp = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+                df_current = df_current.append(temp)
         except KeyError:
-            df_current = compare_data.file_paths_arc(gdb, True)
+            if 'df_current' not in locals():
+                df_current = compare_data.file_paths_arc(gdb, True)
+            else:
+                temp = compare_data.file_paths_arc(gdb, True)
+                df_current = df_current.append(temp)
 
     # standardize paths
     df_current = norm_file_path_df(df_current, target_col = tc)
@@ -2007,7 +2028,7 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     col_id = df_current.columns.get_loc(tc)
     fp_fcs_current = os.path.normpath(df_current.iloc[0, col_id])
     fp_components = fp_fcs_current.split(os.sep)
-    print(fp_components)
+    # print(fp_components)
     if offline:
         csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\offline_lookup_table.csv'
         olt = pd.read_csv(csv, index_col = 'gdb_str')

@@ -76,6 +76,7 @@ class metaData(object):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
         for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
+        NEEDS TO incorporate offline_base ZU!! aug 2022
 
         ARGS:
         df_str              df for example
@@ -251,6 +252,7 @@ class metaData(object):
             # get index names from iloc vals
             setattr(self, prop_str_indices_iloc, iloc_action)
             self.indices = df.iloc[iloc_action].index.tolist()
+            self.indices_iloc = iloc_action
             print('iloc')
             print(' --- '.join([str(i) for i in iloc_action]))
             print('indices')
@@ -917,6 +919,12 @@ class metaData(object):
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 # create new filename components
                 fc_new_name = df_item['RENAME']
+
+                if not pd.isnull(fc_new_name):
+                    update_label = True
+                else:
+                    update_label = False
+
                 try:
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
                     col_name_original = dict_col_name_orig[col_name_original]
@@ -1010,7 +1018,23 @@ class metaData(object):
                     df_source = getattr(self, df_str_source)
                     # save a base archive if NEVER saved and a daily archive if never saved
                     self.save_archive_csv(df_str_source)
+
+                # Replace index
+                if update_label:
+                    print('1212')
+                    df = df.rename(index = {index:feat_name})
+                    print('1214')
+                    df_source = df_source.rename(index = {index:feat_name})
+                    # Replace indice with new feat name
+                    print('1217')
+                    idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                    idt = idt[0]
+                    print('index = {}'.format(idt))
+                    self.indices[idt] = feat_name
+                    print('we did it')
+
                 df_source.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
+
                 try:
                     df_source.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 except KeyError:
@@ -1054,6 +1078,7 @@ class metaData(object):
                         online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
                         print('fp_fcs_current {}'.format(fp_fcs_current))
                         fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
+                        fp_components = fp_fcs_current.split(os.sep)
                         print('ONLINE BASE {}'.format(online_base))
                         print('OFFLINE BASE {}'.format(offline_base))
                     except IndexError:
@@ -1760,7 +1785,10 @@ class AgolAccess(metaData):
                                 'web_map':'Web Map'}
         group_id_dict = {'KRRP_Geospatial': 'a6384c0909384a43bfd91f5d9723912b',
                         'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
-                        'mcmjac_everyone': 'b61fb4a0c0a944ebb3dd1558d4887e7f'}
+                        'mcmjac_everyone': 'b61fb4a0c0a944ebb3dd1558d4887e7f',
+                        'sacramento_canal':'eb6b401c468448a39c0aa522461ad3f8'}
+        wkida_dict = {'CA_sp2':6416,
+                        'webmercator': 3857}
         self.group_id_dict = group_id_dict
         df_agol = pd.read_csv(fp_csv_agol, index_col = 'ITEM')
         setattr(self, 'df_agol', df_agol)
@@ -1957,12 +1985,20 @@ class AgolAccess(metaData):
             for content_item in user_content:
                 title = content_item.title
                 if title in self.indices:
-                    print('PUBLISHING: {}'.format(title))
-                    d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
-                            "targetSR":{"wkid":6416}}
-                    # d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
-                    #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
-                    content_item.publish(publish_parameters=d)
+                    try:
+                        wkid = kwargs['wkid']
+                        # wkid = self.df_agol.loc[title, 'WKID']
+                        d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
+                                "targetSR":{"wkid":wkid}}
+                        # d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000,
+                        print('PUBLISHING: {}'.format(title))
+                        #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
+                        content_item.publish(publish_parameters=d)
+                    except KeyError:
+                        d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000}
+                        print('PUBLISHING: {}'.format(title))
+                        #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
+                        content_item.publish(publish_parameters=d)
                 else:
                     print('item title {} did not match queried result on agol --> did NOT publish'.format(title))
                 # if we want to remove vals in ACTION col

@@ -3,7 +3,7 @@ import os
 
 # https://gis.stackexchange.com/questions/229187/copying-only-certain-fields-columns-from-shapefile-into-new-shapefile-using-mode
 
-def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
+def copy_with_fields(in_fc, out_fc, keep_fields, where='', **kwargs):
     """
     Required:
         in_fc -- input feature class
@@ -27,4 +27,10 @@ def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
 
     # copy features
     path, name = os.path.split(out_fc)
+
+    try:
+        dset = kwargs['dset']
+        path = os.path.join(path,dset)
+    except KeyError:
+        pass
     arcpy.conversion.FeatureClassToFeatureClass(in_fc, path, name, where, fmap)

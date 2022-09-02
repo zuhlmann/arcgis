@@ -3,6 +3,7 @@ from arcpy import da
 import os
 import pandas as pd
 import numpy as np
+import copy
 
 # Directly from here:
 # https://support.esri.com/en/technical-article/000011912
@@ -16,11 +17,18 @@ import numpy as np
 #                   created by script are LONG and > 250 paths will break this
 # field_reference   Attribute Name i.e. Name, OBJECTID.  This will be used in file
 #                   and subdir names
+# use_all_fields    boolean - true to output all fields to csv for field report
+# rel_globalid_field   name of globalid field from relational database diretly downloaded from AGOL
+# fc_globalid_field    if updating extracted fc, process is arcpy.da.searchcursor to get globalid
+#                   from FGBD and join to extracted FC.
 
 fc_in = arcpy.GetParameterAsText(0)
 inTable = arcpy.GetParameterAsText(1)
 basedir = arcpy.GetParameterAsText(2)
 field_reference = arcpy.GetParameterAsText(3)
+use_all_fields = arcpy.GetParameterAsText(4)
+rel_globalid_field_fgdb = arcpy.GetParameterAsText(5)
+rel_globalid_field_fc = arcpy.GetParameterAsText(6)
 
 # check for shp - DON'T THINK this matters because feature class is specified as fc_in data type
 if fc_in[-3:] == 'shp':
@@ -28,20 +36,34 @@ if fc_in[-3:] == 'shp':
 else:
     feat_name = os.path.split(fc_in)[-1]
 
+all_fields = [f.name for f in arcpy.ListFields(fc_in) if 'shape' not in f.name.lower()]
+base_fields = [field_reference, 'GLOBALID', 'notes']
+if use_all_fields:
+    fld_list = all_fields
+else:
+    fld_list = base_fields
 # 1) FEATURE CLASS TABLE
-objid_fc, globid_fc, notes = [],[],[]
-with da.SearchCursor(fc_in, [field_reference, 'GLOBALID', 'notes']) as cursor:
+# initiate list of list to add vale
+fld_val_list = [[] for i in range(len(fld_list))]
+# indices to match list
+fld_id_list = list(range(len(fld_val_list)))
+with da.SearchCursor(fc_in, fld_list) as cursor:
     for row in cursor:
-        objid_fc.append(row[0])
-        temp_globid = row[1]
-        notes.append(row[2])
-        globid_formatted = temp_globid.replace('{','').replace('}','')
-        globid_fc.append(globid_formatted)
+        for id in fld_id_list:
+            if fld_list[id] == rel_globalid_field_fc:
+                # get exact globid name for below
+                globalid_field_name = fld_list[id]
+                temp = row[id]
+                temp = temp.replace('{','').replace('}','')
+                globid_id = copy.copy(id)
+            else:
+                temp = row[id]
+            fld_val_list[id].append(temp)
 
 df_fc = pd.DataFrame(np.column_stack(
-                [globid_fc, objid_fc, notes]),
-                columns = ['globalid', field_reference, 'notes'],
-                index = globid_fc)
+                fld_val_list),
+                columns = fld_list,
+                index = fld_val_list[globid_id])
 
 # 2) ATTACHMENT TABLE
 # replace attid with objectid from from feature class after matching global ids
@@ -53,10 +75,19 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
         attid_substr = 'ATT{}'.format(str(row[2]))
         attname_substr = str(row[1]).replace(' ','')
         # GLOBID
-        temp_globid = row[3]
-        globid_formatted = temp_globid.replace('{','').replace('}','')
+        rel_globid = row[3]
+        globid_formatted = rel_globid.replace('{','').replace('}','')
         # globid_formatted == globalid in df_fc (table)
-        matched_objid = df_fc.loc[globid_formatted, field_reference]
+        # Not perfect solution to when a point is deleted from extracted table
+        # TURN OFF if problems with function.  May be masking other small issue
+        # like using wrong attachment table ZU 20220826
+        try:
+            matched_objid = df_fc.loc[globid_formatted, field_reference]
+            deleted_pt = False
+        except KeyError:
+            deleted_pt = True
+            print('key error with: {}'.format(globid_formatted))
+            pass
         # If None Type then no id --> for instance if no value for
         # field_reference attribute in a row
         try:
@@ -82,9 +113,10 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
         open(fp_att, 'wb').write(attachment.tobytes())
 
         # Populate DF for Microsoft Publisher Report Mailings table
-        globid_formatted_list.append(globid_formatted)
-        fname_photo.append(fname_att)
-        fp_photo.append(fp_att)
+        if not deleted_pt:
+            globid_formatted_list.append(globid_formatted)
+            fname_photo.append(fname_att)
+            fp_photo.append(fp_att)
 
         del row
         del attachment
@@ -92,10 +124,10 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
 del cursor
 # 3) PHOTO LOG CSV for Microsoft Publisher photo logs
 df_right = pd.DataFrame(np.column_stack([globid_formatted_list, fname_photo, fp_photo]),
-                        columns = ['globalid', 'fname_photo', 'fp_photo'],
+                        columns = [globalid_field_name, 'fname_photo', 'fp_photo'],
                         index = globid_formatted_list)
 # one to many merge (many to one?)
-df_merged = pd.merge(df_fc, df_right, on='globalid', how = 'outer')
+df_merged = pd.merge(df_fc, df_right, on=globalid_field_name, how = 'outer')
 fc_name = os.path.split(fc_in)[-1]
 fp_csv_out = os.path.join(basedir, '{}_photo_log.csv'.format(fc_name))
 pd.DataFrame.to_csv(df_merged, fp_csv_out)

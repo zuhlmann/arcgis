@@ -1632,12 +1632,18 @@ def centroid_to_index(table_in, id_att, template_str, feet=True,  wc = '', **kwa
         m_ft = 3.28084
         unit_conv = cm_m * m_ft
     else:
-        cm_m = 0.1
+        cm_m = 0.01
         unit_conv = cm_m
     width_cent = df.loc[template_str, 'width_cent']
     ht_cent = df.loc[template_str, 'height_cent']
-    e_len_base = width_cent * unit_conv
-    n_len_base = ht_cent * unit_conv
+    try:
+        rescale = kwargs['rescale']
+        e_len_base = width_cent * unit_conv * rescale
+        n_len_base = ht_cent * unit_conv *rescale
+    except KeyError:
+        e_len_base = width_cent * unit_conv
+        n_len_base = ht_cent * unit_conv
+
 
     if wc != '':
         [(k,v)] = wc.items()

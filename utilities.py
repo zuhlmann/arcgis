@@ -499,7 +499,7 @@ def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
         fms.addFieldMap(fm)
     arcpy.Merge_management([fp_target, fp_append], fp_out, fms)
 
-def parse_dir(obj, substr):
+def parse_dir(obj, **kwargs):
     '''
     matchses substrings to dir(obj) from python interactive
     document and add to: ZRU 5/26/2020
@@ -514,8 +514,27 @@ def parse_dir(obj, substr):
         methods = obj.keys()
         print('dict')
 
-    indices_match = [idx for idx, method in enumerate(methods) if substr in method]
-    methods_match = [methods[idx] for idx in indices_match]
+    try:
+        ex_symb = kwargs['exclude_symbols']
+        indices_match, methods_match = [], []
+        for idx, m in (enumerate(methods)):
+            if s in m:
+                for s in ex_symb:
+                    break
+            # will execute ONLY if no break:
+            #http://psung.blogspot.com/2007/12/for-else-in-python.html
+            else:
+                indices_match.append(idx)
+                methods_match.append(m)
+    except KeyError:
+        pass
+
+    try:
+        substr = kwargs['substring']
+        indices_match = [idx for idx, method in enumerate(methods) if substr in method]
+        methods_match = [methods[idx] for idx in indices_match]
+    except KeyError:
+        pass
     return(indices_match, methods_match)
 
 def zipShapefilesInDir(inDir, outDir, **kwarg):
@@ -777,6 +796,26 @@ def export_ddp(fp_mxd, fp_pdf, range_str, **kwargs):
     # export normal map doc, not DDP
     else:
         arcpy.mapping.ExportToPDF(mxd_doc, fp_pdf)
+
+def export_pdf(fp_csv, dir_out, action_val):
+    '''
+    ZU 20220901.  Outputting batches of old mxd's for Swancove Pool.
+    columns from csv are obvious from col names.  Create these columns:
+    mxd_name (index col), fig_name, fp_mxd, action
+    ARGS
+    fp_csv          path/to/mxd_inv.csv
+    dir_out         path/to/pdf locations
+    action_val      flag to mark what to export from inventory
+    '''
+    df = pd.read_csv(fp_csv, index_col = 'mxd_name')
+    df_select = df[df.action == action_val]
+    for index in df_select.index:
+        fig_name = df_select.loc[index, 'fig_name']
+        fp_mxd = df_select.loc[index, 'fp_mxd']
+        pdf_out = os.path.join(dir_out, '{}.pdf'.format(fig_name))
+        mxd = arcpy.mapping.MapDocument(fp_mxd)
+        print('Exporting: {}\n To:        {}'.format(index, pdf_out))
+        arcpy.mapping.ExportToPDF(mxd, pdf_out)
 
 def mxd_inventory(fp_mxd, figure_name, dir_out):
     '''

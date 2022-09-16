@@ -9,9 +9,11 @@ import matplotlib.pyplot as plt
 # 20220909 For Gaussian Filtering a DEM at Swancove and then resaving as Tif
 
 fp_in = r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\sc_bathwithsurf_barrier_20220331_step3.tif'
+fp_in = r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\original\SC_BathwithSurv.tif'
 ds1 = gdal.Open(fp_in)
 arr_orig = ds1.ReadAsArray()
-arr_orig[arr_orig==-9999] = np.nan
+# NOTE!! this will destroy values less than -9998.  Will work on -3.28 e ... and -9999.  Terrible Hack
+arr_orig[arr_orig<-9998] = np.nan
 
 # Gaussian Blur dealign with NaN
 # https://stackoverflow.com/questions/18697532/gaussian-filtering-a-image-with-nan-in-python
@@ -30,6 +32,7 @@ arr4 = arr2/arr3
 
 arr_in = copy.copy(arr4)
 fp_out =  r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\sc_bathwithsurv_step3_gauss_sigma2.tif'
+fp_out =  r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\SC_BathwithSurv_gauss_sigma2.tif'
 gt = ds1.GetGeoTransform()
 ul = (gt[0], gt[3])
 res = gt[1]

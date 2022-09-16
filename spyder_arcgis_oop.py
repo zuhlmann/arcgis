@@ -436,6 +436,12 @@ class metaData(object):
 
                 if offline:
                     fp_fcs= fp_fcs.replace(online_base, offline_base)
+                # For some reason, if fp does not exist then no error gets thrown
+                # during xml process.  Debugging stinks then - ZU 20220914
+                if not os.path.exists(fp_fcs):
+                    msg_str_fp = 'PATH DOES NOT EXIST: \n{}'.format(fp_fcs)
+                else:
+                    pass
 
                 temp_path = copy.copy(fp_fcs)
                 tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
@@ -504,8 +510,12 @@ class metaData(object):
                     # Replace offline path with online path
                     if item == 'DATA_LOCATION_MCMILLEN_JACOBS':
                         val = os.path.normpath(val)
-                        val = val.replace(offline_base, online_base)
-                        print('WORKING : {}'.format(val))
+                        try:
+                            val = val.replace(offline_base, online_base)
+                            print('WORKING : {}'.format(val))
+                        except UnboundLocalError:
+                            # no solution for offline_base / online_base for standalone shapefiles
+                            pass
                     purp_value.append(val)
 
                 # If add_purp but no purp exists(blank item desc) add new sub items
@@ -529,6 +539,7 @@ class metaData(object):
 
                 # LOG and DOCUMENT DF
                 msg_str = 'NEW PURPOSE for\n{}:\n{}'.format(indice, purpose_new)
+
 
             # Nan from pd.dataframe.read_csv == dtype float
             if isinstance(subtract_purp_items[0], str):
@@ -559,7 +570,11 @@ class metaData(object):
                 element_list = [purp]
                 element_title = ['idPurp']
 
-                # log what the new purp will look like
+                if 'msg_str_fp' in locals():
+                    msg_str = '{}\n\n{}'.format(msg_str_fp, msg_str)
+                else:
+                    pass
+
                 logging.info(msg_str)
 
                 for el, el_title, el_text in zip(element_list, element_title, element_text_list):
@@ -1484,21 +1499,13 @@ class metaData(object):
                         pass
 
                     df_target = df_target.append(ser_append)
+                    df = df.append(ser_append)
 
-                    # set new index
-                    if rename:
-                        # idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
-                        # idt = idt[0]
-                        # print('index = {}'.format(idt))
-                        # self.indices[idt] = feat_name
-                        df = df.rename(index = {index:fc_new_name})
-                        print('we did it')
                     debug_idx = 8
 
                     df.at[index, 'ACTION'] = ''
                     df.at[index, 'MOVE_LOCATION'] = ''
                     df.at[index, 'MOVE_LOCATION_DSET'] = ''
-                    df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
 
                     if not dry_run:
                         msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)

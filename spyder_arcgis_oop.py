@@ -182,7 +182,6 @@ class metaData(object):
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
-
         try:
             target_tag = kwargs['target_tag']
             # list will be passed for multiple target tags
@@ -252,7 +251,6 @@ class metaData(object):
             # get index names from iloc vals
             setattr(self, prop_str_indices_iloc, iloc_action)
             self.indices = df.iloc[iloc_action].index.tolist()
-            self.indices_iloc = iloc_action
             print('iloc')
             print(' --- '.join([str(i) for i in iloc_action]))
             print('indices')
@@ -274,8 +272,8 @@ class metaData(object):
             try:
                 int(indices[0])
                 print('indices {}'.format(indices))
+                setattr(self, prop_str_indice_iloc, indices)
                 self.indices = df.iloc[indices].index.tolist()
-                self.indices_iloc = copy.copy(indices)
             # If indices were index_column vals (stirng)
             except ValueError:
                 try:
@@ -341,6 +339,24 @@ class metaData(object):
         except KeyError:
             pass
 
+    def selection_index_translate(self, df_str_target):
+        '''
+        Designed to be used after initiating spyder_arcgis_oop from the AGOL class.
+        run this next --> i.e. selection_index_translate('df'). ZU 20220921
+        ARGS
+        df_str_target       self-explanatory
+
+        '''
+        if df_str_target == 'df':
+            prop_str_indices_iloc = 'indices_iloc'
+        else:
+            df_base_str = df_str.replace('df_','')
+            prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
+
+        indices = getattr(self, 'indices')
+        df_target = getattr(self, df_str_target)
+        indices_target = [df_target.index.get_loc(i) for i in indices]
+        setattr(self, prop_str_indices_iloc, indices_target)
     def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
@@ -780,14 +796,6 @@ class metaData(object):
 
         self.create_base_properties(df_str)
 
-        # # set path to archive for later archiving
-        # # 1) create object name or archive csv path
-        # str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
-        #
-        # # 2) create path to csv to save to object
-        # fp_csv_archive = '{}_archive_{}.csv'.format(os.path.splitext(fp_csv)[0], self.todays_date)
-        # setattr(self, str_csv_archive_obj, fp_csv_archive)
-
     def take_action(self, df_str, action_type,
                     target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
                     dry_run = False, replace_action = '', save_df = False,
@@ -966,6 +974,8 @@ class metaData(object):
 
                 if not dry_run:
                     msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
+                    print(fp_fcs_current)
+                    print(fp_fcs_new)
                     arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
                     # Now fp is renamed, so change alias on NEW fcs
                     arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
@@ -1998,7 +2008,7 @@ class AgolAccess(metaData):
                         'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
                         'mcmjac_everyone': 'b61fb4a0c0a944ebb3dd1558d4887e7f',
                         'sacramento_canal':'eb6b401c468448a39c0aa522461ad3f8'}
-        wkida_dict = {'CA_sp2':6416,
+        wkid_dict = {'CA_sp2':6416,
                         'webmercator': 3857}
         self.group_id_dict = group_id_dict
         df_agol = pd.read_csv(fp_csv_agol, index_col = 'ITEM')
@@ -2264,6 +2274,16 @@ class AgolAccess(metaData):
                     new_tags = ductape_utilities.parse_csl(new_tags, False)
                     print(new_tags)
                     update_dict = {'tags':new_tags}
+                    content_item.update(update_dict)
+                except KeyError:
+                    print('Item {} is not present in DF'.format(item_title))
+        if action_type in ['update_snippets']:
+            content_items = [item for item in user_content if item.title in self.indices]
+            for content_item in content_items:
+                title = content_item.title
+                try:
+                    new_snippet = df_agol.loc[title, 'SNIPPET']
+                    update_dict = {'snippet':new_snippet}
                     content_item.update(update_dict)
                 except KeyError:
                     print('Item {} is not present in DF'.format(item_title))

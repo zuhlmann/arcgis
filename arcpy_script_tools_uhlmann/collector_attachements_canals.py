@@ -27,9 +27,20 @@ inTable = arcpy.GetParameterAsText(1)
 basedir = arcpy.GetParameterAsText(2)
 field_reference = arcpy.GetParameterAsText(3)
 use_all_fields = arcpy.GetParameterAsText(4)
-rel_globalid_field_fgdb = arcpy.GetParameterAsText(5)
-rel_globalid_field_fc = arcpy.GetParameterAsText(6)
+rel_globalid_field_fc = arcpy.GetParameterAsText(5)
 
+'''
+field_reference         field name from fc_in to use in filename prefix i.e. name or id.
+                        filename will then = name5_... for example
+in_table                matching attach table from rel gdb
+basedir                 where photos will be saved.  A subdir with fc_in title will be created.
+                        then <field_reference_name>_<field_reference_val> subdir beneath
+                        i.e. name_5
+use_all_fields          output all fields from FC.  This is a true/false checkbox
+rel_globalid_field_fc   attribute name created in fc_in which holds vals for relational fgdb.
+                        Note that field name can be anything, but field values need
+                        to match relative globalid from rel fgdb i.e. 1690814A-4E54-4DBC-866E-18E87550D7D2
+'''
 # check for shp - DON'T THINK this matters because feature class is specified as fc_in data type
 if fc_in[-3:] == 'shp':
     feat_name = os.path.split(fc_in)[-1][:-4]
@@ -82,41 +93,43 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
         # TURN OFF if problems with function.  May be masking other small issue
         # like using wrong attachment table ZU 20220826
         try:
+            # If a rel_globalid was never utilized - i.e. deleted from fc
             matched_objid = df_fc.loc[globid_formatted, field_reference]
             deleted_pt = False
-        except KeyError:
-            deleted_pt = True
-            print('key error with: {}'.format(globid_formatted))
-            pass
-        # If None Type then no id --> for instance if no value for
-        # field_reference attribute in a row
-        try:
-            matched_objid_formatted = matched_objid.replace(' - ','_').replace('-','_').replace('.','').replace(' ','_').replace('__','_')
-        except AttributeError:
-            matched_objid_formatted = matched_objid
-        objid_substr = '{}_{}'.format(field_reference, matched_objid_formatted)
-        # Should create fname ex) Huntin_Blinds_OBJID20_ATT1_Photo1
-        fname_att = '{}_{}_{}_{}'.format(feat_name, objid_substr, attid_substr, attname_substr)
+            # Terrible way to check if
+            if not isinstance(matched_objid, str):
+                matched_objid = '_AND_'.join(matched_objid.values.tolist())
+            # If None Type then no id --> for instance if no value for
+            # field_reference attribute in a row
+            try:
+                matched_objid_formatted = matched_objid.replace(' - ','_').replace('-','_').replace('.','').replace(' ','_').replace('__','_')
+            except AttributeError:
+                matched_objid_formatted = matched_objid
+            objid_substr = '{}_{}'.format(field_reference, matched_objid_formatted)
+            # Should create fname ex) Huntin_Blinds_OBJID20_ATT1_Photo1
+            fname_att = '{}_{}_{}_{}'.format(feat_name, objid_substr, attid_substr, attname_substr)
 
-        # Need feature class (fc_subdir) before trying feature (feat_dir)
-        fc_subdir = os.path.join(basedir, feat_name)
-        if not os.path.isdir(fc_subdir):
-            os.mkdir(fc_subdir)
-        # Now Make subdir Unless already created (i.e. multiple attachments in a feature)
-        feat_subdir = os.path.join(fc_subdir, '{}_{}'.format(field_reference, matched_objid_formatted))
-        # for some reason a filename had <filename>_ NOTICe the underscore.
-        if feat_subdir[-1]=='_':
-            feat_subdir = feat_subdir[:-1]
-        if not os.path.isdir(feat_subdir):
-            os.mkdir(feat_subdir)
-        fp_att = os.path.join(feat_subdir, fname_att)
-        open(fp_att, 'wb').write(attachment.tobytes())
+            # Need feature class (fc_subdir) before trying feature (feat_dir)
+            fc_subdir = os.path.join(basedir, feat_name)
+            if not os.path.isdir(fc_subdir):
+                os.mkdir(fc_subdir)
+            # Now Make subdir Unless already created (i.e. multiple attachments in a feature)
+            feat_subdir = os.path.join(fc_subdir, '{}_{}'.format(field_reference, matched_objid_formatted))
+            # for some reason a filename had <filename>_ NOTICe the underscore.
+            if feat_subdir[-1]=='_':
+                feat_subdir = feat_subdir[:-1]
+            if not os.path.isdir(feat_subdir):
+                os.mkdir(feat_subdir)
+            fp_att = os.path.join(feat_subdir, fname_att)
+            open(fp_att, 'wb').write(attachment.tobytes())
 
-        # Populate DF for Microsoft Publisher Report Mailings table
-        if not deleted_pt:
             globid_formatted_list.append(globid_formatted)
             fname_photo.append(fname_att)
             fp_photo.append(fp_att)
+
+        except KeyError:
+            print('key error with: {}'.format(globid_formatted))
+            pass
 
         del row
         del attachment

@@ -127,7 +127,7 @@ def unpack_list(list_in, arcobj):
     return(fields_out)
 
 
-def file_paths_arc(folder_or_gdb, want_df, **kwargs):
+def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
     '''
     ZRU 5/6/2020
     returns list of all paths to feature classes including path/to/featureDataset/features
@@ -186,14 +186,22 @@ def file_paths_arc(folder_or_gdb, want_df, **kwargs):
     nrows = len(feats_df)
     blank = [None] * nrows
     if want_df:
-        df = pd.DataFrame(np.column_stack([feats_df, dsets_df, path_to_feat,
-                                            blank, blank, blank, blank, blank,
-                                            blank, blank, blank, blank]),
-                            columns = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
-                                        'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
-                                        'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
-                                        'MOVE_LOCATION_DSET','RENAME','DSET_LOWER_CASE',
-                                        'COL_NAME_ARCHIVAL'])
+        # Basic columns for the bare bones
+        if basic_cols:
+            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS']
+            cols = np.column_stack([feats_df, dsets_df, path_to_feat])
+
+        else:
+            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
+
+                        'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
+                        'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
+                        'MOVE_LOCATION_DSET','RENAME','DSET_LOWER_CASE',
+                        'COL_NAME_ARCHIVAL']
+            cols = np.column_stack([feats_df, dsets_df, path_to_feat,
+                                    blank, blank, blank, blank, blank,
+                                    blank, blank, blank, blank])
+        df = pd.DataFrame(cols, columns = col_list)
     return(df)
 
 def intersection_feats(path_to_dset_feats1, path_to_dset_feats2):

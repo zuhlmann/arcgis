@@ -2031,7 +2031,8 @@ def norm_file_path_df(df, **kwargs):
                 df.at[i,c] = fp_new
     return(df)
 
-def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS', offline = True, **kwargs):
+def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS',
+                        offline = True, basic_cols=True, **kwargs):
     '''
     ZU 20220201.  Update data inventories if changed.  Finds omitted (deleted),
     comitted (existing) and added (new) feature classes. NOTE!! need to make
@@ -2049,19 +2050,20 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     '''
     # Inventory all specified gdbs in maestro
     import compare_data
+
     for idx, gdb in enumerate(gdb_dir_list):
         try:
             dsets = kwargs['dsets_desired']
             if 'df_current' not in locals():
-                df_current = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+                df_current = compare_data.file_paths_arc(gdb, True, basic_cols, dsets_desired = dsets)
             else:
-                temp = compare_data.file_paths_arc(gdb, True, dsets_desired = dsets)
+                temp = compare_data.file_paths_arc(gdb, True, basic_cols, dsets_desired = dsets)
                 df_current = df_current.append(temp)
         except KeyError:
             if 'df_current' not in locals():
-                df_current = compare_data.file_paths_arc(gdb, True)
+                df_current = compare_data.file_paths_arc(gdb, True, basic_cols)
             else:
-                temp = compare_data.file_paths_arc(gdb, True)
+                temp = compare_data.file_paths_arc(gdb, True, basic_cols)
                 df_current = df_current.append(temp)
 
     # standardize paths

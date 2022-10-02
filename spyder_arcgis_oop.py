@@ -272,7 +272,7 @@ class metaData(object):
             try:
                 int(indices[0])
                 print('indices {}'.format(indices))
-                setattr(self, prop_str_indice_iloc, indices)
+                setattr(self, prop_str_indices_iloc, indices)
                 self.indices = df.iloc[indices].index.tolist()
             # If indices were index_column vals (stirng)
             except ValueError:
@@ -1990,10 +1990,6 @@ class AgolAccess(metaData):
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__(prj_file, subproject_str)
-        u_name = 'uhlmann@mcmjac.com'
-        u_name2 = 'zuhlmann@mcmjac.com'
-        p_word = 'Gebretekle24!'
-        p_word2 = 'Mcmjac081'
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
@@ -2277,12 +2273,41 @@ class AgolAccess(metaData):
                     content_item.update(update_dict)
                 except KeyError:
                     print('Item {} is not present in DF'.format(item_title))
-        if action_type in ['update_snippets']:
+        if action_type in ['new_snippets']:
+            # Replace with entirely new snippet
             content_items = [item for item in user_content if item.title in self.indices]
             for content_item in content_items:
                 title = content_item.title
                 try:
                     new_snippet = df_agol.loc[title, 'SNIPPET']
+                    orig_snippet = content_item.snippet
+
+                    update_dict = {'snippet':new_snippet}
+                    content_item.update(update_dict)
+                except KeyError:
+                    print('Item {} is not present in DF'.format(item_title))
+        if action_type in ['append_snippets']:
+            # For appending SOURCE  and SOURCE_ORIGINAL key pair after publishing
+            # and manually populating snippet field in agol_inventory
+            #The original snippet is pulled from
+            # the Id Purp in xml shapefile and I replaced this with customish,
+            # manually copied/created snippet + SOURCE info.
+            # ZU 20220928
+            content_items = [item for item in user_content if item.title in self.indices]
+            for content_item in content_items:
+                title = content_item.title
+                try:
+                    new_snippet = df_agol.loc[title, 'SNIPPET']
+                    orig_snippet = content_item.snippet
+                    try:
+                        sub = orig_snippet.split('\n')
+                        for s in sub:
+                            if (s[0:6] =='SOURCE') & ('CONTACT' not in s):
+                                new_snippet = '{}\n{}'.format(new_snippet, s)
+                            else:
+                                pass
+                    except AttributeError:
+                        pass
                     update_dict = {'snippet':new_snippet}
                     content_item.update(update_dict)
                 except KeyError:

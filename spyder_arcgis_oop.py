@@ -38,13 +38,13 @@ class metaData(object):
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        fp_csv_lookup = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\path_list_updated.csv'
+        fp_csv_lookup = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
         lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str')
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
         # eventually make submaestroe
         if use_item_desc:
-            fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
+            fp_csv = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
         else:
             fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
@@ -449,7 +449,7 @@ class metaData(object):
                 gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
                 offline_base = olt.loc[gdb_str, 'offline']
                 online_base = olt.loc[gdb_str, 'online']
-
+                # https: // gfycat.com / honestanchoredesok
                 if offline:
                     fp_fcs= fp_fcs.replace(online_base, offline_base)
                 # For some reason, if fp does not exist then no error gets thrown
@@ -478,7 +478,7 @@ class metaData(object):
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
             if pd.isnull(dataIdInfo):
-                fp_xml_template = r'C:\Users\uhlmann\Box\WR Users\3.0 - Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
+                fp_xml_template = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
                 print('\n{} contained no Item Desc - \nTemplate used instead: \n{}\n'.format(indice, fp_xml_template))
                 tree = ET.parse(fp_xml_template)
                 # root is the root ELEMENT of a tree
@@ -515,6 +515,7 @@ class metaData(object):
                 # Marks To Do if - proceed with updating Purp
                 update_purp = True
                 purp_item, purp_value = [], []
+                purp_item, purp_value = [], []
                 for item in new_purp_items:
                     purp_item.append(item)
                     # value to add to Item Desc
@@ -524,7 +525,7 @@ class metaData(object):
                         # format file path to agol 2x forward slash
                         val = utilities.fix_fp(val, 'agol')
                     # Replace offline path with online path
-                    if item == 'DATA_LOCATION_MCMILLEN_JACOBS':
+                    if item == ('DATA_LOCATION_MCMILLEN_JACOBS'):
                         val = os.path.normpath(val)
                         try:
                             val = val.replace(offline_base, online_base)
@@ -797,7 +798,7 @@ class metaData(object):
         self.create_base_properties(df_str)
 
     def take_action(self, df_str, action_type,
-                    target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
+                    target_col = 'DATA_LOCATION_MCMILLEN',
                     dry_run = False, replace_action = '', save_df = False,
                     offline_source = True, offline_target = True, **kwargs):
         '''
@@ -1146,21 +1147,28 @@ class metaData(object):
                 else:
                     tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
 
-                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-                fp_csv_target = os.path.join(inventory_dir, fname_csv)
-                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
-                # Only grabs TargetGDB once per gdb
-                try:
-                    df_target = getattr(self, df_str_target)
-                # if dataframe NOT already added via self.add_df
-                except AttributeError:
-                    print('populating target')
-                    # note this also creates fp_csv_archive
-                    self.add_df(fp_csv_target, df_str_target, 'ITEM')
-                    df_target = getattr(self, df_str_target)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_target)
+                # src and tgt same, then only need one non maestro df
+                if src_gdb_or_dir_str == tgt_gdb_or_dir_str:
+                    src_tgt_same = True
+                else:
+                    src_tgt_same = False
+
+                if not src_tgt_same:
+                    inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                    fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                    fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                    df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+                    # Only grabs TargetGDB once per gdb
+                    try:
+                        df_target = getattr(self, df_str_target)
+                    # if dataframe NOT already added via self.add_df
+                    except AttributeError:
+                        print('populating target')
+                        # note this also creates fp_csv_archive
+                        self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                        df_target = getattr(self, df_str_target)
+                        # save a base archive if NEVER saved and a daily archive if never saved
+                        self.save_archive_csv(df_str_target)
 
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -1236,39 +1244,51 @@ class metaData(object):
                         offline_base = olt.loc[gdb_str, 'offline']
                         fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
-                    df.at[index, 'ACTION'] = ''
-                    df.at[index, 'MOVE_LOCATION'] = ''
-                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
-
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
 
                     # To document whether fp_fcs_current = Staging, Previous, Original
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
+                    merge_cols = df_item['MERGE_COLUMNS']
+                    print('MERGE COLUMNS: ', merge_cols)
                     if not pd.isnull(col_name_original):
                         col_name_original = dict_col_name_orig[col_name_original]
                         df.at[index, col_name_original] = fp_fcs_current
                         d = {col_name_original: fp_fcs_current,
-                            'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                            'NOTES_APPEND':notes}
+                             'FEATURE_DATASET':dset_move,
+                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
+                             'NOTES_APPEND':notes}
+                        # columns to transfer from source to target
+                        if not pd.isnull(merge_cols):
+                            print('merge col block')
+                            keys = [c.strip() for c in merge_cols.split(',')]
+                            vals = df_source.loc[index, keys]
+                            d.update(dict(zip(keys,vals)))
                         ser_append = pd.Series(data = d,
-                                     index = [col_name_original, 'FEATURE_DATASET',
-                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                     name = feat_name)
+                                               index = list(d.keys()),
+                                               name = feat_name)
                     # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
                     # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                            'NOTES_APPEND':notes}
+                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
+                             'NOTES_APPEND':notes}
                         ser_append = pd.Series(data = d,
-                                     index = ['FEATURE_DATASET',
-                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                     name = feat_name)
+                                               index = ['FEATURE_DATASET',
+                                                        'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
+                                               name = feat_name)
 
                     # append new row from Series
                     debug_idx = 7
+
+                    try:
+                        df_source.drop(index, inplace = True)
+                    except KeyError:
+                        pass
+
+                    if src_tgt_same:
+                        df_target = copy.copy(df_source)
+
                     # first drop index in case multiple times running due to error
                     try:
                         print('1205')
@@ -1277,11 +1297,9 @@ class metaData(object):
                         pass
 
                     df_target = df_target.append(ser_append)
+                    df = df.rename(index = {index:feat_name})
+
                     if rename:
-                        print('1212')
-                        df = df.rename(index = {index:feat_name})
-                        print('1214')
-                        df_target = df_target.rename(index = {index:feat_name})
                         # Replace indice with new feat name
                         print('1217')
                         idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
@@ -1289,34 +1307,25 @@ class metaData(object):
                         print('index = {}'.format(idt))
                         self.indices[idt] = feat_name
                         print('we did it')
+                        index = copy.copy(feat_name)
                     debug_idx = 8
+                    df.loc[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
 
-                    if action_type == 'MOVE':
-                        # drop if Move and move index exists (i.e. in standalone or original download)
-                        try:
-                            df_source.drop(index, inplace = True)
-                        except KeyError:
-                            pass
-                    else:
-                        item_temp = df.loc[index]
-                        item_temp = item_temp.rename(item_temp.RENAME)
-                        df.at[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
 
                     if not dry_run:
                         msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
                         logging.info(msg_str)
 
                     # SAVE TO TARGET_DF every Iter in case Exception
-                    setattr(self, df_str_target, df_target)
-                    setattr(self, df_str_source, df_source)
                     setattr(self, df_str, df)
+                    setattr(self, df_str_source, df_source)
+                    if not src_tgt_same:
+                        setattr(self, df_str_target, df_target)
 
                     if save_df:
                         pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
-                        if action_type == 'copy':
-                            pd.DataFrame.to_csv(df_target, fp_csv_target)
-                        else:
-                            pd.DataFrame.to_csv(df_source, fp_csv_source)
+                        pd.DataFrame.to_csv(df_source, fp_csv_source)
+                        if not src_tgt_same:
                             pd.DataFrame.to_csv(df_target, fp_csv_target)
 
                 except Exception as e:
@@ -1326,7 +1335,7 @@ class metaData(object):
                         logging.info(msg_str)
                         logging.info(e)
 
-        elif action_type in ['copy']:
+        elif action_type in ['copy', 'copy_replace']:
 
             for index in self.indices:
                 df_item = df.loc[index]
@@ -1340,8 +1349,6 @@ class metaData(object):
                 else:
                     rename = False
 
-                # DETERMINE DSET
-                rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
 
                 if offline_source:
@@ -1368,27 +1375,24 @@ class metaData(object):
                     fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
-                for idx, comp in enumerate(fp_components):
-                    if '.gdb' in comp:
-                        fp_gdb_orig = os.sep.join(fp_components[:idx+1])
-                        dset_orig = fp_components[idx + 1]
-                        # same gdb cannot have features with the same name even in diff dsets.;
-                        if (fp_gdb_orig == fp_move) & (not rename):
-                            rename_delete_protocol = True
-
-                        # Get Source STR
-                        src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
-
-                        if src_gdb_or_dir_str in viable_gdbs:
-                            standalone = False
-                        else:
-                            standalone = True
-                        # Once gdb is found in path, then break
-                        break
-                    # translation - there was no gdb in fp_fcs_orig
-                    elif idx == (len(fp_components) - 1):
-                        # No gdb found == shapefile passed - use dir/folder
-                        standalone = True
+                # for idx, comp in enumerate(fp_components):
+                #     if '.gdb' in comp:
+                #         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
+                #         dset_orig = fp_components[idx + 1]
+                #
+                #         # Get Source STR
+                #         src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+                #
+                #         if src_gdb_or_dir_str in viable_gdbs:
+                #             standalone = False
+                #         else:
+                #             standalone = True
+                #         # Once gdb is found in path, then break
+                #         break
+                #     # translation - there was no gdb in fp_fcs_orig
+                #     elif idx == (len(fp_components) - 1):
+                #         # No gdb found == shapefile passed - use dir/folder
+                #         standalone = True
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -1440,29 +1444,18 @@ class metaData(object):
                 debug_idx = 0
                 try:
                     if not dry_run:
-                        # Should only trigger if move not copy (i.e. move into same gdb)
-                        if rename_delete_protocol:
-                            print('Rename Protocol GO!!!')
-                            fp_fcs_current_comp = fp_fcs_current.split(os.sep)
-                            fc_current_renamed = fp_fcs_current_comp[-1] + '_1'
-                            fp_fcs_renamed = os.path.sep.join(fp_fcs_current_comp[:-1] + [fc_current_renamed])
-                            debug_idx = 1
-                            msg_substr = copy.copy(fp_fcs_current)
-                            msg_substr2 = copy.copy(os.path.join(fp_dset, feat_name))
-                            arcpy.Rename_management(fp_fcs_current, fc_current_renamed)
-                            debug_idx = 2
-                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_renamed, fp_dset, feat_name)
-                            debug_idx = 3
-                            arcpy.Delete_management(fp_fcs_renamed)
-                        else:
-                            msg_substr = copy.copy(fp_fcs_current)
-                            msg_substr2 = copy.copy(os.path.join(fp_dset, feat_name))
+                        msg_substr = copy.copy(fp_fcs_current)
+                        msg_substr2 = copy.copy(os.path.join(fp_dset, feat_name))
+                        try:
+                            wc = kwargs['where_clause']
+                            arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name, where_clause = wc)
+                        except KeyError:
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
-                            debug_idx = 4
+                        debug_idx = 4
 
                     # TRANSFORM
-                    if offline_source:
-                        fp_fcs_current = copy.copy(fp_fcs_current_online)
+                    # if offline_source:
+                    #     fp_fcs_current = copy.copy(fp_fcs_current_online)
                     if offline_target:
                         fp_components = fp_fcs_new.split(os.sep)
                         gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
@@ -1504,21 +1497,34 @@ class metaData(object):
                     # first drop index in case multiple times running due to error
                     try:
                         print('1205')
-                        df_target.drop(index, inplace=True)
+                        df_target.drop(feat_name, inplace=True)
                     except KeyError:
                         pass
 
                     df_target = df_target.append(ser_append)
-                    df = df.append(ser_append)
+                    debug_idx = 8
+                    if action_type == 'copy_replace':
+                        df.loc[index, col_name_original] = fp_fcs_current
+                        df.loc[index, target_col]=fp_fcs_new
+                    else:
+                        df = df.append(ser_append)
 
+                    if rename:
+                        # Replace indice with new feat name
+                        print('1217')
+                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        idt = idt[0]
+                        print('index = {}'.format(idt))
+                        self.indices[idt] = feat_name
+                        if action_type == 'copy_replace':
+                            self.df.rename(index={index:feat_name}, inplace=True)
+                        else:
+                            self.indices_iloc[idt] = df.index.get_loc(feat_name)
+                        print('we did it')
                     debug_idx = 8
 
-                    df.at[index, 'ACTION'] = ''
-                    df.at[index, 'MOVE_LOCATION'] = ''
-                    df.at[index, 'MOVE_LOCATION_DSET'] = ''
-
                     if not dry_run:
-                        msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
+                        msg_str = '\nCOPYING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
                         logging.info(msg_str)
 
                     # SAVE TO TARGET_DF every Iter in case Exception
@@ -1532,9 +1538,10 @@ class metaData(object):
                 except Exception as e:
                     if not dry_run:
                         logging.info(debug_idx)
-                        msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(msg_substr, debug_idx)
+                        msg_str = '\nUNABLE TO COPY:  {}\nARCPY DEBUG: {}'.format(msg_substr, debug_idx)
                         logging.info(msg_str)
                         logging.info(e)
+
 
         elif action_type == 'gp':
             pass
@@ -1611,7 +1618,7 @@ class metaData(object):
                 offline_base = olt.loc[gdb_str, 'offline']
                 fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
-            # Dict will be UPDATED below if kwarg specified
+                # Dict will be UPDATED below if kwarg specified
             d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
                 'DATA_LOCATION_MCMILLEN_JACOBS':[fp_fcs_new.replace(os.sep, '//')]}
 
@@ -1990,6 +1997,8 @@ class AgolAccess(metaData):
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__(prj_file, subproject_str)
+        u_name = 'uhlmann@mcmjac.com'
+        p_word = 'Gebretekle24!'
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
         # dictionary that can be expanded upon
@@ -2177,7 +2186,7 @@ class AgolAccess(metaData):
                 except:
                     pass
         if action_type == 'add_data':
-            for indice, indice_iloc in zip(self.indices, self.indices_iloc):
+            for indice, indice_iloc in zip(self.indices, self.agol_indices_iloc):
                 agol_dir = self.df_agol.loc[indice, 'AGOL_DIR']
                 zip_dir = r'{}_zip'.format(agol_dir)
                 shp = os.path.join(zip_dir, '{}.zip'.format(indice))
@@ -2212,7 +2221,7 @@ class AgolAccess(metaData):
                         #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
                         content_item.publish(publish_parameters=d)
                     except KeyError:
-                        d =   {"name":title, "description":"Published in API with wkid specified","maxRecordCount":5000}
+                        d =   {"name":title,"maxRecordCount":5000}
                         print('PUBLISHING: {}'.format(title))
                         #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
                         content_item.publish(publish_parameters=d)

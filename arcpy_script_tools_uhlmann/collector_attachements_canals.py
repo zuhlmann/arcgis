@@ -97,7 +97,7 @@ with da.SearchCursor(inTable, ['DATA', 'ATT_NAME', 'ATTACHMENTID', 'REL_GLOBALID
             matched_objid = df_fc.loc[globid_formatted, field_reference]
             deleted_pt = False
             # Terrible way to check if
-            if not isinstance(matched_objid, str):
+            if isinstance(matched_objid, list):
                 matched_objid = '_AND_'.join(matched_objid.values.tolist())
             # If None Type then no id --> for instance if no value for
             # field_reference attribute in a row

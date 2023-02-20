@@ -8,32 +8,15 @@ import matplotlib.pyplot as plt
 
 # 20220909 For Gaussian Filtering a DEM at Swancove and then resaving as Tif
 
-fp_in = r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\sc_bathwithsurf_barrier_20220331_step3.tif'
-fp_in = r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\original\SC_BathwithSurv.tif'
-fp_in = r'C:\Users\uhlmann\Documents\urisa_conference_2022\data_maps\data\raster\USGS_13_n45w117_20220309_clip.tif'
+fp_in = r'D:\box_offline\small_projects\eklutna_d\lidar_geomorph\2015_dem_warped_gdal.tif'
+
 ds1 = gdal.Open(fp_in)
 arr_orig = ds1.ReadAsArray()
 # NOTE!! this will destroy values less than -9998.  Will work on -3.28 e ... and -9999.  Terrible Hack
 arr_orig[arr_orig<-9998] = np.nan
-
-# Gaussian Blur dealign with NaN
-# https://stackoverflow.com/questions/18697532/gaussian-filtering-a-image-with-nan-in-python
-sigma = 2
-truncate = 4
-arr2 = arr_orig.copy()
-arr2[np.isnan(arr_orig)]=0
-arr2 = sp.ndimage.gaussian_filter(arr2, sigma=sigma, truncate=truncate)
-
-arr3 = 0 * arr_orig.copy()+1
-arr3[np.isnan(arr_orig)]=0
-arr3 = sp.ndimage.gaussian_filter(arr3, sigma=sigma, truncate=truncate)
-
-# Final result --> NA's ignored
-arr4 = arr2/arr3
+arr_orig = arr_orig *
 
 arr_in = copy.copy(arr4)
-fp_out =  r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\sc_bathwithsurv_step3_gauss_sigma2.tif'
-fp_out =  r'D:\box_offline\swancove_2022\backbarrier_20220314\rasters\SC_BathwithSurv_gauss_sigma2.tif'
 fp_out = r'C:\Users\uhlmann\Documents\urisa_conference_2022\data_maps\data\raster\USGS_13_n45w117_20220309_clip_guass_sigma2.tif'
 gt = ds1.GetGeoTransform()
 ul = (gt[0], gt[3])

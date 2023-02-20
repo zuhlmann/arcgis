@@ -193,40 +193,28 @@ def list_unique_fields(fp_feat, field, data_storage, **kwargs):
                 dict[field] = vals[idx]
         df = pd.DataFrame(dict)
     return(df)
-def where_clause_create_p1(field,  vals, **kwargs):
+def where_clause_2023(fld,  vals, **kwargs):
     '''
-    ZRU 6/11/2020
-    should be expanded.  Follow comments at the end to combine multiple lists
-    field       currently just accepts single string
-    vals         list of strings or ints.  Make sure to pass int as a list even if single item
-    kwargs      currently just val pair 'operator' = [pick val in operator_dict]
-    RETURNS
-    where_clause_components     list of string or strings
-    '''
+    ZU 20230206
+    Args:
+        fld:            single field (string)
+        vals:           list of vals
+        **kwargs:
 
-    if isinstance(vals[0], str):
-        where_clause_components  =  ["({field} = '{val}')".format(field=field, val=val)
-                                            for val in vals]
+    Returns:
+        wc:             where_clause argument
+    '''
+    if not isinstance(vals[0], str):
+        v = [str(vi) for vi in vals]
+        v_str = ','.join(v)
     else:
-        try:
-            # get operator type from kwarg operator = operator
-            operator = kwargs['operator']
-            operator_dict = {'equal':'=', 'gt':'>', 'lt':'<'}
-            operator = operator_dict[operator]
-            where_clause_components = ["({field} {operator} {val})".format(field=field, operator = operator, val=vals)
-                                                                            for val in vals]
-        except KeyError:
-            print('operator string not valid.  gt = > lt = < equal = =')
-            # Note: nest in list for consistency when stringing together multiple calls
-    return(where_clause_components)
-    # 1) take output and run below line to combine with OR conditional.  Change
-    # to AND if need be
-    # where_clause_location = ' OR '.join(where_clause_location)
-    # 2) Try adding this in future to ensure field delimeter instead of if else statment
-    # field_delim = arcpy.AddFieldDelimiters(fp, field)
-    # # check here and here to find code and learn unicode background:
-    # # https://gis.stackexchange.com/questions/153444/using-select-layer-by-attribute-in-arcpy
-    # # https://pro.arcgis.com/en/pro-app/help/data/geodatabases/overview/a-quick-tour-of-unicode.htm
+        #     v_str = r'"{}"'.format('","'.join(vals))
+        v_str = r"'{}'".format("','".join(vals))
+
+        # now create wc
+    delimited_fld = arcpy.AddFieldDelimiters(arcpy.env.workspace, fld)
+    wc = '{} in ({})'.format(delimited_fld, v_str)
+    return(wc)
 
 def custom_select(fp_or_feat, field, target_vals):
     '''
@@ -1813,11 +1801,11 @@ def calc_acreage(fp_in, units, geodesic = False):
     geodesic            Read link below for info on choosing
     '''
     # https://community.esri.com/t5/new-to-gis-questions/planar-vs-geodesic-area-length/td-p/350368
-    # existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
-    # if 'acres' not in existing_fields:
-    #     arcpy.AddField_management(fp_fcs, 'acres', 'TEXT')
-    # else:
-    #     pass
+    # if using geodesic, this will be indicated in field name
+    if geodesic:
+        geodesic_substr='_geodesic'
+    else:
+        geodesic_substr = ''
     if geodesic:
         area_str = ['AREA_GEODESIC', 'LENGTH_GEODESIC']
     else:
@@ -1825,14 +1813,17 @@ def calc_acreage(fp_in, units, geodesic = False):
     shape_type = arcpy.da.Describe(fp_in)['shapeType']
     if shape_type == 'Polygon':
         arcpy.AddGeometryAttributes_management(fp_in, area_str[0], '',units,'')
-        fname = 'POLY_AREA'
+        if not geodesic:
+            fname = 'POLY_AREA'
+        else:
+            fname = 'AREA_GEO'
         units_lc = units.lower()
-        new_fname = 'area_{}'.format(units_lc)
+        new_fname = 'area_{}{}'.format(units_lc, geodesic_substr)
     if shape_type == 'Polyline':
         arcpy.AddGeometryAttributes_management(fp_in, area_str[1], units,'','')
         fname = 'LENGTH'
         units_lc = units.replace('(United States)','').replace(' ','_').lower()
-        new_fname = 'length_{}'.format(units_lc)
+        new_fname = 'length_{}{}'.format(units_lc, geodesic_substr)
     arcpy.AlterField_management(fp_in, fname, new_fname, new_fname)
 
 def union_z(feat1, feat2, fp_out, where1 = '', where2 = ''):
@@ -2222,3 +2213,23 @@ def assim_df_cols(df_target, df_append, col_mapping_list):
         notes_comb.append(temp)
     df_assim['NOTES_ASSIM'] = notes_comb
     return(df_assim)
+
+def dir_use_inv(fp):
+    '''
+    Created for quick inventory of subdirs in main dir and their last modified time.  For GIS dir box migration post McMJac split
+    20230201
+    Args:
+        fp:         directory
+
+    Returns:
+        df:         dataframe inventory
+    '''
+    l1, l2 = [],[]
+    for dn in os.listdir(fp):
+        fpt = os.path.join(fp, dn)
+        tm = time.strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(fpt)))
+        l1.append(dn)
+        l2.append(tm)
+    df = pd.DataFrame(np.column_stack([l1,l2]), columns = ['Directory', 'Last_Modified'])
+    df = df.sort_values(by=['Last_Modified'], ascending = False)
+    return(df)

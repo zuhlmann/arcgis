@@ -39,7 +39,7 @@ class metaData(object):
         fill in now that reworked
         '''
         fp_csv_lookup = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
-        lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str')
+        lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
         # eventually make submaestroe
@@ -47,7 +47,7 @@ class metaData(object):
             fp_csv = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
         else:
             fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
-        df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str')
+        df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str',encoding = "utf-8")
         setattr(self, 'subproject_str', subproject_str)
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -156,6 +156,26 @@ class metaData(object):
             utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
+    def zip_shp_dir(self, shp_dir, zip_dir):
+        '''
+        Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
+        ZU 20230224
+        Args:
+            shp_dir:        path/to/shp/dir
+            zip_dir:        path/to/zip/dir
+
+        Returns:
+
+        '''
+        incl_files = copy.copy(self.indices)
+        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
+        excl_files = list(set(exist_file) - set(incl_files))
+        if len(excl_files)>0:
+            print('here ', excl_files)
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
+        else:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir)
+            print('there')
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -637,7 +657,7 @@ class metaData(object):
                 pass
             # CREDITS
             # standard credits --> set col value to 'standard' in csv
-            credits_stamp = 'Zachary Uhlmann\nMcMillen Jacobs\nuhlmann@mcmjac.com'
+            credits_stamp = 'Zachary Uhlmann\nMcMillen Corp\nuhlmann@mcmillencorp.com'
             try:
                 #   NEEDS WORK - doesn't erase existimng --> see RAMP_restoration_bdry
                 credits_new = df.loc[indice]['CREDITS']
@@ -704,7 +724,7 @@ class metaData(object):
         credits_list = []
 
         # If standard credits stamp
-        credits_stamp = 'Zachary Uhlmann\nMcMillen Jacobs\nuhlmann@mcmjac.com'
+        credits_stamp = 'Zachary Uhlmann\nMcMillen Corp\nuhlmann@mcmillencorp.com'
         # If feature classes
         if not shp:
             for indice in self.indices:
@@ -1256,27 +1276,22 @@ class metaData(object):
                         df.at[index, col_name_original] = fp_fcs_current
                         d = {col_name_original: fp_fcs_current,
                              'FEATURE_DATASET':dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                             'NOTES_APPEND':notes}
-                        # columns to transfer from source to target
-                        if not pd.isnull(merge_cols):
-                            print('merge col block')
-                            keys = [c.strip() for c in merge_cols.split(',')]
-                            vals = df_source.loc[index, keys]
-                            d.update(dict(zip(keys,vals)))
-                        ser_append = pd.Series(data = d,
-                                               index = list(d.keys()),
-                                               name = feat_name)
+                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
                     # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
                     # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET':dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                             'NOTES_APPEND':notes}
-                        ser_append = pd.Series(data = d,
-                                               index = ['FEATURE_DATASET',
-                                                        'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                               name = feat_name)
+                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+
+                    # columns to transfer from source to target
+                    if not pd.isnull(merge_cols):
+                        keys = [c.strip() for c in merge_cols.split(',')]
+                        vals = df_source.loc[index, keys]
+                        d.update(dict(zip(keys,vals)))
+
+                    ser_append = pd.Series(data = d,
+                                           index = list(d.keys()),
+                                           name = feat_name)
 
                     # append new row from Series
                     debug_idx = 7
@@ -1341,7 +1356,6 @@ class metaData(object):
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
-                notes = df_item['NOTES']
                 fc_new_name = df_item['RENAME']
 
                 if not pd.isnull(fc_new_name):
@@ -1466,31 +1480,30 @@ class metaData(object):
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
 
-                    # To document whether fp_fcs_current = Staging, Previous, Original
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
+                    merge_cols = df_item['MERGE_COLUMNS']
+                    print('MERGE COLUMNS: ', merge_cols)
                     if not pd.isnull(col_name_original):
                         col_name_original = dict_col_name_orig[col_name_original]
-                        # Archival col
                         df.at[index, col_name_original] = fp_fcs_current
                         d = {col_name_original: fp_fcs_current,
-                            'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                            'NOTES_APPEND':notes}
-                        ser_append = pd.Series(data = d,
-                                     index = [col_name_original, 'FEATURE_DATASET',
-                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                     name = feat_name)
-
+                             'FEATURE_DATASET': dset_move,
+                             'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
                     # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
                     # to master, and now decide to move back to archival.
                     else:
-                        d = {'FEATURE_DATASET':dset_move,
-                            'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new,
-                            'NOTES_APPEND':notes}
-                        ser_append = pd.Series(data = d,
-                                     index = ['FEATURE_DATASET',
-                                            'DATA_LOCATION_MCMILLEN_JACOBS','NOTES_APPEND'],
-                                     name = feat_name)
+                        d = {'FEATURE_DATASET': dset_move,
+                             'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
+
+                    # columns to transfer from source to target
+                    if not pd.isnull(merge_cols):
+                        keys = [c.strip() for c in merge_cols.split(',')]
+                        vals = df_source.loc[index, keys]
+                        d.update(dict(zip(keys, vals)))
+
+                    ser_append = pd.Series(data=d,
+                                           index=list(d.keys()),
+                                           name=feat_name)
 
                     # append new row from Series
                     debug_idx = 7
@@ -1951,6 +1964,18 @@ class metaData(object):
         setattr(self, '{}_matched'.format(df_str_target), df_target)
 
     def data_sent_tracking(self, fp_csv_tracking, base_dir, action, tracking_dict):
+        '''
+        Initially created for a JB request in 20220209.  Updated now - 20230224. ZU
+
+        Args:
+            fp_csv_tracking:        similiar to item_desc but an ongoing list for this purpose
+            base_dir:               path/to/base_dir/<shp and zip> nested there
+            action:                 only one so far
+            tracking_dict:          to populate csv
+
+        Returns:
+
+        '''
         fp_list = self.df.loc[self.indices, 'DATA_LOCATION_MCMILLEN_JACOBS']
         notes = tracking_dict['notes']
         tags = tracking_dict['tags']
@@ -1964,10 +1989,11 @@ class metaData(object):
             os.mkdir(shp_dir)
 
         if action == 'convert_zip':
-            # for fp, fn in zip(fp_list, self.indices):
-                # arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
-            # path/to/directory/yyyymmdd_project
-            # self.zip_shp_agol_prep(shp_dir)
+            for fp, fn in zip(fp_list, self.indices):
+                arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
+
+            zip_dir = os.path.join(base_dir,'zip')
+            self.zip_shp_dir(shp_dir, zip_dir)
 
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)
@@ -1997,7 +2023,7 @@ class AgolAccess(metaData):
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__(prj_file, subproject_str)
-        u_name = 'uhlmann@mcmjac.com'
+        u_name = 'uhlmann@mcmillencorp.com'
         p_word = 'Gebretekle24!'
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
@@ -2050,9 +2076,9 @@ class AgolAccess(metaData):
         # If Group (default KRRC_Geospatial), add to query str
         if group_name is not None:
             group_id = self.group_id_dict[group_name]
-            query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
+            query_str = 'owner: uhlmann@mcmillencorp.com AND group:{}'.format(group_id)
         else:
-            query_str = 'owner: uhlmann@mcmjac.com'
+            query_str = 'owner: uhlmann@mcmillencorp.com'
         try:
             title = kwargs['title']
             query_str = '{} AND title: {}'.format(title)
@@ -2469,7 +2495,7 @@ class AgolAccess(metaData):
         it_vals = [self.item_type_dict[it] for it in it_vals_key]
 
         group_id = self.group_id_dict['KRRP_Geospatial']
-        query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
+        query_str = 'owner: uhlmann@mcmillencorp.com AND group:{}'.format(group_id)
 
         for idx, it in enumerate(it_vals):
             items = self.mcmjac_gis.content.search(query_str,
@@ -2498,7 +2524,7 @@ class AgolAccess(metaData):
         setattr(self, 'df_agol_raw', df_agol_raw)
 
     def email_group(self):
-        signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmjac.com'
+        signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmillencorp.com'
         #
         # Group User Info: dict with keys - owner, admins, users
         try:
@@ -2649,7 +2675,7 @@ x`        target_col              name of column with fp or gdb path
 # 'getchildren', 'getiterator', 'insert', 'items', 'iter', 'iterfind', 'itertext', 'keys', 'makeelement', 'remove', 'set', 'tag', 'tail', 'text']
 
 # # 4) share items
-# feat_layer_list = mcmjac_gis.content.search(query = 'owner: uhlmann@mcmjac.com', item_type = 'Feature Layer Collection', max_items = 50)
+# feat_layer_list = mcmjac_gis.content.search(query = 'owner: uhlmann@mcmillencorp.com', item_type = 'Feature Layer Collection', max_items = 50)
 # target_tag = 'wetlands'
 # # find features which are wetlands
 # feats = [feat for feat in feat_layer_list if target_tag in feat.tags]

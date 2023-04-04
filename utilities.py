@@ -491,6 +491,8 @@ def parse_dir(obj, **kwargs):
     '''
     matchses substrings to dir(obj) from python interactive
     document and add to: ZRU 5/26/2020
+    ARGUMENTS
+    obj:        a list essentially; but in this case one derived from calling dir(<something>)
     '''
     # if dir used on list:
     if isinstance(obj, list):
@@ -2226,6 +2228,7 @@ def dir_use_inv(fp):
     '''
     l1, l2 = [],[]
     for dn in os.listdir(fp):
+
         fpt = os.path.join(fp, dn)
         tm = time.strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(fpt)))
         l1.append(dn)
@@ -2233,3 +2236,16 @@ def dir_use_inv(fp):
     df = pd.DataFrame(np.column_stack([l1,l2]), columns = ['Directory', 'Last_Modified'])
     df = df.sort_values(by=['Last_Modified'], ascending = False)
     return(df)
+
+def write_folder_contents_df(fp):
+    '''
+
+    Args:
+        fp:
+
+    Returns:
+
+    '''
+
+    fn = os.listdir(fp)
+    fp_full = [os.path.join(fp, f) for f in fn]

@@ -492,7 +492,9 @@ def parse_dir(obj, **kwargs):
     matchses substrings to dir(obj) from python interactive
     document and add to: ZRU 5/26/2020
     ARGUMENTS
-    obj:        a list essentially; but in this case one derived from calling dir(<something>)
+    obj:                        a list essentially; but in this case one derived from calling dir(<something>)
+    kwargs['substring']         substring to search
+    kwargs['exclude_symbols']   have not used in awhile (20230407).  check it out
     '''
     # if dir used on list:
     if isinstance(obj, list):

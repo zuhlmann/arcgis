@@ -221,3 +221,4 @@ def gdf_shp_merge(gdf_tgt, gdf_src, feat_out, csv, geom_type, crs, **kwargs):
             pass
         gdf_joined.to_file(feat_out[0], layer = feat_out[1], driver = 'OpenFileGDB', schema = schema_updated)
     return(gdf_joined, schema_updated)
+

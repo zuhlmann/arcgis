@@ -195,12 +195,9 @@ class metaData(object):
         df = getattr(self, df_str)
 
         if df_str == 'df':
-            prop_str_fp_logfile = 'fp_log'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
-            prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
-            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
         try:
             target_tag = kwargs['target_tag']
@@ -1202,7 +1199,6 @@ class metaData(object):
                     # save a base archive if NEVER saved and a daily archive if never saved
                     self.save_archive_csv(df_str_source)
 
-
                 # for featureclasstofeatureclass
                 if pd.isnull(dset_move):
                     dset_move = ''
@@ -1389,24 +1385,41 @@ class metaData(object):
                     fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
-                # for idx, comp in enumerate(fp_components):
-                #     if '.gdb' in comp:
-                #         fp_gdb_orig = os.sep.join(fp_components[:idx+1])
-                #         dset_orig = fp_components[idx + 1]
-                #
-                #         # Get Source STR
-                #         src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
-                #
-                #         if src_gdb_or_dir_str in viable_gdbs:
-                #             standalone = False
-                #         else:
-                #             standalone = True
-                #         # Once gdb is found in path, then break
-                #         break
-                #     # translation - there was no gdb in fp_fcs_orig
-                #     elif idx == (len(fp_components) - 1):
-                #         # No gdb found == shapefile passed - use dir/folder
-                #         standalone = True
+                for idx, comp in enumerate(fp_components):
+                    if '.gdb' in comp:
+                        # Get Source STR
+                        src_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+
+                        if src_gdb_or_dir_str in viable_gdbs:
+                            standalone = False
+                        else:
+                            standalone = True
+                        # Once gdb is found in path, then break
+                        break
+                    # translation - there was no gdb in fp_fcs_orig
+                    elif idx == (len(fp_components) - 1):
+                        # No gdb found == shapefile passed - use dir/folder
+                        standalone = True
+
+                if not standalone:
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
+                else:
+                    # clunky way of grabbing any inventory dir value
+                    fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
+                    df_str_source = 'df_{}_standalone'.format(project_str)
+
+                # Only grabs TargetGDB once per gdb
+                try:
+                    df_source = getattr(self, df_str_source)
+                # if dataframe NOT already added via self.add_df
+                except AttributeError:
+                    print('populating source')
+                    # note this also creates fp_csv_archive
+                    self.add_df(fp_csv_source, df_str_source, 'ITEM')
+                    df_source = getattr(self, df_str_source)
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -2023,7 +2036,7 @@ class AgolAccess(metaData):
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__(prj_file, subproject_str)
-        u_name = 'uhlmann@mcmillencorp.com'
+        u_name = 'uhlmann@mcmjac.com'
         p_word = 'Gebretekle24!'
         setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
@@ -2076,9 +2089,9 @@ class AgolAccess(metaData):
         # If Group (default KRRC_Geospatial), add to query str
         if group_name is not None:
             group_id = self.group_id_dict[group_name]
-            query_str = 'owner: uhlmann@mcmillencorp.com AND group:{}'.format(group_id)
+            query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
         else:
-            query_str = 'owner: uhlmann@mcmillencorp.com'
+            query_str = 'owner: uhlmann@mcmjac.com'
         try:
             title = kwargs['title']
             query_str = '{} AND title: {}'.format(title)
@@ -2495,7 +2508,7 @@ class AgolAccess(metaData):
         it_vals = [self.item_type_dict[it] for it in it_vals_key]
 
         group_id = self.group_id_dict['KRRP_Geospatial']
-        query_str = 'owner: uhlmann@mcmillencorp.com AND group:{}'.format(group_id)
+        query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
 
         for idx, it in enumerate(it_vals):
             items = self.mcmjac_gis.content.search(query_str,

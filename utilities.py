@@ -2218,26 +2218,113 @@ def assim_df_cols(df_target, df_append, col_mapping_list):
     df_assim['NOTES_ASSIM'] = notes_comb
     return(df_assim)
 
-def dir_use_inv(fp):
+def subdir_inv(fp_dir, shapefile, target_col):
     '''
-    Created for quick inventory of subdirs in main dir and their last modified time.  For GIS dir box migration post McMJac split
-    20230201
+
     Args:
-        fp:         directory
+        fp_dir:         directory to inventory
+    Returns:
+
+    '''
+    sd = []
+    fname = []
+    fp = []
+    for f in os.scandir(fp_dir):
+        if f.is_file():
+            sd.append(float('NaN'))
+            fname.append(f.name)
+            fp.append(f.path)
+        if (f.is_dir()) & (f.name!='.zip'):
+            for f2 in f:
+                if f2.is_file():
+                    sd.append(f.name)
+                    fname.append(f2)
+                    fp.append(f2.path)
+
+    nrows = len(fp)
+    blank = [None] * nrows
+    if not shapefile:
+        col_list = ['FILENAME', 'SUBDIR', target_col]
+        cols = np.column_stack([fname, sd, fp])
+        df_subdir = pd.DataFrame(cols, columns=col_list)
+    else:
+        col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
+                    'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
+                    'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
+                    'MOVE_LOCATION_DSET', 'RENAME', 'DSET_LOWER_CASE',
+                    'COL_NAME_ARCHIVAL', 'MERGE_COLUMNS']
+        cols = np.column_stack([fname, blank, fp,
+                                blank, blank, blank, blank, blank,
+                                blank, blank, blank, blank, blank])
+        df_subdir = pd.DataFrame(cols, columns=col_list)
+        # remove non shapefiles: Note - shitty two part, but works fine. ZU 20230427
+        df_subdir = df_subdir[df_subdir[target_col].str.contains(r'.shp')]
+        df_subdir = df_subdir[~df_subdir[target_col].str.contains(r'.xml')]
+    return(df_subdir)
+def dir_use_inv(fp_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile = False, **kwargs):
+    '''
+
+    Args:
+        fp_dir:         directory to inventory
+        target_col:     for matching existing rows
+        shapefile:      not fleshed out for shapefile = False.  Use for time modified and the existing_inv
+        **kwargs:       time_modified.  Used for finding unused directories.  Sorting by date
+                        update_dir_inv. create and update directory inventory
+                        new_inventory:    step 1 in standalone inventory
+                        update_inventory:  for adding to existing inventory
 
     Returns:
-        df:         dataframe inventory
-    '''
-    l1, l2 = [],[]
-    for dn in os.listdir(fp):
+        saves csv or returns df
 
-        fpt = os.path.join(fp, dn)
-        tm = time.strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(fpt)))
-        l1.append(dn)
-        l2.append(tm)
-    df = pd.DataFrame(np.column_stack([l1,l2]), columns = ['Directory', 'Last_Modified'])
-    df = df.sort_values(by=['Last_Modified'], ascending = False)
-    return(df)
+    '''
+    try:
+        kwargs['time_modified']
+        l1, l2 = [],[]
+        for dn in os.listdir(fp_dir):
+
+            fpt = os.path.join(fp_dir, dn)
+            tm = time.strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(fpt)))
+            l1.append(dn)
+            l2.append(tm)
+        df = pd.DataFrame(np.column_stack([l1,l2]), columns = ['Directory', 'Last_Modified'])
+        df = df.sort_values(by=['Last_Modified'], ascending = False)
+        return(df)
+    except KeyError:
+        pass
+
+    try:
+        new_csv = kwargs['new_inventory']
+        df_subdir = subdir_inv(fp_dir, shapefile, target_col)
+        df_subdir = df_subdir.set_index(target_col)
+        if not os.path.exists(new_csv):
+            df_subdir.to_csv(new_csv)
+        else:
+            print('csv already exists; did not save')
+        return (df_subdir)
+    except KeyError:
+        pass
+    try:
+        updated_csv = kwargs['update_inventory']
+        df_orig = pd.read_csv(updated_csv, index_col = target_col)
+        df_subdir = subdir_inv(fp_dir, shapefile, target_col)
+        # run through above function
+        df_subdir = df_subdir.set_index(target_col)
+        df_concat = pd.concat([df_orig, df_subdir])
+        # In the case that updating a folder that has already been processed with this function
+        # this will retain the first row, and remove the new inventory
+        df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
+        df_concat.to_csv(updated_csv)
+    except KeyError:
+        pass
+
+    try:
+        csv = kwargs['make work with shapefile == false']
+        df = pd.read_csv(csv)
+        df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
+        # populate
+    except KeyError:
+        pass
+
 
 def write_folder_contents_df(fp):
     '''

@@ -396,6 +396,7 @@ class metaData(object):
         return(parsed_csl_temp)
 
     def write_xml(self, df_str, shp = False, offline = True, **kwargs):
+
         '''
         Update metadata to include assemble_metadata() statement or skip that
         step and add lines to existing Item Description.  This can be fleshed
@@ -1091,8 +1092,6 @@ class metaData(object):
                 else:
                     rename = False
 
-                notes = df_item['NOTES']
-
                 # DETERMINE DSET
                 rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
@@ -1211,8 +1210,6 @@ class metaData(object):
                 # if rename specified
                 if rename:
                     feat_name = copy.copy(fc_new_name)
-                    # flag to change index label
-                    update_label = True
                 else:
                     feat_name = copy.copy(index)
                     feat_name = feat_name.replace(' ','_')
@@ -1489,7 +1486,6 @@ class metaData(object):
                         online_base = olt.loc[gdb_str, 'online']
                         offline_base = olt.loc[gdb_str, 'offline']
                         fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
-
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
 
@@ -1507,13 +1503,11 @@ class metaData(object):
                     else:
                         d = {'FEATURE_DATASET': dset_move,
                              'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
-
                     # columns to transfer from source to target
                     if not pd.isnull(merge_cols):
                         keys = [c.strip() for c in merge_cols.split(',')]
                         vals = df_source.loc[index, keys]
                         d.update(dict(zip(keys, vals)))
-
                     ser_append = pd.Series(data=d,
                                            index=list(d.keys()),
                                            name=feat_name)
@@ -1530,8 +1524,16 @@ class metaData(object):
                     df_target = df_target.append(ser_append)
                     debug_idx = 8
                     if action_type == 'copy_replace':
-                        df.loc[index, col_name_original] = fp_fcs_current
-                        df.loc[index, target_col]=fp_fcs_new
+                        # similar in function to updating dictionary, but instead, updating row in df if new vals
+                        df_join = pd.DataFrame(d, index=[index])
+                        # saves name to csv column above index
+                        df_join.index.name = copy.copy(df.index.name)
+                        col_order_orig = df.columns.to_list()
+                        idx_order_orig = df.index.to_list()
+                        df = df_join.combine_first(df)
+                        df = df.reindex(idx_order_orig)
+                        # or else gets reordered alphabetically
+                        df = df.reindex(columns=col_order_orig)
                     else:
                         df = df.append(ser_append)
 
@@ -1543,7 +1545,7 @@ class metaData(object):
                         print('index = {}'.format(idt))
                         self.indices[idt] = feat_name
                         if action_type == 'copy_replace':
-                            self.df.rename(index={index:feat_name}, inplace=True)
+                            df.rename(index={index:feat_name}, inplace=True)
                         else:
                             self.indices_iloc[idt] = df.index.get_loc(feat_name)
                         print('we did it')
@@ -2002,11 +2004,11 @@ class metaData(object):
             os.mkdir(shp_dir)
 
         if action == 'convert_zip':
-            for fp, fn in zip(fp_list, self.indices):
-                arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
+            # for fp, fn in zip(fp_list, self.indices):
+            #     arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
 
-            zip_dir = os.path.join(base_dir,'zip')
-            self.zip_shp_dir(shp_dir, zip_dir)
+            # zip_dir = os.path.join(base_dir,'zip')
+            # self.zip_shp_dir(shp_dir, zip_dir)
 
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)
@@ -2017,12 +2019,14 @@ class metaData(object):
             c6 = self.indices
             c7 = [os.path.join(shp_dir, '{}.shp'.format(i)) for i in self.indices]
             c8 = fp_list
+            c9 = [self.todays_date]* len(self.indices)
 
-            df_new_rows = pd.DataFrame(np.column_stack([c1,c2,c3,c4,c5, c6,c7,c8]),
+            df_new_rows = pd.DataFrame(np.column_stack([c1,c2,c3,c4,c5, c6,c7,c8, c9]),
                                         columns = ['NOTES', 'TAGS', 'RECIPIENT_COMPANY',
                                                     'RECIPIENT_NAME', 'PROJECT',
                                                     'ITEM', 'DATA_LOCATION_SHARED',
-                                                    'DATA_LOCATION_MCMILLEN_JACOBS'])
+                                                    'DATA_LOCATION_MCMILLEN_JACOBS',
+                                                   'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
 

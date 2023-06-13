@@ -161,7 +161,6 @@ def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
     for dset in dsets:
         feats = arcpy.ListFeatureClasses(feature_dataset = dset)
         for feat in feats:
-            print(feat)
             if want_df:
                 # append feat name
                 feats_df.append(feat)
@@ -175,7 +174,6 @@ def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
     # now for feats in gdb itself (NOT in a dset)
     feats_standalone = arcpy.ListFeatureClasses()
     for feat in feats_standalone:
-        print(feat)
         # append feat name
         feats_df.append(feat)
         # repeat dset name for every feature layer within it
@@ -199,7 +197,7 @@ def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
                         'COL_NAME_ARCHIVAL', 'MERGE_COLUMNS']
             cols = np.column_stack([feats_df, dsets_df, path_to_feat,
                                     blank, blank, blank, blank, blank,
-                                    blank, blank, blank, blank])
+                                    blank, blank, blank, blank, blank])
         df = pd.DataFrame(cols, columns = col_list)
     return(df)
 

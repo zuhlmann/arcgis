@@ -12,7 +12,7 @@ import datetime
 import time
 import glob
 import copy
-# from compare_data import *
+import compare_data
 
 def show_table(display_preference):
     '''
@@ -2218,34 +2218,19 @@ def assim_df_cols(df_target, df_append, col_mapping_list):
     df_assim['NOTES_ASSIM'] = notes_comb
     return(df_assim)
 
-def subdir_inv(fp_dir, shapefile, target_col):
+def subdir_inv(parent_dir, shapefile, target_col):
     '''
 
     Args:
-        fp_dir:         directory to inventory
+        parent_dir:         directory to inventory
     Returns:
 
     '''
-    sd = []
-    fname = []
-    fp = []
-    for f in os.scandir(fp_dir):
-        if f.is_file():
-            sd.append(float('NaN'))
-            fname.append(f.name)
-            fp.append(f.path)
-        if (f.is_dir()) & (f.name!='.zip'):
-            for f2 in f:
-                if f2.is_file():
-                    sd.append(f.name)
-                    fname.append(f2)
-                    fp.append(f2.path)
 
-    nrows = len(fp)
-    blank = [None] * nrows
+    fname, fp =  dir_inv_recursive(parent_dir)
     if not shapefile:
-        col_list = ['FILENAME', 'SUBDIR', target_col]
-        cols = np.column_stack([fname, sd, fp])
+        col_list = ['ITEM', target_col]
+        cols = np.column_stack([fname, fp])
         df_subdir = pd.DataFrame(cols, columns=col_list)
     else:
         col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
@@ -2253,21 +2238,20 @@ def subdir_inv(fp_dir, shapefile, target_col):
                     'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
                     'MOVE_LOCATION_DSET', 'RENAME', 'DSET_LOWER_CASE',
                     'COL_NAME_ARCHIVAL', 'MERGE_COLUMNS']
+        nrows = len(fname)
+        blank = [None] * nrows
         cols = np.column_stack([fname, blank, fp,
                                 blank, blank, blank, blank, blank,
                                 blank, blank, blank, blank, blank])
         df_subdir = pd.DataFrame(cols, columns=col_list)
-        # remove non shapefiles: Note - shitty two part, but works fine. ZU 20230427
-        df_subdir = df_subdir[df_subdir[target_col].str.contains(r'.shp')]
-        df_subdir = df_subdir[~df_subdir[target_col].str.contains(r'.xml')]
     return(df_subdir)
-def dir_use_inv(fp_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile = False, **kwargs):
+def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile = False,  **kwargs):
     '''
 
     Args:
-        fp_dir:         directory to inventory
+        parent_dir:         directory to inventory
         target_col:     for matching existing rows
-        shapefile:      not fleshed out for shapefile = False.  Use for time modified and the existing_inv
+        verbose:        Use for time modified and subdir scanning i.e. data_received
         **kwargs:       time_modified.  Used for finding unused directories.  Sorting by date
                         update_dir_inv. create and update directory inventory
                         new_inventory:    step 1 in standalone inventory
@@ -2294,19 +2278,19 @@ def dir_use_inv(fp_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile
 
     try:
         new_csv = kwargs['new_inventory']
-        df_subdir = subdir_inv(fp_dir, shapefile, target_col)
+        df_subdir = subdir_inv(parent_dir, shapefile, target_col)
         df_subdir = df_subdir.set_index(target_col)
         if not os.path.exists(new_csv):
             df_subdir.to_csv(new_csv)
         else:
             print('csv already exists; did not save')
-        return (df_subdir)
+        return(df_subdir)
     except KeyError:
         pass
     try:
         updated_csv = kwargs['update_inventory']
         df_orig = pd.read_csv(updated_csv, index_col = target_col)
-        df_subdir = subdir_inv(fp_dir, shapefile, target_col)
+        df_subdir = subdir_inv(parent_dir, shapefile, target_col)
         # run through above function
         df_subdir = df_subdir.set_index(target_col)
         df_concat = pd.concat([df_orig, df_subdir])
@@ -2317,24 +2301,69 @@ def dir_use_inv(fp_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile
     except KeyError:
         pass
 
-    try:
-        csv = kwargs['make work with shapefile == false']
-        df = pd.read_csv(csv)
-        df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
-        # populate
-    except KeyError:
-        pass
-
-
-def write_folder_contents_df(fp):
+def dir_inv_recursive(parent_dir):
     '''
+    Inventory directories and subdirectories for shapefiles.  ZU 20230515.  For standalone directory management
 
     Args:
-        fp:
+        parent_dir:         directory to perform inventory
+
+    Returns:
+        feat_name:          list of feature names (shapfefiles)
+        feat_path:          list of path/to/shapefile
+
+    '''
+    # https://stackoverflow.com/questions/49664518/python-2-7-using-scandir-to-traverse-all-sub-directories-and-return-list
+    # https://stackoverflow.com/questions/30214531/basics-of-recursion-in-python
+
+    feat_path = []
+    feat_name = []
+    for f in os.scandir(parent_dir):
+        if f.is_file():
+            if os.path.splitext(f)[-1] == '.shp':
+                feat_name.append(f.name)
+                feat_path.append(f.path)
+        # non-zipped dir AND a gdb
+        elif (f.is_dir()) & (f.name[-4:] != '.zip') & (os.path.splitext(f.name)[-1] == r'.gdb'):
+            df_gdb = compare_data.file_paths_arc(f.path, True, True)
+            feat_name.extend(df_gdb.ITEM.to_list())
+            feat_path.extend(df_gdb.DATA_LOCATION_MCMILLEN_JACOBS.to_list())
+        else:
+            feat_name.extend(dir_inv_recursive(f.path)[0])
+            feat_path.extend(dir_inv_recursive(f.path)[1])
+    return(feat_name, feat_path)
+
+def sql_dict_update_cursor(df, feat, key_fld, val_fld):
+    '''
+    Create new field if does not exist and populate based on dict {key_fld:val_fld}
+    ZU 20230517
+    key_fld  |  val_fld
+    18       |  blue
+    19       |  blue
+    20       |  yellow
+    21       |  blue
+
+    Args:
+        df:             Dataframe with all fld_names to be agglomerated and fld_vals for aglomeration
+        key_fld:       string.  name of field in feature class to select
+        val_fld:        string. name of new field.
+        fld_classify:   new field to output val_fld
 
     Returns:
 
     '''
+    d = dict(zip(df[key_fld], df[val_fld]))
+    existing_fields = [f.name for f in arcpy.ListFields(feat)]
+    if val_fld not in existing_fields:
+        arcpy.AddField_management(feat, val_fld, 'TEXT', field_length=255)
+    with arcpy.da.UpdateCursor(feat, [key_fld, val_fld]) as cursor:
+        for row in cursor:
+            try:
+                row[1] = d[row[0]]
+            except KeyError:
+                row[1] = 'key error'
+            cursor.updateRow(row)
+    del cursor
 
-    fn = os.listdir(fp)
-    fp_full = [os.path.join(fp, f) for f in fn]
+
+

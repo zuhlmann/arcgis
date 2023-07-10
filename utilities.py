@@ -13,6 +13,9 @@ import time
 import glob
 import copy
 import compare_data
+import logging
+from imp import reload
+reload(logging)
 
 def show_table(display_preference):
     '''
@@ -955,8 +958,21 @@ def write_folder_contents(fp, **kwargs):
         files_fp = [f for f in files_fp if '.xml' not in f]
     except KeyError:
         pass
-    files_formatted = [os.path.split(fp)[-1] for fp in files_fp]
-    basic_str = '\n'.join(files_formatted)
+    try:
+        ft = kwargs['filetype']
+        # ensure filetype passed as kw has .
+        if ft[0] != '.':
+            ft = '.{}'.format(ft)
+        files_fp = [f for f in files_fp if os.path.splitext(f)[-1] == ft]
+    except KeyError:
+        pass
+    # default is filename.  Use KW filepath to output filepath
+    try:
+        str_piece = kwargs['filepath']
+        str_piece = files_fp
+    except KeyError:
+        str_piece = [os.path.split(fp)[-1] for fp in files_fp]
+    basic_str = '\n'.join(str_piece)
     todays_date = datetime.datetime.today().strftime('%B %d %Y')
     signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
     file_name = 'README_{}'.format(folder_name)
@@ -1655,7 +1671,7 @@ def centroid_to_index(table_in, id_att, template_str, feet=True,  wc = '', **kwa
     fp_out = os.path.join(basedir, index_fc_name)
 
     # GET BASE OFFSETS FROM LOOKUP SPREADSHEET
-    reference_csv = r'C:\Users\uhlmann\Box\WR Users\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\centroid_generator.csv'
+    reference_csv = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\centroid_generator.csv'
     df = pd.read_csv(reference_csv, index_col = 'template_str')
 
     if feet:
@@ -1687,7 +1703,7 @@ def centroid_to_index(table_in, id_att, template_str, feet=True,  wc = '', **kwa
     # if updating
     try:
         kwargs['update_rows']
-        with arcpy.da.UpdateCursor(fp_out, ['SHAPE@XY', 'SHAPE@', 'index_scale'], where_clause = wc) as cursor:
+        with arcpy.da.UpdateCursor(fp_out, ['SHAPE@XY',  'SHAPE@','index_scale'], where_clause = wc) as cursor:
             for row in cursor:
                 # centroids
                 x = row[0][0]
@@ -2218,7 +2234,7 @@ def assim_df_cols(df_target, df_append, col_mapping_list):
     df_assim['NOTES_ASSIM'] = notes_comb
     return(df_assim)
 
-def subdir_inv(parent_dir, shapefile, target_col):
+def subdir_inv(parent_dir, shapefile, target_col, fp_logfile):
     '''
 
     Args:
@@ -2227,7 +2243,7 @@ def subdir_inv(parent_dir, shapefile, target_col):
 
     '''
 
-    fname, fp =  dir_inv_recursive(parent_dir)
+    fname, fp =  dir_inv_recursive(parent_dir, fp_logfile)
     if not shapefile:
         col_list = ['ITEM', target_col]
         cols = np.column_stack([fname, fp])
@@ -2238,7 +2254,15 @@ def subdir_inv(parent_dir, shapefile, target_col):
                     'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
                     'MOVE_LOCATION_DSET', 'RENAME', 'DSET_LOWER_CASE',
                     'COL_NAME_ARCHIVAL', 'MERGE_COLUMNS']
-        nrows = len(fname)
+        fname_issue_len = len(fname) - len(fp)
+        if fname_issue_len>0:
+            fp.extend([None]*fname_issue_len)
+            nrows = len(fname)
+        if fname_issue_len<0:
+            fname.extend([None]*(fname_issue_len*(-1)))
+            nrows = len(fname)
+        else:
+            nrows = len(fname)
         blank = [None] * nrows
         cols = np.column_stack([fname, blank, fp,
                                 blank, blank, blank, blank, blank,
@@ -2261,6 +2285,8 @@ def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shape
         saves csv or returns df
 
     '''
+    from time import gmtime, strftime
+    fp_logfile = os.path.join(parent_dir, 'subdir_inventory_log.log')
     try:
         kwargs['time_modified']
         l1, l2 = [],[]
@@ -2278,7 +2304,7 @@ def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shape
 
     try:
         new_csv = kwargs['new_inventory']
-        df_subdir = subdir_inv(parent_dir, shapefile, target_col)
+        df_subdir = subdir_inv(parent_dir, shapefile, target_col, fp_logfile)
         df_subdir = df_subdir.set_index(target_col)
         if not os.path.exists(new_csv):
             df_subdir.to_csv(new_csv)
@@ -2290,7 +2316,7 @@ def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shape
     try:
         updated_csv = kwargs['update_inventory']
         df_orig = pd.read_csv(updated_csv, index_col = target_col)
-        df_subdir = subdir_inv(parent_dir, shapefile, target_col)
+        df_subdir = subdir_inv(parent_dir, shapefile, target_col, fp_logfile)
         # run through above function
         df_subdir = df_subdir.set_index(target_col)
         df_concat = pd.concat([df_orig, df_subdir])
@@ -2301,7 +2327,7 @@ def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shape
     except KeyError:
         pass
 
-def dir_inv_recursive(parent_dir):
+def dir_inv_recursive(parent_dir, fp_logfile):
     '''
     Inventory directories and subdirectories for shapefiles.  ZU 20230515.  For standalone directory management
 
@@ -2315,12 +2341,19 @@ def dir_inv_recursive(parent_dir):
     '''
     # https://stackoverflow.com/questions/49664518/python-2-7-using-scandir-to-traverse-all-sub-directories-and-return-list
     # https://stackoverflow.com/questions/30214531/basics-of-recursion-in-python
-
+    logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
     feat_path = []
     feat_name = []
+    subdir_check = 'initiate'
     for f in os.scandir(parent_dir):
         if f.is_file():
             if os.path.splitext(f)[-1] == '.shp':
+                subdir = os.path.split(f)[0]
+                if subdir != subdir_check:
+                    tm = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+                    msg_str = r'TIME {} IN THIS SUBDIRECTORY: {}'.format(tm, subdir)
+                    logging.info(msg_str)
+                subdir_check = copy.copy(subdir)
                 feat_name.append(f.name)
                 feat_path.append(f.path)
         # non-zipped dir AND a gdb
@@ -2328,9 +2361,10 @@ def dir_inv_recursive(parent_dir):
             df_gdb = compare_data.file_paths_arc(f.path, True, True)
             feat_name.extend(df_gdb.ITEM.to_list())
             feat_path.extend(df_gdb.DATA_LOCATION_MCMILLEN_JACOBS.to_list())
+        # keeps running if another folder encountered
         else:
-            feat_name.extend(dir_inv_recursive(f.path)[0])
-            feat_path.extend(dir_inv_recursive(f.path)[1])
+            feat_name.extend(dir_inv_recursive(f.path, fp_logfile)[0])
+            feat_path.extend(dir_inv_recursive(f.path, fp_logfile)[1])
     return(feat_name, feat_path)
 
 def sql_dict_update_cursor(df, feat, key_fld, val_fld):

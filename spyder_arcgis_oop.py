@@ -681,10 +681,10 @@ class metaData(object):
             setattr(self, df_str, df)
 
             # now remove all the lines
-            df.at[indice, 'ADD_LINES_PURP'] = ''
-            df.at[indice, 'REMOVE_LINES_PURP']=''
-            df.at[indice, 'ABSTRACT'] = ''
-            df.at[indice, 'CREDITS'] = ''
+            df.at[indice, 'ADD_LINES_PURP'] = np.nan
+            df.at[indice, 'REMOVE_LINES_PURP']=np.nan
+            df.at[indice, 'ABSTRACT'] = np.nan
+            df.at[indice, 'CREDITS'] = np.nan
 
             # additional step for fcs in gdb
             if not shp:
@@ -1006,8 +1006,8 @@ class metaData(object):
 
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
-                df.at[index, 'ACTION'] = ''
-                df.at[index, 'RENAME'] = ''
+                df.at[index, 'ACTION'] = np.nan
+                df.at[index, 'RENAME'] = np.nan
                 try:
                     df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
                 except KeyError:
@@ -1531,6 +1531,7 @@ class metaData(object):
                         col_order_orig = df.columns.to_list()
                         idx_order_orig = df.index.to_list()
                         df = df_join.combine_first(df)
+                        # If ValueError: cannot reindex from duplicate axis, this means there are duplicate row indices, i.e. ITEM duplicated
                         df = df.reindex(idx_order_orig)
                         # or else gets reordered alphabetically
                         df = df.reindex(columns=col_order_orig)
@@ -1549,7 +1550,7 @@ class metaData(object):
                         else:
                             self.indices_iloc[idt] = df.index.get_loc(feat_name)
                         print('we did it')
-                    debug_idx = 8
+                    debug_idx = 9
 
                     if not dry_run:
                         msg_str = '\nCOPYING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
@@ -2004,11 +2005,11 @@ class metaData(object):
             os.mkdir(shp_dir)
 
         if action == 'convert_zip':
-            # for fp, fn in zip(fp_list, self.indices):
-            #     arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
+            for fp, fn in zip(fp_list, self.indices):
+                arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
 
-            # zip_dir = os.path.join(base_dir,'zip')
-            # self.zip_shp_dir(shp_dir, zip_dir)
+            zip_dir = os.path.join(base_dir,'zip')
+            self.zip_shp_dir(shp_dir, zip_dir)
 
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)

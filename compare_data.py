@@ -8,7 +8,11 @@ import sys
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcPy')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\Resources\ArcToolBox\Scripts')
 # sys.path.append('C:\Program Files\ArcGIS\Pro\\bin\Python')
-import arcpy
+try:
+    sys.path = [p for p in sys.path if '86' not in p]
+    import arcpy
+except ModuleNotFoundError:
+    print('Running utilities without Arcpy')
 
 def path_create(data1, data2):
     parent_dirs1 = data1.split('/')[:].append('_')

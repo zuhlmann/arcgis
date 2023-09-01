@@ -72,7 +72,7 @@ class metaData(object):
 
         # PRJ FILE
         self.prj_file = prj_file
-    def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS'):
+    def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN'):
         '''
         Created long time ago.  Edited for different workflow - i.e. pass indices
         for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
@@ -131,7 +131,7 @@ class metaData(object):
             except KeyError:
                 utilities.zipShapefilesInDir(id, outDir)
 
-    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN_JACOBS', **kwargs):
+    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN', **kwargs):
         '''
         To zip all the indices.  If zipped exist already, they will be ignored.
         20220610
@@ -443,12 +443,12 @@ class metaData(object):
             # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
             # NOTE fp_base is refering to base name for shapefiles (since multiple file extensions
             # under same BASE name)
-            fp_shp = df.loc[self.indices]['DATA_LOCATION_MCMILLEN_JACOBS'].tolist()
+            fp_shp = df.loc[self.indices]['DATA_LOCATION_MCMILLEN'].tolist()
             index_names = df.loc[self.indices].index.to_list()
             # glob strings will create the string to pass to  glob.glob which
             # uses th *xml wildcard to pull JUST the xml files from shapefile folder
             glob_strings = ['{}*.xml'.format(fp_shp) for fp_shp in fp_shp]
-
+            # Note if shp has no xml file, then this will throw exception for index error ZU 20230831
             fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
 
         # key/val and key lists for add and subtract purpose list respectively
@@ -462,7 +462,7 @@ class metaData(object):
                 fp_xml = fp_xml_orig_shp[ct]
                 temp_path = copy.copy(fp_xml)
             elif not shp:
-                fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN_JACOBS'])
+                fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN'])
                 fp_components = fp_fcs.split(os.sep)
                 gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
                 offline_base = olt.loc[gdb_str, 'offline']
@@ -510,7 +510,7 @@ class metaData(object):
 
             # AGOL needs different path sep than PC. Change these columns
             # to AGOL format lower down
-            file_path_columns = ['DATA_LOCATION_MCMILLEN_JACOBS',
+            file_path_columns = ['DATA_LOCATION_MCMILLEN',
                                 'DATA_LOCATION_MCM_ORIGINAL',
                                 'DATA_LOCATION_MCM_STAGING', 'AGOL_DIR']
 
@@ -543,7 +543,7 @@ class metaData(object):
                         # format file path to agol 2x forward slash
                         val = utilities.fix_fp(val, 'agol')
                     # Replace offline path with online path
-                    if item == ('DATA_LOCATION_MCMILLEN_JACOBS'):
+                    if item == ('DATA_LOCATION_MCMILLEN'):
                         val = os.path.normpath(val)
                         try:
                             val = val.replace(offline_base, online_base)
@@ -696,7 +696,7 @@ class metaData(object):
 
 
 
-    def quickie_inventory(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN_JACOBS',
+    def quickie_inventory(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN',
                         shp = False, standard_credits = True, **kwargs):
         '''
         quick grab item description to add to new csv for the gang.  ZRU 20201207
@@ -753,7 +753,7 @@ class metaData(object):
                     fp_xml_orig.append(fp_base[idx])
             ct = 0
             # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
-            # to append DATA_LOCATION_MCMILLEN_JACOBS key/pair to Item Description
+            # to append DATA_LOCATION_MCMILLEN key/pair to Item Description
             # need to fix all columns in this regard when writing xml
             # FIX THIS it is not prepared to handle other cases.
             for idx, fp_xml in enumerate(fp_xml_orig):
@@ -1145,6 +1145,7 @@ class metaData(object):
                     fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
                     inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
                     fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1269,12 +1270,12 @@ class metaData(object):
                         df.at[index, col_name_original] = fp_fcs_current
                         d = {col_name_original: fp_fcs_current,
                              'FEATURE_DATASET':dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                             'DATA_LOCATION_MCMILLEN':fp_fcs_new}
                     # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
                     # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET':dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS':fp_fcs_new}
+                             'DATA_LOCATION_MCMILLEN':fp_fcs_new}
 
                     # columns to transfer from source to target
                     if not pd.isnull(merge_cols):
@@ -1317,7 +1318,7 @@ class metaData(object):
                         print('we did it')
                         index = copy.copy(feat_name)
                     debug_idx = 8
-                    df.loc[index, 'DATA_LOCATION_MCMILLEN_JACOBS'] = fp_fcs_new
+                    df.loc[index, 'DATA_LOCATION_MCMILLEN'] = fp_fcs_new
 
 
                     if not dry_run:
@@ -1402,21 +1403,13 @@ class metaData(object):
                     fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
                     inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
                     fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
                     fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
                     df_str_source = 'df_{}_standalone'.format(project_str)
-
-                # Only grabs TargetGDB once per gdb
-                try:
-                    df_source = getattr(self, df_str_source)
-                # if dataframe NOT already added via self.add_df
-                except AttributeError:
-                    print('populating source')
-                    # note this also creates fp_csv_archive
-                    self.add_df(fp_csv_source, df_str_source, 'ITEM')
-                    df_source = getattr(self, df_str_source)
+                    print('why am I here')
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -1432,6 +1425,7 @@ class metaData(object):
                 inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
                 fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
                 fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                print('CSV TARGET:    --->',  fp_csv_target)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -1497,12 +1491,12 @@ class metaData(object):
                         df.at[index, col_name_original] = fp_fcs_current
                         d = {col_name_original: fp_fcs_current,
                              'FEATURE_DATASET': dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
+                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
                     # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
                     # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET': dset_move,
-                             'DATA_LOCATION_MCMILLEN_JACOBS': fp_fcs_new}
+                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
                     # columns to transfer from source to target
                     if not pd.isnull(merge_cols):
                         keys = [c.strip() for c in merge_cols.split(',')]
@@ -1581,18 +1575,21 @@ class metaData(object):
                 for index in self.indices:
                     print('HERE')
                     df_item = df.loc[index]
+                    dset_move = df_item['MOVE_LOCATION_DSET']
 
                     if offline_target:
                         fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
                     else:
                         fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
-                    dset = df_item['MOVE_LOCATION_DSET']
                     # NO DSET passed
-                    if pd.isnull(dset):
-                        pass
-                    else:
-                        fp_move = os.path.join(fp_move, dset)
+                    if pd.isnull(dset_move):
+                        dset_move=''
+
+                    fp_dset = os.path.join(fp_move, dset_move)
+                    # check to make sure output dset exists before proceeding
+                    if not arcpy.Exists(fp_dset):
+                        arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
 
                     feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
                                         'create_point':'POINT'}
@@ -1603,7 +1600,7 @@ class metaData(object):
                     msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs_new)
                     # flag_index
                     if not dry_run:
-                        arcpy.CreateFeatureclass_management(fp_move, feat_name, feat_type,
+                        arcpy.CreateFeatureclass_management(fp_dset, feat_name, feat_type,
                                                             spatial_reference = self.prj_file,
                                                             has_m = 'No', has_z = 'No')
 
@@ -1649,7 +1646,7 @@ class metaData(object):
 
                 # Dict will be UPDATED below if kwarg specified
             d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
-                'DATA_LOCATION_MCMILLEN_JACOBS':[fp_fcs_new.replace(os.sep, '//')]}
+                'DATA_LOCATION_MCMILLEN':[fp_fcs_new.replace(os.sep, '//')]}
 
             df_append = pd.DataFrame(d)
             df_append = df_append.set_index('ITEM')
@@ -1808,7 +1805,7 @@ class metaData(object):
             kwargs['shapefile']
             orig_index = df.index.to_list()
             indices_iloc = self.indices_iloc
-            fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN_JACOBS.to_list()
+            fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN.to_list()
             print(fp_fcs)
             # flag_index
             # example of zip syntax for indices_iloc
@@ -1909,7 +1906,7 @@ class metaData(object):
         df_str_target           string of dataframe to add values to based off other arguments
         df_str_source           string of dataframe to transfer values from
         match_col_list          columns to match from table to table [col_source_str, col_target_str]
-                                i.e. fp_feat, DATA_LOCATION_MCMILLEN_JACOBS
+                                i.e. fp_feat, DATA_LOCATION_MCMILLEN
         replace_col_target      column where we add tag / val
         '''
         # STRING to NUMBERIC!!
@@ -1992,7 +1989,7 @@ class metaData(object):
         Returns:
 
         '''
-        fp_list = self.df.loc[self.indices, 'DATA_LOCATION_MCMILLEN_JACOBS']
+        fp_list = self.df.loc[self.indices, 'DATA_LOCATION_MCMILLEN']
         notes = tracking_dict['notes']
         tags = tracking_dict['tags']
         rec_comp = tracking_dict['recipient_company']
@@ -2026,7 +2023,7 @@ class metaData(object):
                                         columns = ['NOTES', 'TAGS', 'RECIPIENT_COMPANY',
                                                     'RECIPIENT_NAME', 'PROJECT',
                                                     'ITEM', 'DATA_LOCATION_SHARED',
-                                                    'DATA_LOCATION_MCMILLEN_JACOBS',
+                                                    'DATA_LOCATION_MCMILLEN',
                                                    'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)

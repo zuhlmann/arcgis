@@ -190,11 +190,11 @@ def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
     if want_df:
         # Basic columns for the bare bones
         if basic_cols:
-            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS']
+            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN']
             cols = np.column_stack([feats_df, dsets_df, path_to_feat])
 
         else:
-            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
+            col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN',
                         'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
                         'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
                         'MOVE_LOCATION_DSET','RENAME','DSET_LOWER_CASE',

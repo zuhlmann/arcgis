@@ -14,11 +14,12 @@ proj_bdry = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\South_Fork_Tolt\d
 contour = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\Eklutna\Data\trails_2023july\contour_2022dem_267ft.shp'
 lakeside_trail = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\Eklutna\Data\trails_2023july\eklutna_lakeside_trail_split.shp'
 
-gdf_contour = gpd.read_file(contour)
-gdf_trail = gpd.read_file(lakeside_trail)
-gdf_pipeline = gpd.read_file(gdb_master, layer = 'pipelines')
-gdf_pipeline = gdf_pipeline.iloc[[3,5],]
-gdf_proj_bdry = gpd.read_file(proj_bdry)
+#gdf_contour = gpd.read_file(contour)
+#gdf_trail = gpd.read_file(lakeside_trail)
+#gdf_pipeline = gpd.read_file(gdb_master, layer = 'pipelines')
+#gdf_pipeline = gdf_pipeline.iloc[[3,5],]
+# gdf_proj_bdry = gpd.read_file(proj_bdry)
+gdf_roads = gpd.read_file(gdb_pro, layer = 'road_base_tolt_res')
 gdf_streams = gpd.read_file(gdb_pro, layer='tributaries_tolt_res')
 
 intersections_gdf = pd.DataFrame()
@@ -26,7 +27,7 @@ intersections_gdf = pd.DataFrame()
 # Next, we'll iterate through each row in `gdf` and find out if and where it intersects with another line.
 for index, row in gdf_streams.iterrows():
     # Get GeoSeries of intersections of row with all rows
-    row_intersections = gdf_proj_bdry.intersection(row['geometry'])\
+    row_intersections = gdf_roads.intersection(row['geometry'])\
     
     # Exclude any rows that aren't a Point geometry
     row_intersection_points = row_intersections[row_intersections.geom_type == 'Point']
@@ -63,4 +64,4 @@ intersections_gdf = gpd.GeoDataFrame(intersections_gdf, geometry = 'geometry')
 intersections_gdf.crs = {'init': 'epsg:2926'}
 
 ## will throw error but works
-#intersections_gdf.to_file(gdb_pro, layer='fish_passage_points_reservoir')
+intersections_gdf.to_file(gdb_pro, layer='fish_passage_points_reservoir_v2')

@@ -1881,7 +1881,7 @@ def aprx_inventory(aprx_dir, csv_dir_out):
     fp_csv_out          full path - path/to/dir/<filename>.csv
 
     '''
-    aprx = arcpy.mp.ArcGISProject(aprx_dir)
+    aprx = arcpy.mp.ArcGISProject(r"{}".format(aprx_dir))
     # maps = aprx.listMaps()
     lyts = aprx.listLayouts()
     maps_active = []
@@ -1891,16 +1891,21 @@ def aprx_inventory(aprx_dir, csv_dir_out):
         el_list = l.listElements()
         for el in el_list:
             if el.type == 'MAPFRAME_ELEMENT':
-                mapframe_present = True
-                map = el.map
-                map_name = map.name
-                if len(maps_active) == 0:
-                    maps_active.append(map)
-                else:
-                    mn_list = [m.name for m in maps_active]
-                    if map_name not in mn_list:
+                # 20230829 - If layout was result of imported lyt file and/or
+                # a map frame within layout references a deleted map, then map.name will throw error
+                try:
+                    map = el.map
+                    map_name = map.name
+                    mapframe_present = True
+                    if len(maps_active) == 0:
                         maps_active.append(map)
-                lyt_map_names.append(map_name)
+                    else:
+                        mn_list = [m.name for m in maps_active]
+                        if map_name not in mn_list:
+                            maps_active.append(map)
+                    lyt_map_names.append(map_name)
+                except RuntimeError:
+                    pass
         # Because layouts without mapframes will break this if not conditional
         if mapframe_present:
             if 'lyt_map_dict' not in locals():
@@ -2249,7 +2254,7 @@ def subdir_inv(parent_dir, shapefile, target_col, fp_logfile):
         cols = np.column_stack([fname, fp])
         df_subdir = pd.DataFrame(cols, columns=col_list)
     else:
-        col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN_JACOBS',
+        col_list = ['ITEM', 'DSET', 'DATA_LOCATION_MCMILLEN',
                     'DATA_LOCATION_MCM_ORIGINAL', 'DATA_LOCATION_MCM_STAGING',
                     'ADD_LINES_PURP', 'REMOVE_LINES_PURP', 'MOVE_LOCATION',
                     'MOVE_LOCATION_DSET', 'RENAME', 'DSET_LOWER_CASE',
@@ -2269,7 +2274,7 @@ def subdir_inv(parent_dir, shapefile, target_col, fp_logfile):
                                 blank, blank, blank, blank, blank])
         df_subdir = pd.DataFrame(cols, columns=col_list)
     return(df_subdir)
-def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shapefile = False,  **kwargs):
+def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN', shapefile = False,  **kwargs):
     '''
 
     Args:
@@ -2319,11 +2324,14 @@ def dir_use_inv(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN_JACOBS', shape
         df_subdir = subdir_inv(parent_dir, shapefile, target_col, fp_logfile)
         # run through above function
         df_subdir = df_subdir.set_index(target_col)
+        print('FUCK', df_subdir)
         df_concat = pd.concat([df_orig, df_subdir])
         # In the case that updating a folder that has already been processed with this function
         # this will retain the first row, and remove the new inventory
+        df_concat.to_csv('c:/users/uhlmann/desktop/testicls.csv')
         df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
         df_concat.to_csv(updated_csv)
+        df_concat.to_csv('c:/users/uhlmann/desktop/testicls.csv')
     except KeyError:
         pass
 
@@ -2360,7 +2368,7 @@ def dir_inv_recursive(parent_dir, fp_logfile):
         elif (f.is_dir()) & (f.name[-4:] != '.zip') & (os.path.splitext(f.name)[-1] == r'.gdb'):
             df_gdb = compare_data.file_paths_arc(f.path, True, True)
             feat_name.extend(df_gdb.ITEM.to_list())
-            feat_path.extend(df_gdb.DATA_LOCATION_MCMILLEN_JACOBS.to_list())
+            feat_path.extend(df_gdb.DATA_LOCATION_MCMILLEN.to_list())
         # keeps running if another folder encountered
         else:
             feat_name.extend(dir_inv_recursive(f.path, fp_logfile)[0])
@@ -2399,5 +2407,13 @@ def sql_dict_update_cursor(df, feat, key_fld, val_fld):
             cursor.updateRow(row)
     del cursor
 
+    def tiles_to_index(main_dir):
+        '''
 
+        Args:
+            main_dir:
 
+        Returns:
+
+        '''
+        os.listdir()

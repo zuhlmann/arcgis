@@ -3,7 +3,8 @@ from osgeo import osr
 import os
 
 src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\Eklutna2022_Topobathy_clip.tif'
-dir_out = r'E:\box_offline\small_projects\eklutna_d\lu_clip_dem_20230810\clipped_dems\clipped_800ft_topobathy\test_lu'
+src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\EklutnaRiver_BE_DEM_UTM6.tif'
+dir_out = r'E:\box_offline\small_projects\eklutna_d\lu_clip_dem_20230810\clipped_dems\clipped_800ft'
 
 src = osr.SpatialReference()
 src.SetFromUserInput('EPSG:6335')
@@ -20,11 +21,14 @@ shp_name = os.path.split(fp_cutline)[-1][:-4]
 fld = 'Name'
 sc_num = [1,2,3,4,5,6,7,8]
 
-# for aerial imagery
-sc_num =[1,2,3,4,5,6,7,8]
-tiles = [9,8,8,7,6,6,5,5]
-eklut_indices_dict =dict(zip(sc_num,tiles))
-aerial_base_str = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\2022_Eklutna_0'
+# for topo
+sc_num =[1]
+
+# # for aerial
+# sc_num =[1,2,3,4,5,6,7,8]
+# tiles = [9,8,8,7,6,6,5,5]
+# eklut_indices_dict =dict(zip(sc_num,tiles))
+# aerial_base_str = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\2022_Eklutna_0'
 
 ct = 0
 for n in sc_num:
@@ -36,16 +40,18 @@ for n in sc_num:
                                srcSRS=src, dstSRS=tgt)
     vf = tgt_val.replace(' ','_')
 
-    # # DEM tgt dset
+    # DEM tgt dset
     # fname = r'eklutna2022_topobathy_stream_nn_{}.tif'.format(vf)
-    # tgt_dset = os.path.join(dir_out, fname)
+    fname = r'eklutna2020_BE_nn_{}.tif'.format(vf)
+    tgt_dset = os.path.join(dir_out, fname)
 
-    # Aerial tgt dset
-    tile_num = eklut_indices_dict[n]
-    src_dset = '{}{}.tif'.format(aerial_base_str, tile_num)
-    tgt_dset = os.path.join(dir_out, '2022_Eklutna_Aerial_nn_{}.tif'.format(vf))
-    print(src_dset)
-    print(tgt_dset)
+    # # Aerial tgt dset
+    # tile_num = eklut_indices_dict[n]
+    # src_dset = '{}{}.tif'.format(aerial_base_str, tile_num)
+    # tgt_dset = os.path.join(dir_out, '2022_Eklutna_Aerial_nn_{}.tif'.format(vf))
+    # print(src_dset)
+    # print(tgt_dset)
+
     gdal.Warp(tgt_dset, src_dset, options = options)
     ct+=1
 

@@ -1344,7 +1344,7 @@ class metaData(object):
                         logging.info(msg_str)
                         logging.info(e)
 
-        elif action_type in ['copy', 'copy_replace']:
+        elif action_type in ['copy_no_replace', 'copy_replace']:
 
             for index in self.indices:
                 df_item = df.loc[index]
@@ -1835,19 +1835,16 @@ class metaData(object):
         if df_str == 'df':
             fp_csv_prop_str = 'fp_csv'
             fp_csv_archive_prop_str = 'fp_csv_archive'
-            fp_csv_archive_temp_prop_str = 'fp_csv_archive_temp'
             fp_log_prop_str = 'fp_log'
         else:
             df_base_str = df_str.replace('df_', '')
             fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
             fp_csv_archive_prop_str = 'fp_csv_archive_{}'.format(df_base_str)
-            fp_csv_archive_temp_prop_str = 'fp_csv_archive_temp_{}'.format(df_base_str)
             fp_log_prop_str = 'fp_log_{}'.format(df_base_str)
 
         fp_csv = getattr(self, fp_csv_prop_str)
         basepath = os.path.splitext(fp_csv)[0]
         setattr(self, fp_csv_archive_prop_str, '{}_archive.csv'.format(basepath))
-        setattr(self, fp_csv_archive_temp_prop_str, '{}_archive_{}.csv'.format(basepath, self.todays_date))
         fp_log = '{}_logfile.log'.format(basepath)
         setattr(self, fp_log_prop_str, fp_log)
 
@@ -1865,18 +1862,12 @@ class metaData(object):
 
         # 2) path to csv archive
         fp_csv_archive = getattr(self, str_csv_archive_obj)
-        fp_csv_archive_temp = getattr(self, str_csv_archive_temp_obj)
 
         # create archive if first time managing database
         if not os.path.exists(fp_csv_archive):
             # initiate archive file for day
             print('save an archive:\n{}'.format(fp_csv_archive))
             pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
-
-        if not os.path.exists(fp_csv_archive_temp):
-            print('save a time stamped archive:\n{}'.format(fp_csv_archive_temp))
-            # determine if temporary archive is necessary
-            pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive_temp)
 
         # # perhaps useful later for cleanup?
         # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]

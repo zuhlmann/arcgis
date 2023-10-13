@@ -2047,6 +2047,43 @@ def norm_file_path_df(df, **kwargs):
                 df.at[i,c] = fp_new
     return(df)
 
+def detect_df_changes(df_orig, df_current, tc = 'DATA_LOCATION_MCMILLEN'):
+    '''
+
+    Args:
+        df_orig:    dataframe needing updating or checking if changes have occured
+        tc:         target columns
+
+    Returns:
+        df_assim:   dataframe that is assimilated with change cols
+    '''
+    df_current = df_current.set_index(tc)
+    df_orig = df_orig.set_index(tc)
+
+    # Added, Omited and Comitted
+    dloc_o = df_orig.index.to_list()
+    dloc_c = df_current.index.to_list()
+    so = set(dloc_o)
+    sc = set(dloc_c)
+
+    # update updates the series and will NOT assign to variable
+    added = list(sc - so)
+    omitted = list(so - sc)
+    comitted = copy.copy(so)
+    comitted = list(comitted.intersection(sc))
+
+    # APPEND and remove duplicates
+    df_assim = df_orig.append(df_current)
+    # oddly, keep first will Flag the last duplicates as True, the first
+    # duplicates as false, and non-duplicates as false ZU 20220202
+    df_assim = df_assim[~df_assim.index.duplicated(keep='first')]
+
+    todays_date = datetime.datetime.today().strftime('%Y%m%d')
+    df_assim.loc[added, 'ASSIMILATED'] = todays_date
+    df_assim.loc[omitted, 'ASSIMILATED'] = 'removed'
+    df_assim.loc[comitted, 'ASSIMILATED'] = 'predates_{}'.format(todays_date)
+    return (df_assim)
+
 def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS',
                         offline = True, basic_cols=True, **kwargs):
     '''
@@ -2108,72 +2145,8 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     else:
         pass
 
-    df_current = df_current.set_index(tc)
-    df_orig = df_orig.set_index(tc)
-
-    # Added, Omited and Comitted
-    dloc_o = df_orig.index.to_list()
-    dloc_c = df_current.index.to_list()
-    so = set(dloc_o)
-    sc = set(dloc_c)
-
-    # update updates the series and will NOT assign to variable
-    added = list(sc - so)
-    omitted = list(so - sc)
-    comitted = copy.copy(so)
-    comitted = list(comitted.intersection(sc))
-
-    # APPEND and remove duplicates
-    df_assim = df_orig.append(df_current)
-    # oddly, keep first will Flag the last duplicates as True, the first
-    # duplicates as false, and non-duplicates as false ZU 20220202
-    df_assim = df_assim[~df_assim.index.duplicated(keep='first')]
-
-    todays_date = datetime.datetime.today().strftime('%Y%m%d')
-    df_assim.loc[added, 'ASSIMILATED'] = todays_date
-    df_assim.loc[omitted, 'ASSIMILATED'] = 'removed'
-    df_assim.loc[comitted, 'ASSIMILATED'] = 'predates_{}'.format(todays_date)
-
+    df_assim = detect_df_changes(df_orig, df_current, tc='DATA_LOCATION_MCMILLEN')
     return(df_assim)
-
-def detect_df_changes(df_orig, df_current, tc = 'DATA_LOCATION_MCMILLEN'):
-    '''
-
-    Args:
-        df_orig:    dataframe needing updating or checking if changes have occured
-        tc:         target columns
-
-    Returns:
-        df_assim:   dataframe that is assimilated with change cols
-    '''
-    df_current = df_current.set_index(tc)
-    df_orig = df_orig.set_index(tc)
-
-    # Added, Omited and Comitted
-    dloc_o = df_orig.index.to_list()
-    dloc_c = df_current.index.to_list()
-    so = set(dloc_o)
-    sc = set(dloc_c)
-
-    # update updates the series and will NOT assign to variable
-    added = list(sc - so)
-    omitted = list(so - sc)
-    comitted = copy.copy(so)
-    comitted = list(comitted.intersection(sc))
-
-    # APPEND and remove duplicates
-    df_assim = df_orig.append(df_current)
-    # oddly, keep first will Flag the last duplicates as True, the first
-    # duplicates as false, and non-duplicates as false ZU 20220202
-    df_assim = df_assim[~df_assim.index.duplicated(keep='first')]
-
-    todays_date = datetime.datetime.today().strftime('%Y%m%d')
-    df_assim.loc[added, 'ASSIMILATED'] = todays_date
-    df_assim.loc[omitted, 'ASSIMILATED'] = 'removed'
-    df_assim.loc[comitted, 'ASSIMILATED'] = 'predates_{}'.format(todays_date)
-
-    return (df_assim)
-
 def mark_duplicate_rows(df, target_col, ispath = False):
     '''
     function for finding duplicates from "seen = set()" to "seen.add()"

@@ -404,6 +404,7 @@ def field_mapping_retain_src(fp_source, fp_target, fld_csv):
     if roads_idaho has street_name and roads_boise has NAME we would map NAME to
     streets_name. This could easily be adapted (along with fld_csv) to change the
     mapped name for both.
+    UPDATED in 20230929.  Checkout different version on git if needed. ZU
     ARGS
     fp_source       path/to/source (or TOC name) feature class
     fp_target       path/to/target (or TOC name) feature class
@@ -414,30 +415,97 @@ def field_mapping_retain_src(fp_source, fp_target, fld_csv):
     fm.addTable(fp_source)
     fm.addTable(fp_target)
     df = pd.read_csv(fld_csv)
-    # find where mapping occurs
-    idx = [pd.notnull(v) for v in df.target_fld]
-    df_temp = df[idx]
-    rmv_fld = df_temp.source_fld.to_list()
 
-    for src, tgt in zip(df_temp['source_fld'], df_temp['target_fld']):
-        fld_map_temp = arcpy.FieldMap()
-        fld_map_temp.addInputField(fp_source, src)
-        fld_map_temp.addInputField(fp_target, tgt)
-        mapped_name = fld_map_temp.outputField
-        mapped_name.name = src
-        fld_map_temp.outputField = mapped_name
-        fm.addFieldMap(fld_map_temp)
-
-    # Remove source field mapping since we now have two for each mapped field
-    for fld in rmv_fld:
-        idx = fm.findFieldMapIndex(fld)
-        fm.removeFieldMap(idx)
+    # something mapped to another
+    df_mapped = df.groupby('field_mapped', sort=False).count() == 2
+    field_keys = df_mapped[df_mapped.field_orig].index.to_list()
+    df_mapped = df.loc[df['field_mapped'].isin(field_keys)]
 
     # only retain fields from both target and source retained in csv
-    retain_fld =  df.source_fld.to_list()
+    source_fields = [f.name for f in arcpy.ListFields(fp_source)]
+    target_fields = [f.name for f in arcpy.ListFields(fp_target)]
+
+    # find fields not being output
+    remove_source = [f for f in source_fields if f not in df['field_orig'].to_list()]
+    remove_target = [f for f in target_fields if f not in df['field_orig'].to_list()]
+    remove_fields = copy.copy(remove_source)
+    remove_fields.extend(remove_target)
+    remove_fields.extend(df_mapped.field_orig.to_list())
+
+    # Remove all but fields from csv and those that are being mapped
     for fld in fm.fields:
         if fld.type not in ('OID', 'Geometry') and 'shape' not in fld.name.lower():
-            if fld.name not in retain_fld:
+            if fld.name in remove_fields:
                 fm.removeFieldMap(fm.findFieldMapIndex(fld.name))
 
+    # Map fields where retaining target fields
+    df_mapped = df_mapped.sort_values(by=['field_mapped'])
+    # Two rows per iteration because they repeat field mapping vals
+    for idx in range(int(len(df_mapped)/2)):
+        idx0 = 2 * idx
+        idx1 = 2 * idx + 1
+
+        iloc1 = df_mapped.columns.get_loc('source_fc')
+        iloc2 = df_mapped.columns.get_loc('field_orig')
+        iloc3 = df_mapped.columns.get_loc('field_mapped')
+
+        fld_map_temp = arcpy.FieldMap()
+
+        # Add first mapping
+        feat = df_mapped.iloc[idx0,iloc1]
+        field_key = df_mapped.iloc[idx0,iloc2]
+        print('{}'.format(field_key))
+        fld_map_temp.addInputField(feat, field_key)
+
+        # add second mapping
+        feat = df_mapped.iloc[idx1, iloc1]
+        field_key = df_mapped.iloc[idx1, iloc2]
+        print('{}'.format(field_key))
+        fld_map_temp.addInputField(feat, field_key)
+
+        # field vals will be identical
+        field_val = df_mapped.iloc[idx1, iloc3]
+        print('---->{}'.format(field_val))
+        name_attr = fld_map_temp.outputField
+        name_attr.name = field_val
+        fld_map_temp.outputField = name_attr
+        fm.addFieldMap(fld_map_temp)
+
     return(fm)
+
+def unique_field_vals(fc,fields, csv):
+    '''
+    Output csv with fields and associated unique values.
+    ZU 20231009
+
+    Args:
+        fc:             feature class to report. path or TOC layer
+        fields:         fields within fc to report. list
+        csv:            path/to/output/inv.csv
+
+    Returns:
+
+    '''
+    # Check if fields passed exist
+    fields_matched = [f.name for f in arcpy.ListFields(fc) if f.name in fields]
+    fields_matched.sort()
+    fields.sort()
+    if fields_matched==fields:
+        pass
+    else:
+        print('List of field names provided includes incorrect or nonexistent field name values')
+        return
+    fvals = []
+    fn = []
+    for f in fields:
+        with arcpy.da.SearchCursor(fc, [f]) as cursor:
+            t = [r[0] for r in cursor]
+            v = list(set(t))
+            ft = [f] * len(v)
+            print(v, '\n\n', fn)
+            fvals.extend(v)
+            fn.extend(ft)
+    del cursor
+
+    df = pd.DataFrame(np.column_stack([fn, fvals]), columns = ['field_name', 'value'])
+    df.to_csv(csv)

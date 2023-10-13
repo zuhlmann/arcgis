@@ -449,7 +449,12 @@ class metaData(object):
             # uses th *xml wildcard to pull JUST the xml files from shapefile folder
             glob_strings = ['{}*.xml'.format(fp_shp) for fp_shp in fp_shp]
             # Note if shp has no xml file, then this will throw exception for index error ZU 20230831
-            fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+            try:
+                fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
+            except IndexError:
+                fp_xml = arcpy.CreateScratchName('.xml', workspace=arcpy.env.scratchFolder)
+                # copy xml of feature class -- next up - update it
+                tgt_item_md.saveAsXML(fp_xml, 'EXACT_COPY')
 
         # key/val and key lists for add and subtract purpose list respectively
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')

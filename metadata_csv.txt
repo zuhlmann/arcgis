@@ -1,2 +1,0 @@
-item, name1, created_by, zach uhlmann, date_created, 20201008, url, http:/balls.com
-item, name2, created_by, john silverstein, date_created, 20201009, url, http:/sticks.com

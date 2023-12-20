@@ -943,6 +943,8 @@ def write_folder_contents(fp, **kwargs):
     be README_<folder_name>_<date>.txt.  Will indicate date in file
     ARGS
     fp          file path for folder to README
+    Keyword Args
+        add_quotes          for file names with spaces, special characters that will result in errors in gdaltindex
     '''
     folder_name = os.path.split(fp)[-1]
     fname_readme = 'README_{}.txt'.format(folder_name)
@@ -977,8 +979,15 @@ def write_folder_contents(fp, **kwargs):
     signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
     file_name = 'README_{}'.format(folder_name)
     basic_str = file_name + '\n' + signature + '\n\nContents\n' + basic_str
-    with open(fp_out, 'w') as out_file:
-        out_file.write(basic_str)
+    try:
+        kwargs['add_quotes']
+        with open(fp_out, 'w') as out_file:
+            str_piece = [r'"{}"'.format(sp) for sp in str_piece]
+            basic_str = '\n'.join(str_piece)
+            out_file.write(basic_str)
+    except KeyError:
+        with open(fp_out, 'w') as out_file:
+            out_file.write(basic_str)
 def enum_fp_list(fp_base, return_full_path, **kwargs):
     '''
     will this print

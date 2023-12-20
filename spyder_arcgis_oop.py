@@ -395,7 +395,7 @@ class metaData(object):
         #     print(idx, ' ', item)
         return(parsed_csl_temp)
 
-    def write_xml(self, df_str, shp = False, offline = True, **kwargs):
+    def write_xml(self, df_str, offline = True, **kwargs):
 
         '''
         Update metadata to include assemble_metadata() statement or skip that
@@ -437,43 +437,36 @@ class metaData(object):
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
 
-        # may not use too often -  legacy from before master.gdb and direct gdb
-        # updating ZU 20210505
-        if shp:
-            # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
-            # NOTE fp_base is refering to base name for shapefiles (since multiple file extensions
-            # under same BASE name)
-            fp_shp = df.loc[self.indices]['DATA_LOCATION_MCMILLEN'].tolist()
-            index_names = df.loc[self.indices].index.to_list()
-            # glob strings will create the string to pass to  glob.glob which
-            # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-            glob_strings = ['{}*.xml'.format(fp_shp) for fp_shp in fp_shp]
-            # Note if shp has no xml file, then this will throw exception for index error ZU 20230831
-            try:
-                fp_xml_orig_shp = [glob.glob(glob_string)[0] for glob_string in glob_strings]
-            except IndexError:
-                fp_xml = arcpy.CreateScratchName('.xml', workspace=arcpy.env.scratchFolder)
-                # copy xml of feature class -- next up - update it
-                tgt_item_md.saveAsXML(fp_xml, 'EXACT_COPY')
-
         # key/val and key lists for add and subtract purpose list respectively
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
         subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
-        ct = 0
 
         indices_iloc = getattr(self, prop_str_indices_iloc)
         for indice, indice_iloc in zip(self.indices, indices_iloc):
-            if shp:
-                fp_xml = fp_xml_orig_shp[ct]
-                temp_path = copy.copy(fp_xml)
-            elif not shp:
+            fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN'])
+            if os.path.splitext(fp_fcs)[-1]=='.shp':
+                glob_string = '{}*.xml'.format(fp_fcs)
+                # shapefile has xml
+                try:
+                    xml_created = False
+                    fp_xml = glob.glob(glob_string)[0]
+                # shapefile has no xml; will undergo same protocol as feature class in gdb
+                except IndexError:
+                    xml_created = True
+                    fp_xml = arcpy.CreateScratchName('.xml', workspace=arcpy.env.scratchFolder)
+                    # copy xml of feature class -- next up - update it
+                    tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
+                    tgt_item_md.saveAsXML(fp_xml, 'EXACT_COPY')
+
+            else:
+                xml_created = True
                 fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN'])
                 fp_components = fp_fcs.split(os.sep)
                 gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
                 offline_base = olt.loc[gdb_str, 'offline']
                 online_base = olt.loc[gdb_str, 'online']
-                # https: // gfycat.com / honestanchoredesok
                 if offline:
+                    # https: // gfycat.com / honestanchoredesok
                     fp_fcs= fp_fcs.replace(online_base, offline_base)
                 # For some reason, if fp does not exist then no error gets thrown
                 # during xml process.  Debugging stinks then - ZU 20220914
@@ -482,14 +475,11 @@ class metaData(object):
                 else:
                     pass
 
-                temp_path = copy.copy(fp_fcs)
                 tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
                 fp_xml = arcpy.CreateScratchName('.xml', workspace = arcpy.env.scratchFolder)
                 # copy xml of feature class -- next up - update it
                 tgt_item_md.saveAsXML(fp_xml, 'EXACT_COPY')
-            ct += 1
 
-            print('indice {}. path {}'.format(indice_iloc, temp_path))# refer to notes below for diff betw trees and elements
             tree = ET.parse(fp_xml)
             # root is the root ELEMENT of a tree
             root = tree.getroot()
@@ -692,7 +682,7 @@ class metaData(object):
             df.at[indice, 'CREDITS'] = np.nan
 
             # additional step for fcs in gdb
-            if not shp:
+            if xml_created:
                 # copy new metadata
                 src_template_md = arcpy.metadata.Metadata(fp_xml)
                 # apply to fcs (tgt)
@@ -1489,8 +1479,7 @@ class metaData(object):
                     # Assemble Series to append to Master DF
 
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
-                    merge_cols = df_item['MERGE_COLUMNS']
-                    print('MERGE COLUMNS: ', merge_cols)
+                    debug_idx = 41
                     if not pd.isnull(col_name_original):
                         col_name_original = dict_col_name_orig[col_name_original]
                         df.at[index, col_name_original] = fp_fcs_current
@@ -1503,10 +1492,14 @@ class metaData(object):
                         d = {'FEATURE_DATASET': dset_move,
                              'DATA_LOCATION_MCMILLEN': fp_fcs_new}
                     # columns to transfer from source to target
+                    merge_cols = df_item['MERGE_COLUMNS']
+                    debug_idx = 42
                     if not pd.isnull(merge_cols):
+                        print('MERGE COLUMNS: ', merge_cols)
                         keys = [c.strip() for c in merge_cols.split(',')]
-                        vals = df_source.loc[index, keys]
+                        vals = df.loc[index, keys]
                         d.update(dict(zip(keys, vals)))
+                    debug_idx =43
                     ser_append = pd.Series(data=d,
                                            index=list(d.keys()),
                                            name=feat_name)
@@ -1527,11 +1520,16 @@ class metaData(object):
                         df_join = pd.DataFrame(d, index=[index])
                         # saves name to csv column above index
                         df_join.index.name = copy.copy(df.index.name)
+                        setattr(self, 'debug_df_join', df_join)
+                        setattr(self,'debug_df', df)
                         col_order_orig = df.columns.to_list()
                         idx_order_orig = df.index.to_list()
                         df = df_join.combine_first(df)
+                        debug_idx = 81
                         # If ValueError: cannot reindex from duplicate axis, this means there are duplicate row indices, i.e. ITEM duplicated
+                        # NOTE! does not have to be the indices from agol_obj.indices.  Anywhere on csv with duplicate rows will trigger error
                         df = df.reindex(idx_order_orig)
+                        debug_idx = 82
                         # or else gets reordered alphabetically
                         df = df.reindex(columns=col_order_orig)
                     else:
@@ -1993,17 +1991,31 @@ class metaData(object):
         project = tracking_dict['project']
 
         # prep shape dir
-        shp_dir = os.path.join(base_dir, 'shp')
-        if not os.path.exists(shp_dir):
-            os.mkdir(shp_dir)
+        arcpy.env.addOutputsToMap = False
+
+        write_df = True
+        if action == 'copy_to_gdb':
+            if base_dir[-4:]=='.gdb':
+                if os.path.exists(base_dir):
+                    pass
+                else:
+                    bp, gdb_name = os.path.split(base_dir)
+                    arcpy.CreateFileGDB_management(bp, gdb_name)
+                for fp, fn in zip(fp_list, self.indices):
+                    arcpy.FeatureClassToFeatureClass_conversion(fp, base_dir, fn)
+            else:
+                write_df = False
+                print('Used copy_to_gdb action but did not pass path to gdb for base_dir parameter')
 
         if action == 'convert_zip':
+            shp_dir = os.path.join(base_dir, 'shp')
+            if not os.path.exists(shp_dir):
+                os.mkdir(shp_dir)
             for fp, fn in zip(fp_list, self.indices):
                 arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
-
             zip_dir = os.path.join(base_dir,'zip')
             self.zip_shp_dir(shp_dir, zip_dir)
-
+        if write_df:
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)
             c2 = [tags] * len(self.indices)
@@ -2011,16 +2023,19 @@ class metaData(object):
             c4 = [rec_name] * len(self.indices)
             c5 = [project] * len(self.indices)
             c6 = self.indices
-            c7 = [os.path.join(shp_dir, '{}.shp'.format(i)) for i in self.indices]
+            if action=='copy_to_gdb':
+                c7 = [os.path.join(base_dir, '{}.shp'.format(i)) for i in self.indices]
+            elif action=='convert_zip':
+                c7 = [os.path.join(shp_dir, '{}.shp'.format(i)) for i in self.indices]
             c8 = fp_list
             c9 = [self.todays_date]* len(self.indices)
 
             df_new_rows = pd.DataFrame(np.column_stack([c1,c2,c3,c4,c5, c6,c7,c8, c9]),
-                                        columns = ['NOTES', 'TAGS', 'RECIPIENT_COMPANY',
-                                                    'RECIPIENT_NAME', 'PROJECT',
-                                                    'ITEM', 'DATA_LOCATION_SHARED',
-                                                    'DATA_LOCATION_MCMILLEN',
-                                                   'DATE'])
+                                       columns = ['NOTES', 'TAGS', 'RECIPIENT_COMPANY',
+                                                  'RECIPIENT_NAME', 'PROJECT',
+                                                  'ITEM', 'DATA_LOCATION_SHARED',
+                                                  'DATA_LOCATION_MCMILLEN',
+                                                  'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
 

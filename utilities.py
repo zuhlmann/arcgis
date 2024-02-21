@@ -40,7 +40,7 @@ def get_path(idx, path_type):
     args:
     idx         integer for iloc or string of alias
     '''
-    paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
+    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 1)
     # if passing index with iloc
     col_dict = {'gdb':'path_gdb',
@@ -74,7 +74,7 @@ def add_table_entry(alias, desc, fp):
     desc        description of feature class
     fp          file path to dataset
     '''
-    paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
+    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 0)
     if isinstance(df, pd.DataFrame):
         pass
@@ -94,7 +94,7 @@ def remove_table_entry(alias):
     ARGS
     alias       string. alias
     '''
-    paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
+    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 1)
     # get index of row
     row_idx = df.index[getattr(df, 'alias') == alias]
@@ -113,7 +113,7 @@ def replace_table_entry(alias_or_path, original, replacement):
     original            original value for alias
     replacement         value to replace with
     '''
-    paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
+    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
     df = pd.read_csv(paths_table, index_col = 0)
     row_idx = df.index[getattr(df, 'alias') == original]
     if alias_or_path.lower() == 'alias':
@@ -2139,7 +2139,7 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
     fp_components = fp_fcs_current.split(os.sep)
     # print(fp_components)
     if offline:
-        csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\offline_lookup_table.csv'
+        csv = r'C:\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\offline_lookup_table.csv'
         olt = pd.read_csv(csv, index_col = 'gdb_str')
 
         try:

@@ -222,3 +222,28 @@ def gdf_shp_merge(gdf_tgt, gdf_src, feat_out, csv, geom_type, crs, **kwargs):
         gdf_joined.to_file(feat_out[0], layer = feat_out[1], driver = 'OpenFileGDB', schema = schema_updated)
     return(gdf_joined, schema_updated)
 
+
+import geopandas as gpd
+import os
+def gpd_overlay(config_file):
+    '''
+    Used this but never developed because the FERC boundary was geometrically way off.
+    ZU 20240219
+    Args:
+        config_file:
+
+    Returns:
+
+    '''
+    gdb1 = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\SFT_common_maps\SFT_common_maps.gdb'
+    gdb2 = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb\SFT_master.gdb"
+    gdf = gpd.read_file(gdb1, layer = 'land_ownership_merged_v3')
+    gdf_ferc = gpd.read_file(gdb2, layer = 'p2959_project_bdry')
+    seattle_subset = gdf[(gdf.owner_sft=='scl') | (gdf.owner_sft=='spu')]
+    union_seattle = gpd.overlay(seattle_subset, gdf_ferc, how='intersection')
+    union_seattle = union_seattle.dissolve('owner_sft')
+
+    dir_out = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\gis_requests\requests_McMillen\2024PAD_general\seattle_acreage'
+    union_seattle.to_file(os.path.join(dir_out, 'seattle_acreage_ferc_bdry.shp'))
+
+

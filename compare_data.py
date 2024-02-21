@@ -434,13 +434,15 @@ def field_mapping_retain_src(fp_source, fp_target, fld_csv):
 
     # Remove all but fields from csv and those that are being mapped
     for fld in fm.fields:
-        if fld.type not in ('OID', 'Geometry') and 'shape' not in fld.name.lower():
+        if fld.type not in ('OID', 'Geometry') and 'Shape' not in fld.name.lower():
             if fld.name in remove_fields:
                 fm.removeFieldMap(fm.findFieldMapIndex(fld.name))
 
     # Map fields where retaining target fields
     df_mapped = df_mapped.sort_values(by=['field_mapped'])
+
     # Two rows per iteration because they repeat field mapping vals
+    print('PRINTING fields to be mapped')
     for idx in range(int(len(df_mapped)/2)):
         idx0 = 2 * idx
         idx1 = 2 * idx + 1
@@ -454,13 +456,13 @@ def field_mapping_retain_src(fp_source, fp_target, fld_csv):
         # Add first mapping
         feat = df_mapped.iloc[idx0,iloc1]
         field_key = df_mapped.iloc[idx0,iloc2]
-        print('{}'.format(field_key))
+        print('Target: {}'.format(field_key))
         fld_map_temp.addInputField(feat, field_key)
 
         # add second mapping
         feat = df_mapped.iloc[idx1, iloc1]
         field_key = df_mapped.iloc[idx1, iloc2]
-        print('{}'.format(field_key))
+        print('Source: {}'.format(field_key))
         fld_map_temp.addInputField(feat, field_key)
 
         # field vals will be identical

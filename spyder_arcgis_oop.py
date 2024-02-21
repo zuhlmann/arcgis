@@ -38,13 +38,13 @@ class metaData(object):
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        fp_csv_lookup = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
+        fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
         lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
         # eventually make submaestroe
         if use_item_desc:
-            fp_csv = r'C:\Users\UhlmannZachary\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
+            fp_csv = r'C:\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
         else:
             fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
         df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str',encoding = "utf-8")
@@ -491,7 +491,7 @@ class metaData(object):
             # stops at first DIRECT child.  use root.iter for recursive search
             # if doesn't exist.  Add else statements for if does exist and update with dict
             if pd.isnull(dataIdInfo):
-                fp_xml_template = r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
+                fp_xml_template = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files\xml_template_source.xml'
                 print('\n{} contained no Item Desc - \nTemplate used instead: \n{}\n'.format(indice, fp_xml_template))
                 tree = ET.parse(fp_xml_template)
                 # root is the root ELEMENT of a tree

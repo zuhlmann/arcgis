@@ -4,24 +4,24 @@ from shapely.geometry import MultiPolygon
 import geopandas as gpd
 import numpy as np
 
-# 20230823
-# Creating indices with ll beginning tile coordinates, num rows, num cols and overlap.  Set overlap to 0
-# if none desired
-
-# x0 = 1739000
-# y0 = 2722400
+# # 20230823
+# # Creating indices with ll beginning tile coordinates, num rows, num cols and overlap.  Set overlap to 0
+# # if none desired
+#
+# x0 = 1380000
+# y0 = 439500
 # # total overlap for two adjacent indices
 # overlap = 0.05
 # # split between the two tiles
 # o_factor = (1-overlap)
 # layout_width = 12.3
 # layout_ht = 8.2
-# ft_to_in_scale = 500
+# ft_to_in_scale = 3000
 # # multiply by 0.5 because we are starting at centroid.  dx + dx = full indice width
 # dx = (ft_to_in_scale * layout_width) *0.5
 # dy = (ft_to_in_scale * layout_ht) * 0.5
 # rows = 3
-# cols = 6
+# cols = 5
 # polys = []
 # for c in range(cols):
 #     for r in range(rows):
@@ -33,11 +33,12 @@ import numpy as np
 #         ll = (x-dx, y-dy)
 #         polys.append(Polygon([ul,ur,lr,ll]))
 # features = [i for i in range(len(polys))]
-# gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys})
-# gdr.to_file(r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\eklutna_indices_estuary.shp')
+# gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys}, crs="EPSG:6449")
+# gdr.to_file(r'E:\box_offline\projects\magic_valley\parcels\magic_valley_inundation_index_1to3000_v1.shp')
 
 # load df
-fp_shp = r"C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\eklutna_indices_estuary.shp"
+fp_shp = r"C:\Box\MCM Projects\Magic Dam Wood Hydro - Part 12 and other work\24-009 Magic Dam Inundation Mapping" \
+          r"\6.0 Plans and Specs\6.6_GIS\GIS_files\data_original\staging\magic_valley_inundation_index_1to4000_SMK.shp"
 df = gpd.read_file(fp_shp)
 poly = False
 
@@ -85,7 +86,8 @@ for g in df.geometry:
         triangles.extend(upper_coords)
 features = [i for i in range(len(triangles))]
 gdr = gpd.GeoDataFrame({'feature': features, 'geometry':triangles})
-gdr.to_file(r'C:\Users\UhlmannZachary\Box\MCM USERS\3.0 - Employees\zuhlmann\triangles_upper_pts_estuary2.shp')
+gdr.to_file(r"C:\Box\MCM Projects\Magic Dam Wood Hydro - Part 12 and other work" \
+            r"\24-009 Magic Dam Inundation Mapping\6.0 Plans and Specs\6.6_GIS\GIS_files\data_original\staging\3pts_1to4000_SMK.shp")
 
 
 

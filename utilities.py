@@ -288,7 +288,7 @@ def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     except KeyError:
         print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
-def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
+def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
     '''
     Fixed up to include add list of text to new field as option 2.
     the default is adding sequential numbers (for page_num) ZU 20210304
@@ -300,6 +300,7 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
     incr                option to change
     sequential          Set to False to use the csv updating protocol
     fp_csv              pass this if adding text field to fp_fcs
+    field_match         to  match for df.loc
     '''
 
     existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
@@ -318,7 +319,7 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
         del cursor
     else:
         df = pd.read_csv(fp_csv)
-        val_list = df[field].to_list()
+        df = df.set_index(field_match)
         # CHECK IF FIELD EXISTS BEFORE CREATING
         # Arc will replace spaces with _
         field = field.replace(' ','_').replace('.','')
@@ -333,23 +334,24 @@ def update_field(fp_fcs, field, incr = 1, sequential = True, fp_csv = 'path/to/c
             print(r'----Adding field {} ----'.format(field))
         else:
             pass
-        field = [field]
-        with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
+        field_list = [field, field_match]
+        with arcpy.da.UpdateCursor(fp_fcs, field_list) as cursor:
             print('----Updating Cursor ---')
-            ct = 1
-            for row, val in zip(cursor, val_list):
-                try:
-                    data_type = kwargs['data_type']
-                    if data_type in ['SHORT', 'LONG']:
-                        val = int(val)
-                    elif data_type in ['FLOAT', 'DOUBLE']:
-                        val = float(val)
-                except:
-                    pass
-                print(r'{}. Original Val: {} ---- New Val: {}'.format(ct, row[0], val))
-                row[0] = val
-                ct+=1
-                cursor.updateRow(row)
+            for row in cursor:
+                if row[1] in df.index.to_list():
+                    val = df.loc[row[1], field]
+                    try:
+                        data_type = kwargs['data_type']
+                        if data_type in ['SHORT', 'LONG']:
+                            val = int(val)
+                        elif data_type in ['FLOAT', 'DOUBLE']:
+                            val = float(val)
+                    except KeyError:
+                        print('not passed')
+                    row[0] = val
+                    cursor.updateRow(row)
+                else:
+                    print('Error with pandas, probably that val of df.loc[{}, {}] does not exist'.format(row[1], field))
         del cursor
 
 def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
@@ -849,10 +851,10 @@ def mxd_inventory(fp_mxd, figure_name, dir_out):
     mxd_basename = os.path.basename(fp_mxd)
     todays_date = datetime.datetime.today().strftime('%B %d %Y')
     intro =('Figure Name: {}\n'
-            'Map Document: {}\n'
+            'Map Document: {}\n'    
             'Date: {}\n'
             'LAYER NAME = layer name in Table of Contents in map document (mxd)\n'
-            'DATA SOURCE  = path to data on McMillen-Jacobs file system').format(figure_name, mxd_basename, todays_date)
+            'DATA SOURCE  = path to data on McMillen file system').format(figure_name, mxd_basename, todays_date)
 
     txt = '{}\n\n{}'.format(intro, lyr_string_all)
     with open(fp_out, 'w') as out_file:
@@ -2078,8 +2080,6 @@ def detect_df_changes(df_orig, df_current, tc = 'DATA_LOCATION_MCMILLEN'):
     # update updates the series and will NOT assign to variable
     added = list(sc - so)
     omitted = list(so - sc)
-    comitted = copy.copy(so)
-    comitted = list(comitted.intersection(sc))
 
     # APPEND and remove duplicates
     df_assim = df_orig.append(df_current)
@@ -2090,7 +2090,6 @@ def detect_df_changes(df_orig, df_current, tc = 'DATA_LOCATION_MCMILLEN'):
     todays_date = datetime.datetime.today().strftime('%Y%m%d')
     df_assim.loc[added, 'ASSIMILATED'] = todays_date
     df_assim.loc[omitted, 'ASSIMILATED'] = 'removed'
-    df_assim.loc[comitted, 'ASSIMILATED'] = 'predates_{}'.format(todays_date)
     return (df_assim)
 
 def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACOBS',

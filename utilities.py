@@ -288,7 +288,7 @@ def add_path_multiIndex(df, layer, loc_idx, new_path, append):
     except KeyError:
         print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
-def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
+def update_field(fp_fcs, field_dict, field_match, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
     '''
     Fixed up to include add list of text to new field as option 2.
     the default is adding sequential numbers (for page_num) ZU 20210304
@@ -297,6 +297,7 @@ def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv
     field               field for da.searchCursor AND if adding text, set sequential
                         to FALSE and pass a path to csv.  Field will need to match
                         on csv and for attribute field in fc
+                        update 20240328 pass a DICT {'feat':<field to populate in feat>,'csv_idx_col': matching field in csv}
     incr                option to change
     sequential          Set to False to use the csv updating protocol
     fp_csv              pass this if adding text field to fp_fcs
@@ -304,13 +305,13 @@ def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv
     '''
 
     existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
+    field = field_dict['feat']
+    field_csv = field_dict['csv_idx_col']
     if sequential:
         if field not in existing_fields:
             arcpy.AddField_management(fp_fcs, field, 'SHORT')
             print(r'----Adding field {} ----'.format(field))
-
-        field = [field]
-        with arcpy.da.UpdateCursor(fp_fcs, field) as cursor:
+        with arcpy.da.UpdateCursor(fp_fcs, [field]) as cursor:
             ct = 1
             for row in cursor:
                 row[0] = ct
@@ -339,7 +340,8 @@ def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv
             print('----Updating Cursor ---')
             for row in cursor:
                 if row[1] in df.index.to_list():
-                    val = df.loc[row[1], field]
+                    print(field_csv)
+                    val = df.loc[row[1], field_csv]
                     try:
                         data_type = kwargs['data_type']
                         if data_type in ['SHORT', 'LONG']:
@@ -347,11 +349,11 @@ def update_field(fp_fcs, field, field_match, incr = 1, sequential = True, fp_csv
                         elif data_type in ['FLOAT', 'DOUBLE']:
                             val = float(val)
                     except KeyError:
-                        print('not passed')
+                        pass
                     row[0] = val
                     cursor.updateRow(row)
                 else:
-                    print('Error with pandas, probably that val of df.loc[{}, {}] does not exist'.format(row[1], field))
+                    pass
         del cursor
 
 def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
@@ -945,8 +947,10 @@ def write_folder_contents(fp, **kwargs):
     be README_<folder_name>_<date>.txt.  Will indicate date in file
     ARGS
     fp          file path for folder to README
-    Keyword Args
-        add_quotes          for file names with spaces, special characters that will result in errors in gdaltindex
+    KWARGS
+    add_quotes    for file names with spaces, special characters that will result in errors in gdaltindex
+    filetype        more like file extentsion
+    filepath        full filepath
     '''
     folder_name = os.path.split(fp)[-1]
     fname_readme = 'README_{}.txt'.format(folder_name)
@@ -2436,3 +2440,35 @@ def sql_dict_update_cursor(df, feat, key_fld, val_fld):
 
         '''
         os.listdir()
+
+def update_folder_inv(folder, csv, **kwargs):
+    '''
+    To inventory NHD folder particularly.
+    ZU 20240320
+    Args:
+        folder:         directory to inventory
+        csv:            path to existing csv or to update
+
+    Returns:
+        updated csv
+    '''
+
+    # if does not exist, create new
+    prod_list, basin_list, gnis_code,fname = [],[],[],[]
+    for fold in os.listdir(folder):
+        # ensure simple folder; not zip, gdb, etc.
+        if os.path.splitext(fold)[-1]!='':
+            pass
+        else:
+            substr = fold.split('_')
+            product, basin, gnis = substr[0], substr[-2], substr[2]
+            prod_list.append(product)
+            basin_list.append(basin)
+            gnis_code.append(gnis)
+            fname.append(fold)
+    df_add = pd.DataFrame(np.column_stack([fname, gnis_code,prod_list,basin_list]), columns = ['DATASET','code','product','HUC'])
+    df = pd.read_csv(csv)
+    df_joined = df.merge(df_add,how='outer',on='DATASET')
+    df_joined.to_csv(r'C:\Box\MCMGIS\GIS_Data\NHD\test_nhd.csv')
+
+

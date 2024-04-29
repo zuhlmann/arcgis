@@ -1,0 +1,27 @@
+{
+  "name": "trail",
+  "description": "trails at site",
+  "attributes": {
+    "name": "travel_width",
+    "dtype": "float",
+    "shoulder_width": "float",
+    "surface_material": [
+      {
+        "Code": "Asphalt",
+        "Description": "Asphalt"
+      },
+      {
+        "Code": "Gravel",
+        "Description": "Gravel"
+      },
+      {
+        "Code": "Dirt",
+        "Description": "Dirt"
+      },
+      {
+        "Code": "Other",
+        "Description": "Other"
+      }
+    ]
+  }
+}

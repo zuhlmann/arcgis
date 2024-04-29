@@ -6,7 +6,9 @@ import copy
 src_dset = r'E:\box_offline\projects\graip\USGS_1M_DEM_2019_mosaic_ft.tif'
 # src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\EklutnaRiver_BE_DEM_UTM6.tif'
 dir_out = r'E:\box_offline\projects\graip\clips\buffered'
+dir_out = r'E:\box_offline\ProTutorial2024\clips'
 
+# CA Zone2 = EPSG 6418
 src = osr.SpatialReference()
 src.SetFromUserInput('EPSG:6418')
 tgt = osr.SpatialReference()
@@ -17,11 +19,13 @@ tgt.SetFromUserInput('EPSG:6418')
 # NEAREST gdal.GRA_NearestNeighber
 # BILINEAR gdal.GRA_Bilinear
 
-fp_cutline = r'E:\box_offline\projects\graip\sheets_alignments_CASP2_buff200ft_square.shp'
-fp_cutline = r"E:\box_offline\projects\graip\sheets\full_sheets\mokelumne_roads_cad_buff100.shp"
+fp_cutline = r'E:\box_offline\projects\graip\sheets\sheets_alignments_CASP2_buff200ft_square.shp'
+# fp_cutline = r"E:\box_offline\projects\graip\sheets\full_sheets\mokelumne_roads_cad_buff100.shp"
+
 shp_name = os.path.split(fp_cutline)[-1][:-4]
 fld = 'FID'
-sc_num = [2]
+sc_num = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+sc_num = [1,2]
 
 ot = 'GTiff'
 # ot = 'JPEG'
@@ -39,7 +43,6 @@ for n in sc_num:
 
     # vf = tgt_val.replace('kml','sheet')
     vf = 'FID_{}'.format(n)
-    vf = 'RD_8N40'
 
     # DEM tgt dset
     fname = r'USGS_UpperSouthAmerican_Eldorado_2019_nn_{}_CA_SP2_ft.tif'.format(vf)

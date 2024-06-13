@@ -1,0 +1,184 @@
+{
+  "category": {
+    "point": {
+      "trail": {
+        "description": "trails at site",
+        "attributes": {
+          "travel_width": {
+            "dtype": "float"
+          },
+          "shoulder_width": {
+            "dtype": "float"
+          },
+          "trail surface": [
+            {
+              "Code": "Asphalt",
+              "Description": "Asphalt"
+            },
+            {
+              "Code": "Gravel",
+              "Description": "Gravel"
+            },
+            {
+              "Code": "Dirt",
+              "Description": "Dirt"
+            },
+            {
+              "Code": "Other",
+              "Description": "Other"
+            }
+          ]
+        }
+      },
+      "road": {
+        "description": "roads at site",
+        "attributes": {
+          "travel_width": {
+            "dtype": "float"
+          },
+          "shoulder_width": {
+            "dtype": "float"
+          },
+          "road paint": {
+            "dtype": "Boolean"
+          },
+          "Note": {
+            "dtype": "text"
+          },
+          "road surface": [
+            {
+              "Code": "Asphalt",
+              "Description": "Asphalt"
+            },
+            {
+              "Code": "Gravel",
+              "Description": "Gravel"
+            },
+            {
+              "Code": "Dirt",
+              "Description": "Dirt"
+            },
+            {
+              "Code": "Other",
+              "Description": "Other"
+            }
+          ]
+        }
+      },
+      "stormwater": {
+        "attributes": {
+          "culvert material": [
+            {
+              "Code": "CMP",
+              "Description": "CMP"
+            },
+            {
+              "Code": "RCP",
+              "Description": "RCP"
+            },
+            {
+              "Code": "PVC",
+              "Description": "PVC"
+            },
+            {
+              "Code": "Aluminum",
+              "Description": "Aluminum"
+            },
+            {
+              "Code": "HDPE",
+              "Description": "HDPE"
+            }
+          ],
+          "Diameter": [
+            {
+              "Code": 12,
+              "Description": 12
+            },
+            {
+              "Code": 15,
+              "Description": 15
+            },
+            {
+              "Code": 18,
+              "Description": 18
+            },
+            {
+              "Code": 24,
+              "Description": 24
+            },
+            {
+              "Code": 30,
+              "Description": 30
+            },
+            {
+              "Code": 36,
+              "Description": 36
+            },
+            {
+              "Code": 42,
+              "Description": 42
+            },
+            {
+              "Code": 48,
+              "Description": 48
+            }
+          ],
+          "Location": [
+            {
+              "Code": "Inlet",
+              "Description": "Inlet"
+            },
+            {
+              "Code": "Outlet",
+              "Descrption": "Outlet"
+            }
+          ]
+        }
+      },
+      "Point1":{
+        "attributes":{
+          "Point Utility Type": [
+            {
+              "Code": "Sewer",
+              "Description": "Sewer"
+            },
+            {
+              "Code": "Water",
+              "Description": "Water"
+            },
+            {
+              "Code": "Gas",
+              "Description": "Gas"
+            },
+            {
+              "Code": "Electric",
+              "Description": "Electric"
+            }
+          ]
+        }
+      },
+      "Point2": {
+        "attributes": {
+         "Other Point Types": [
+            {
+              "Code": "Signage",
+              "Description": "Signage"
+            },
+            {
+              "Code": "Barrier / Obstruction",
+              "Description": "Barrier / Obstruction"
+            },
+            {
+              "Code": "Vegetation",
+              "Description": "Vegetation"
+            },
+            {
+              "Code": "Miscellaneous",
+              "Description": "Miscellaneous"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

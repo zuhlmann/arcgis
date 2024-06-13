@@ -158,22 +158,28 @@ def file_paths_arc(folder_or_gdb, want_df, basic_cols, **kwargs):
         dsets = kwargs['dsets_desired']
     # if kword not passed then ALL dsets will be inventoried
     except KeyError:
-        dsets = [dset for dset in arcpy.ListDatasets()]
+        try:
+            dsets = [dset for dset in arcpy.ListDatasets()]
+            skip_protocol=False
+        except TypeError:
+            skip_protocol=True
+
     path_to_feat = []
     feats_df = []
     dsets_df =[]
-    for dset in dsets:
-        feats = arcpy.ListFeatureClasses(feature_dataset = dset)
-        for feat in feats:
-            if want_df:
-                # append feat name
-                feats_df.append(feat)
-                # repeat dset name for every feature layer within it
-                dsets_df.append(dset)
-                # returns a dataframe for manually comparing tables with changed feature names
-                path_to_feat.append(os.path.join(folder_or_gdb, dset, feat))
-            else:
-                df = 'FIX LATER'
+    if not skip_protocol:
+        for dset in dsets:
+            feats = arcpy.ListFeatureClasses(feature_dataset = dset)
+            for feat in feats:
+                if want_df:
+                    # append feat name
+                    feats_df.append(feat)
+                    # repeat dset name for every feature layer within it
+                    dsets_df.append(dset)
+                    # returns a dataframe for manually comparing tables with changed feature names
+                    path_to_feat.append(os.path.join(folder_or_gdb, dset, feat))
+                else:
+                    df = 'FIX LATER'
 
     # now for feats in gdb itself (NOT in a dset)
     feats_standalone = arcpy.ListFeatureClasses()

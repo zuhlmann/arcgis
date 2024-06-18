@@ -4,27 +4,27 @@
 # B) QGIS in Conda
 # https://gis.stackexchange.com/questions/119495/does-qgis-work-with-anaconda
 
-#20240502 Output values from selected features in location field
+# 20240502 Output values from selected features in location field
 
-# lyr_name = '2021_ALL_king_county_lidar_v2'
-# layer_in = QgsProject.instance().mapLayersByName(lyr_name)
-# layer_in = layer_in[0].selectedFeatures()
-#
-#
-# # Append a list with the values of your field
-# values_field = []
-# for feature in layer_in:
-#     values_field.append(feature['location']) # gml_id is the name of my field
-#
-# # Open your csv file
-# with open(r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\raster\lidar\merged\vrt\king_co_lidar_2021_TEST_contour.txt', 'w') as file:
-#     # Write in your file
-#     for feature in values_field:
-#         file.write(feature)
-#         file.write('\n') # line break
-#
-# # Close your csv file
-# file.close()
+lyr_name = 'lidar_index_2022'
+layer_in = QgsProject.instance().mapLayersByName(lyr_name)
+layer_in = layer_in[0].selectedFeatures()
+
+
+# Append a list with the values of your field
+values_field = []
+for feature in layer_in:
+    values_field.append(feature['location']) # gml_id is the name of my field
+
+# Open your csv file
+with open(r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\qgis_utils\staging2\tutorial_data_reproject.txt', 'w') as file:
+    # Write in your file
+    for feature in values_field:
+        file.write(feature)
+        file.write('\n') # line break
+
+# Close your csv file
+file.close()
 
 # A) Creating Vector File
 # from qgis.core import (
@@ -117,10 +117,10 @@ base_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\qgis_utils'
 # lrx = ulx + (src.RasterXSize * xres)
 # lry = uly + (src.RasterYSize * yres)
 
-# WRITE METHODS/atts to txt
-gdal_dset_atts = dir(gdal)
-os_environ = os.environm
-with open(os.path.join(base_dir, 'GDAL_CL_methods.txt'), 'w') as out_file:
-    str_formatted = '\n'.join(gdal_dset_atts)
-    out_file.write(str_formatted)
-out_file.close()
+# # WRITE METHODS/atts to txt
+# gdal_dset_atts = dir(gdal)
+# os_environ = os.environm
+# with open(os.path.join(base_dir, 'GDAL_CL_methods.txt'), 'w') as out_file:
+#     str_formatted = '\n'.join(gdal_dset_atts)
+#     out_file.write(str_formatted)
+# out_file.close()

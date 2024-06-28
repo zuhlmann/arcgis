@@ -9,20 +9,20 @@ import numpy as np
 # Creating indices with ll beginning tile coordinates, num rows, num cols and overlap.  Set overlap to 0
 # if none desired
 
-x0 = 7070000
-y0 = 1949000
+x0 = 9043750
+y0 = 625850
 # total overlap for two adjacent indices
 overlap = 0.05
 # split between the two tiles
 o_factor = (1-overlap)
-layout_width = 22.5
-layout_ht = 20
-ft_to_in_scale = 300
+layout_width = 12.3
+layout_ht = 8
+ft_to_in_scale = 1000
 # multiply by 0.5 because we are starting at centroid.  dx + dx = full indice width
 dx = (ft_to_in_scale * layout_width) *0.5
 dy = (ft_to_in_scale * layout_ht) * 0.5
-rows = 2
-cols = 2
+rows = 12
+cols = 1
 polys = []
 for c in range(cols):
     for r in range(rows):
@@ -34,9 +34,9 @@ for c in range(cols):
         ll = (x-dx, y-dy)
         polys.append(Polygon([ul,ur,lr,ll]))
 features = [i for i in range(len(polys))]
-crs = "EPSG:6418"
+crs = "EPSG:6559"
 gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys}, crs=crs)
-fp_out = r'C:\Box\MCM Projects\GreenGen Storage LLC\24-008 Mokelumne PS Regulatory (cont)\6.0 Plans and Specs\6.6_GIS\GIS_files\staging\indices\greengen_1in_to_300ft_24x32.shp'
+fp_out = r'C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\data_received\indices\wallowa_indices_v1.shp'
 gdr.to_file(fp_out)
 
 # # load df

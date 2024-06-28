@@ -15,6 +15,7 @@ import copy
 import compare_data
 import logging
 from imp import reload
+from pathlib import Path
 reload(logging)
 
 def show_table(display_preference):
@@ -1930,7 +1931,7 @@ def aprx_inventory(aprx_dir, csv_dir_out):
         # remove layouts without mapframes
         else:
             lyts.remove(l)
-
+    print(lyt_map_dict)
     # names = [m.name for m in maps]
     for m in maps_active:
         map_name = m.name
@@ -2401,6 +2402,7 @@ def dir_inv_recursive(parent_dir, fp_logfile):
 def sql_dict_update_cursor(df, feat, key_fld, val_fld):
     '''
     Create new field if does not exist and populate based on dict {key_fld:val_fld}
+    NOTE: used in the_basics notebook (towards bottom)
     ZU 20230517
     key_fld  |  val_fld
     18       |  blue
@@ -2471,4 +2473,147 @@ def update_folder_inv(folder, csv, **kwargs):
     df_joined = df.merge(df_add,how='outer',on='DATASET')
     df_joined.to_csv(r'C:\Box\MCMGIS\GIS_Data\NHD\test_nhd.csv')
 
+def subdir_inventory(parent_dir, target_col = r'DATA_LOCATION_MCMILLEN', ftype_filters=['.gdb'],**kwargs):
+    '''
+    Updated 20240620 for general usage
+    Args:
+        parent_dir:             directory to inventory
+        target_col:             for matching existing rows
+        filter_by_ftype         boolean - not developed; hardcoded filebype filters in list in subdir_inventory_scan
+        **kwargs:               new_inventory:    step 1 in standalone inventory
+                                update_inventory:  for adding to existing inventory
 
+    Returns:
+        saves csv or returns df
+
+    '''
+    from time import gmtime, strftime
+    fp_logfile = os.path.join(parent_dir, 'subdir_inventory_log.log')
+
+    try:
+        new_csv = kwargs['new_inventory']
+        df_subdir = subdir_inventory_create(parent_dir, target_col, fp_logfile, ftype_filters)
+        df_subdir = df_subdir.set_index(target_col)
+        if not os.path.exists(new_csv):
+            df_subdir.to_csv(new_csv)
+        else:
+            print('csv already exists; did not save')
+        return(df_subdir)
+    except KeyError:
+        pass
+    try:
+        updated_csv = kwargs['update_inventory']
+        df_orig = pd.read_csv(updated_csv, index_col = target_col)
+        try:
+            exclude_dir_list = kwargs['exclude_subdir_list']
+            df_subdir = subdir_inventory_create(parent_dir, target_col, fp_logfile, ftype_filters)
+        except KeyError:
+            df_subdir = subdir_inventory_create(parent_dir, target_col, fp_logfile,ftype_filters)
+        # run through above function
+        df_subdir = df_subdir.set_index(target_col)
+        print('FUCK', df_subdir)
+        df_concat = pd.concat([df_orig, df_subdir])
+        # In the case that updating a folder that has already been processed with this function
+        # this will retain the first row, and remove the new inventory
+        df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
+        df_concat.to_csv(updated_csv)
+    except KeyError:
+        pass
+
+def subdir_inventory_create(parent_dir, target_col, fp_logfile, ftype_filters):
+    '''
+    Updated 20240620 for general usage (non .shp)
+
+    Args:
+        parent_dir:             directory to inventory
+        target_col:             for matching existing rows
+        fp_logfile:             string path to logfile
+        filter_by_ftype         boolean - not developed; hardcoded filebype filters in list in subdir_inventory_scan
+    Returns:
+        df_subdir               dataframe inventory
+    '''
+    # need to hardcode basically. be better as aclass and methods
+    parent_dir_depth = len(os.path.normpath(parent_dir).split(os.sep))
+    fname, fp, subdir_name, filetype, base_subdir =  subdir_inventory_scan(parent_dir, fp_logfile, ftype_filters, parent_dir_depth)
+    col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE',target_col]
+    cols = np.column_stack([fname, base_subdir, subdir_name, filetype, fp])
+    df_subdir = pd.DataFrame(cols, columns=col_list)
+    return(df_subdir)
+def subdir_inventory_scan(parent_dir, fp_logfile, ftype_filters, parent_dir_depth):
+    '''
+    Inventory directories and subdirectories for ALL files.  ZU 20240620.
+    Created for Tacoma Hatchery for Jodi Burns
+    C:\Box\MCM Projects\City of Tacoma\24-068_Cowlitz Trout Hatchery Remodel\4.0 Data Collection
+
+    Args:
+       parent_dir:             directory to inventory
+        target_col:             for matching existing rows
+        fp_logfile:             string path to logfile
+        ftype_filters        list; file extentsion to SKIP - default = ['.gdb']
+        parent_dir_depth        depth of directory i.e. path/to/this/dir = 4
+
+    Returns:
+        feat_name:          list of feature names (shapfefiles)
+        feat_path:          list of path/to/shapefile
+        subdir_name         final subdirectory where file is located
+        filetype            filetype i.e. .xml, .pdf, etc.
+        base_subdir_list    first directory down from parent dir (or parent dir if no subdir)
+
+    '''
+    # https://stackoverflow.com/questions/49664518/python-2-7-using-scandir-to-traverse-all-sub-directories-and-return-list
+    # https://stackoverflow.com/questions/30214531/basics-of-recursion-in-python
+    logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
+    feat_path,feat_name,filetype,subdir_name, base_subdir_list = [],[],[],[],[]
+    subdir_list =[]
+    ftype_filters.extend([t.upper() for t in ftype_filters])
+    # to use for top subparent dir list
+    for f in os.scandir(parent_dir):
+        if f.is_file():
+            file_ext = os.path.splitext(f)[-1]
+            subdir=os.path.split(f)[0]
+            # FIND subdir by triggering (or not) exception below
+            # base_subdir = directory name one deeper than parent
+            try:
+                # try triggering exception - need idx + 1 because f.path inncludes filename
+                os.path.normpath(f.path).split(os.sep)[parent_dir_depth + 1]
+                base_subdir = os.path.normpath(f.path).split(os.sep)[parent_dir_depth]
+            except IndexError:
+                # in root of parent_dir
+                base_subdir = os.path.normpath(parent_dir).split(os.sep)[-1]
+            if file_ext not in ftype_filters:
+                # if subdir not in subdir_list:
+                #     tm = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+                #     msg_str = r'TIME {} IN THIS SUBDIRECTORY: {}'.format(tm, subdir)
+                #     logging.info(msg_str)
+                #     subdir_list.append(subdir)
+                feat_name.append(f.name)
+                feat_path.append(f.path)
+                filetype.append(file_ext)
+                subdir_name.append(Path(f.path).parent.name)
+                base_subdir_list.append(base_subdir)
+            else:
+                logging.info('SKIPPED THIS FILE due to file type filter: {}'.format(f.path))
+        # Find directory NOT .zip (needs work - ZU 202406200
+        elif (f.is_dir()) & (f.name[-4:] == '.zip'):
+            # base_subdir = directory name one deeper than parent
+            try:
+                # try triggering exception - need idx + 1 because f.path inncludes filename
+                os.path.normpath(f.path).split(os.sep)[parent_dir_depth + 1]
+                base_subdir = os.path.normpath(f.path).split(os.sep)[parent_dir_depth]
+            except IndexError:
+                # in root of parent_dir
+                base_subdir = os.path.normpath(parent_dir).split(os.sep)[-1]
+            feat_name.append('{}.zip'.format(f.name))
+            feat_path.append('{}.zip'.format(f.path))
+            subdir_name.append(Path(f.path).parent.name)
+            filetype.append(None)
+            base_subdir_list.append(base_subdir)
+        # keeps running if another folder encountered
+        else:
+            t0,t1,t2,t3,t4 = subdir_inventory_scan(f.path, fp_logfile,ftype_filters, parent_dir_depth)
+            feat_name.extend(t0)
+            feat_path.extend(t1)
+            subdir_name.extend(t2)
+            filetype.extend(t3)
+            base_subdir_list.extend(t4)
+    return(feat_name, feat_path, subdir_name, filetype, base_subdir_list)

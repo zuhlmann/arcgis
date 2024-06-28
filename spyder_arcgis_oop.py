@@ -131,7 +131,7 @@ class metaData(object):
             except KeyError:
                 utilities.zipShapefilesInDir(id, outDir)
 
-    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN', **kwargs):
+    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN'):
         '''
         To zip all the indices.  If zipped exist already, they will be ignored.
         20220610
@@ -2049,22 +2049,22 @@ class AgolAccess(metaData):
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__(prj_file, subproject_str)
-        u_name = 'uhlmann@mcmjac.com'
-        p_word = 'Gebretekle24!'
-        setattr(self, 'mcmjac_gis',  GIS(username = u_name, password = p_word))
-        print('Connected to {} as {}'.format(self.mcmjac_gis.properties.portalHostname, self.mcmjac_gis.users.me.username))
+        u_name = 'uhlmann_mcm'
+        p_word = 'Mmleciln138!'
+        setattr(self, 'mcm_gis',  GIS(username = u_name, password = p_word))
+        print('Connected to {} as {}'.format(self.mcm_gis.properties.portalHostname, self.mcm_gis.users.me.username))
         # dictionary that can be expanded upon
         # FOUND NO difference between feature layer collection and feature layer.  All feature layers were
-        # detected as both with mcmjac_gis.content.search(item_type = <collection or layer>)
+        # detected as both with mcm_gis.content.search(item_type = <collection or layer>)
         self.item_type_dict = {'shapefile': 'Shapefile',
                                 'feature_layer': 'Feature Layer',
                                 'webmap': 'Web Map',
                                 'vector_tile': 'Vector Tile Service',
                                 'web_map':'Web Map'}
         group_id_dict = {'KRRP_Geospatial': 'a6384c0909384a43bfd91f5d9723912b',
-                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
                         'mcmjac_everyone': 'b61fb4a0c0a944ebb3dd1558d4887e7f',
-                        'sacramento_canal':'eb6b401c468448a39c0aa522461ad3f8'}
+                        'sacramento_canal':'eb6b401c468448a39c0aa522461ad3f8',
+                         'SFT_FERC_Relicensing_McMillen':'cda69f86424c42b3b79e777f53a00bfa'}
         wkid_dict = {'CA_sp2':6416,
                         'webmercator': 3857}
         self.group_id_dict = group_id_dict
@@ -2077,12 +2077,9 @@ class AgolAccess(metaData):
         hardcoded. update if more groups become necessary.
         DELETE ZU 20210827
         '''
-        group_id_dict = {'krrp_geospatial': 'a6384c0909384a43bfd91f5d9723912b',
-                        'klamath_river_test': '01b12361c9e54386a955ba6e3279b09',
-                        }
-        group_id = group_id_dict[group_key]
-        krrp_geospatial = Group(getattr(self, 'mcmjac_gis'), group_id)
-        setattr(self, group_key, krrp_geospatial)
+        group_id = self.group_id_dict[group_key]
+        group_obj = Group(getattr(self, 'mcm_gis'), group_id)
+        setattr(self, group_key, group_obj)
 
     def identify_items_online(self, itemType=['feature'],
                                 group_name ='KRRP_Geospatial', **kwargs):
@@ -2102,12 +2099,12 @@ class AgolAccess(metaData):
         # If Group (default KRRC_Geospatial), add to query str
         if group_name is not None:
             group_id = self.group_id_dict[group_name]
-            query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
+            query_str = 'owner: uhlmann_mcm AND group:{}'.format(group_id)
         else:
-            query_str = 'owner: uhlmann@mcmjac.com'
+            query_str = 'owner: uhlmann_mcm'
         try:
             title = kwargs['title']
-            query_str = '{} AND title: {}'.format(title)
+            query_str = '{} AND title: {}'.format(query_str, title)
         except KeyError:
             pass
 
@@ -2137,7 +2134,7 @@ class AgolAccess(metaData):
             print(itemType)
             print(content_str)
             setattr(self,'content_string',content_str)
-            items = self.mcmjac_gis.content.search(query_str,
+            items = self.mcm_gis.content.search(query_str,
                                             item_type = itemType, max_items = 250)
             setattr(self, content_str, items)
             # filtered tags attribute
@@ -2240,7 +2237,7 @@ class AgolAccess(metaData):
         if action_type == 'add_data':
             for indice, indice_iloc in zip(self.indices, self.agol_indices_iloc):
                 agol_dir = self.df_agol.loc[indice, 'AGOL_DIR']
-                zip_dir = r'{}_zip'.format(agol_dir)
+                zip_dir = os.path.join(agol_dir,'zip')
                 shp = os.path.join(zip_dir, '{}.zip'.format(indice))
 
                 # TAGS
@@ -2255,7 +2252,7 @@ class AgolAccess(metaData):
                                     'tags':tags,
                                     'snippet':snippet}
                 print('ADDING TO AGOL: \n{}'.format(shp))
-                fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
+                fc_item = self. mcm_gis.content.add(properties_dict, data = shp)
                 # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
                 print('iloc = {} \\n fc_item {} '.format(indice_iloc, fc_item))
 
@@ -2278,7 +2275,8 @@ class AgolAccess(metaData):
                         #         "copyrightText":"new copyright","targetSR":{"wkid":6416}}
                         content_item.publish(publish_parameters=d)
                 else:
-                    print('item title {} did not match queried result on agol --> did NOT publish'.format(title))
+                    pass
+                    # print('item title {} did not match queried result on agol --> did NOT publish'.format(title))
                 # if we want to remove vals in ACTION col
                 try:
                     col_val = kwargs['update_action']
@@ -2290,14 +2288,15 @@ class AgolAccess(metaData):
             indices_remaining = copy.copy(self.indices)
             # get group id for sharing
             try:
-                getattr(self, 'krrp_geospatial')
+                group_obj = getattr(self, group)
             except AttributeError:
-                self.get_group('krrp_geospatial')
+                self.get_group(group)
+                group_obj = getattr(self, group)
             for content_item in user_content:
                 title = content_item.title
                 if title in self.indices:
                     print('SHARING: {}'.format(content_item))
-                    content_item.share(groups = [self.krrp_geospatial], org = True)
+                    content_item.share(groups = [group_obj], org = True)
                     df_agol.at[title, 'SHARED'] = True
                     indices_remaining.remove(title)
                 else:
@@ -2504,7 +2503,7 @@ class AgolAccess(metaData):
                                 'tags':tags[idx],
                                 'snippet':snippets[idx]}
             print('ADDING TO AGOL: \n{}'.format(shp))
-            fc_item = self. mcmjac_gis.content.add(properties_dict, data = shp)
+            fc_item = self. mcm_gis.content.add(properties_dict, data = shp)
             # fc_item.share(groups = 'a6384c0909384a43bfd91f5d9723912b')
             print('ct = {} \\n fc_item {} '.format(idx, fc_item))
 
@@ -2524,7 +2523,7 @@ class AgolAccess(metaData):
         query_str = 'owner: uhlmann@mcmjac.com AND group:{}'.format(group_id)
 
         for idx, it in enumerate(it_vals):
-            items = self.mcmjac_gis.content.search(query_str,
+            items = self.mcm_gis.content.search(query_str,
                                             item_type = it, max_items = 500)
             n = [i.title for i in items]
             nv = [i.numViews for i in items]
@@ -2701,7 +2700,7 @@ x`        target_col              name of column with fp or gdb path
 # 'getchildren', 'getiterator', 'insert', 'items', 'iter', 'iterfind', 'itertext', 'keys', 'makeelement', 'remove', 'set', 'tag', 'tail', 'text']
 
 # # 4) share items
-# feat_layer_list = mcmjac_gis.content.search(query = 'owner: uhlmann@mcmillencorp.com', item_type = 'Feature Layer Collection', max_items = 50)
+# feat_layer_list = mcm_gis.content.search(query = 'owner: uhlmann@mcmillencorp.com', item_type = 'Feature Layer Collection', max_items = 50)
 # target_tag = 'wetlands'
 # # find features which are wetlands
 # feats = [feat for feat in feat_layer_list if target_tag in feat.tags]
@@ -2732,14 +2731,14 @@ x`        target_col              name of column with fp or gdb path
 # target_content = krrp_content[5]
 # print(target_content)
 # target_id = target_content.id
-# feature_collection = mcmjac_gis.content.get(target_id)
+# feature_collection = mcm_gis.content.get(target_id)
 # fp_download = 'C:\\Users\\uhlmann\\box_offline\\test_download'
 # gdb_name = 'eagle.gdb'
 # result = feature_collection.export(gdb_name, 'File Geodatabase')
 # result.download(fp_download)
 
 
-# # dir(feat) from features mcmjac_gis.content.search()
+# # dir(feat) from features mcm_gis.content.search()
 # '_ux_item_type', '_workdir', 'access', 'accessInformation', 'add_comment', 'add_relationship',
 #  'appCategories', 'app_info', 'avgRating', 'banner', 'categories', 'clear', 'comments', 'content_status',
 #  'copy', 'copy_feature_layer_collection', 'create_thumbnail', 'create_tile_service', 'created', 'culture',

@@ -32,13 +32,13 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, subproject_str, use_item_desc = False,
+    def __init__(self,  prj_file, subproject_str, fp_csv_lookup, use_item_desc = False,
                 df_str = 'df', df_index_col = 'ITEM'):
         '''
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
+        # fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
         lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
@@ -156,18 +156,23 @@ class metaData(object):
             utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
-    def zip_shp_dir(self, shp_dir, zip_dir):
+    def zip_shp_dir(self, shp_dir, zip_dir, **kwargs):
         '''
         Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
         ZU 20230224
         Args:
             shp_dir:        path/to/shp/dir
             zip_dir:        path/to/zip/dir
+            **kwargs        renamed_files - use case for data_share_inv if renaming from indices.
+                            not awesome protocol
 
         Returns:
 
         '''
-        incl_files = copy.copy(self.indices)
+        try:
+            incl_files = kwargs['renamed_files']
+        except KeyError:
+            incl_files = copy.copy(self.indices)
         exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
         excl_files = list(set(exist_file) - set(incl_files))
         if len(excl_files)>0:
@@ -1990,11 +1995,13 @@ class metaData(object):
         rec_name = tracking_dict['recipient_name']
         project = tracking_dict['project']
 
+
         # prep shape dir
         arcpy.env.addOutputsToMap = False
 
         write_df = True
         if action == 'copy_to_gdb':
+            items=[]
             if base_dir[-4:]=='.gdb':
                 if os.path.exists(base_dir):
                     pass
@@ -2002,19 +2009,35 @@ class metaData(object):
                     bp, gdb_name = os.path.split(base_dir)
                     arcpy.CreateFileGDB_management(bp, gdb_name)
                 for fp, fn in zip(fp_list, self.indices):
-                    arcpy.FeatureClassToFeatureClass_conversion(fp, base_dir, fn)
+                    fc_new_name = self.df.loc[fn,'RENAME_SHARE']
+                    if not pd.isnull(fc_new_name):
+                        fname = fc_new_name
+                    else:
+                        fname=copy.copy(fn)
+                    items.append(fname)
+                    arcpy.FeatureClassToFeatureClass_conversion(fp, base_dir, fname)
             else:
                 write_df = False
                 print('Used copy_to_gdb action but did not pass path to gdb for base_dir parameter')
 
         if action == 'convert_zip':
             shp_dir = os.path.join(base_dir, 'shp')
+            items=[]
             if not os.path.exists(shp_dir):
                 os.mkdir(shp_dir)
             for fp, fn in zip(fp_list, self.indices):
-                arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fn)
+                fc_new_name = self.df.loc[fn,'RENAME_SHARE']
+                if not pd.isnull(fc_new_name):
+                    fname = fc_new_name
+                else:
+                    fname = copy.copy(fn)
+                arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fname)
+                items.append(fname)
             zip_dir = os.path.join(base_dir,'zip')
-            self.zip_shp_dir(shp_dir, zip_dir)
+            if not pd.isnull(fc_new_name):
+                self.zip_shp_dir(shp_dir, zip_dir, renamed_files=items)
+            else:
+                self.zip_shp_dir(shp_dir, zip_dir)
         if write_df:
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)
@@ -2022,7 +2045,7 @@ class metaData(object):
             c3 = [rec_comp] * len(self.indices)
             c4 = [rec_name] * len(self.indices)
             c5 = [project] * len(self.indices)
-            c6 = self.indices
+            c6 = items
             if action=='copy_to_gdb':
                 c7 = [os.path.join(base_dir, '{}.shp'.format(i)) for i in self.indices]
             elif action=='convert_zip':

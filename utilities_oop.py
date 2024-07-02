@@ -1,4 +1,11 @@
-
+import copy
+import os
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from time import gmtime, strftime
+import time
+import math
 
 class utilities(object):
     '''
@@ -31,10 +38,15 @@ class utilities(object):
         from time import gmtime, strftime
         # fp_logfile = os.path.join(parent_dir, 'subdir_inventory_log.log')
         ftype_filters.extend([t.upper() for t in ftype_filters])
-        self.ftype_filters=copy.copy(ftype_filters)
+        try:
+            kwargs['just_shp']
+            ftype_filters.extend(['.cpg','.dbf','.idx','.shx'])
+        except KeyError:
+            pass
+        self.ftype_filters = copy.copy(ftype_filters)
         try:
             new_csv = kwargs['new_inventory']
-            df_subdir = subdir_inventory_create(self)
+            df_subdir = self.subdir_inventory_create()
             df_subdir = df_subdir.set_index(self.target_col)
             if not os.path.exists(new_csv):
                 df_subdir.to_csv(new_csv)
@@ -48,9 +60,9 @@ class utilities(object):
             df_orig = pd.read_csv(updated_csv, index_col = self.target_col)
             try:
                 exclude_dir_list = kwargs['exclude_subdir_list']
-                df_subdir = subdir_inventory_create(self)
+                df_subdir = self.subdir_inventory_create()
             except KeyError:
-                df_subdir = subdir_inventory_create(self)
+                df_subdir = self.subdir_inventory_create()
             # run through above function
             df_subdir = df_subdir.set_index(self.target_col)
             print('FUCK', df_subdir)
@@ -77,9 +89,9 @@ class utilities(object):
         '''
         # need to hardcode basically. be better as aclass and methods
         self.parent_dir_depth = len(os.path.normpath(self.parent_dir).split(os.sep))
-        fname, fp, subdir_name, filetype, base_subdir =  subdir_inventory_scan(self)
-        col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE',target_col]
-        cols = np.column_stack([fname, base_subdir, subdir_name, filetype, fp])
+        fname, fp, subdir_name, filetype, base_subdir, time_modified, file_size =  self.subdir_inventory_scan(self.parent_dir)
+        col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE','FILESIZE','TIME_MODIFIED',self.target_col]
+        cols = np.column_stack([fname, base_subdir, subdir_name, filetype, file_size, time_modified, fp])
         df_subdir = pd.DataFrame(cols, columns=col_list)
         return(df_subdir)
     def subdir_inventory_scan(self, parent_dir):
@@ -105,7 +117,7 @@ class utilities(object):
         '''
         # https://stackoverflow.com/questions/49664518/python-2-7-using-scandir-to-traverse-all-sub-directories-and-return-list
         # https://stackoverflow.com/questions/30214531/basics-of-recursion-in-python
-        feat_path,feat_name,filetype,subdir_name, base_subdir_list = [],[],[],[],[]
+        feat_path,feat_name,filetype,subdir_name, base_subdir_list, file_size, time_modified = [],[],[],[],[],[],[]
         subdir_list =[]
         # to use for top subparent dir list
         for f in os.scandir(parent_dir):
@@ -116,22 +128,22 @@ class utilities(object):
                 # base_subdir = directory name one deeper than parent
                 try:
                     # try triggering exception - need idx + 1 because f.path inncludes filename
-                    os.path.normpath(f.path).split(os.sep)[parent_dir_depth + 1]
-                    base_subdir = os.path.normpath(f.path).split(os.sep)[parent_dir_depth]
+                    os.path.normpath(f.path).split(os.sep)[self.parent_dir_depth + 1]
+                    base_subdir = os.path.normpath(f.path).split(os.sep)[self.parent_dir_depth]
                 except IndexError:
                     # in root of parent_dir
                     base_subdir = os.path.normpath(parent_dir).split(os.sep)[-1]
                 if file_ext not in self.ftype_filters:
-                    # if subdir not in subdir_list:
-                    #     tm = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-                    #     msg_str = r'TIME {} IN THIS SUBDIRECTORY: {}'.format(tm, subdir)
-                    #     logging.info(msg_str)
-                    #     subdir_list.append(subdir)
                     feat_name.append(f.name)
                     feat_path.append(f.path)
                     filetype.append(file_ext)
                     subdir_name.append(Path(f.path).parent.name)
                     base_subdir_list.append(base_subdir)
+                    time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
+                    # 1000/1024 because Kibibyte not KiLibyte - https://superuser.com/questions/1528837/file-explorer-size-property-less-than-file-size-in-properties
+                    # divide by 1000 to go bytes to kibibyte
+                    size_math = Path(f.path).stat().st_size * (1000 / 1024) / 1000
+                    file_size.append(math.ceil(size_math))
                 else:
                     pass
                     # logging.info('SKIPPED THIS FILE due to file type filter: {}'.format(f.path))
@@ -150,12 +162,25 @@ class utilities(object):
                 subdir_name.append(Path(f.path).parent.name)
                 filetype.append(None)
                 base_subdir_list.append(base_subdir)
+                time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
+                file_size.append(math.floor(os.path.getsize(f.path / 1000)))
             # keeps running if another folder encountered
             else:
-                t0,t1,t2,t3,t4 = subdir_inventory_scan(f.path)
+                t0,t1,t2,t3,t4,t5,t6 = self.subdir_inventory_scan(f.path)
                 feat_name.extend(t0)
                 feat_path.extend(t1)
                 subdir_name.extend(t2)
                 filetype.extend(t3)
                 base_subdir_list.extend(t4)
-        return(feat_name, feat_path, subdir_name, filetype, base_subdir_list)
+                time_modified.extend(t5)
+                file_size.extend(t6)
+        return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size)
+    def flag_duplicates(self, tc):
+        '''
+
+        Args:
+            tc:         target_column to look for duplicates
+
+        Returns:
+
+        '''

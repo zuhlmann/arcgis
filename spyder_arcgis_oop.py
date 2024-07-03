@@ -13,8 +13,6 @@ import copy
 import pandas as pd
 import numpy as np
 import utilities
-import ductape_utilities
-import os_utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
@@ -38,7 +36,6 @@ class metaData(object):
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        # fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
         lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
@@ -72,115 +69,7 @@ class metaData(object):
 
         # PRJ FILE
         self.prj_file = prj_file
-    def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN'):
-        '''
-        Created long time ago.  Edited for different workflow - i.e. pass indices
-        for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
-        NEEDS TO incorporate offline_base ZU!! aug 2022
 
-        ARGS:
-        df_str              df for example
-        target_col          col name for  col with file path to fcs for conversion
-        '''
-        arcpy.env.addOutputsToMap = False
-        df = getattr(self, df_str)
-        ct = 0
-        for indice in self.indices:
-            inDir = df.loc[indice, 'AGOL_DIR']
-            # shp subdir does not exist
-            if not os.path.exists(inDir):
-                os.mkdir(inDir)
-            fp_fcs_in = df.loc[indice][target_col]
-            symb = '-'*20
-            fp_shp = os.path.join(inDir, indice + '.shp')
-            if not arcpy.Exists(fp_shp):
-                print('{}  CONVERTING  {}\nInput FCS: {}\nOutput SHP: {}'.format
-                                (symb, symb, fp_fcs_in, '{}.shp'.format(indice)))
-                arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_in, inDir, indice)
-                print('{}  CONVERSION COMPLETE  {}'.format(symb, symb))
-            else:
-                print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(fp_shp))
-
-    def zip_shp_agol_prep(self, df_str, **kwargs):
-        '''
-        Created long time ago.  Edited for different workflow - i.e. pass indices
-        for one fell swoop within function as opposed to calling within for loop.
-        Also, convert fcs to shp AND zip in one fell swoop.  ZU 5/21/21
-
-        ARGS:
-        base_dir_shp:           path/to/dir/with/agol_Uploads/2020_10_05
-        exclude_files:          take from self.indices --> string of shapefile name
-                                to exclude from zipping (already zipped)
-        '''
-
-        df = getattr(self, df_str)
-        yyyymmdd = datetime.datetime.today().strftime('%B %d %Y')
-
-        inDir = list(set(self.df.loc[self.indices,'AGOL_DIR'].to_list()))
-        for id in inDir:
-            outDir = '{}_zip'.format(id)
-            # ensure shp_dir does not already exist
-            if not os.path.exists(outDir):
-                os.mkdir(outDir)
-
-            # 3) ZIP all Files at once
-            try:
-                # exclude files if already zipped
-                exclude_files = kwargs['exclude_files']
-                utilities.zipShapefilesInDir(id, outDir, exclude_files = exclude_files)
-            except KeyError:
-                utilities.zipShapefilesInDir(id, outDir)
-
-    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN'):
-        '''
-        To zip all the indices.  If zipped exist already, they will be ignored.
-        20220610
-        '''
-        for index in self.indices:
-            fp_in = self.df.loc[index, tc]
-            dir_out = self.df.loc[index, 'AGOL_DIR']
-            shp_dir = os.path.join(dir_out, 'shp')
-            zip_dir = os.path.join(dir_out, 'zip')
-            for d in [shp_dir, zip_dir]:
-                if not os.path.exists(d):
-                    os.mkdir(d)
-                else:
-                    pass
-            print('FC to FC: {}'.format(fp_in))
-            arcpy.FeatureClassToFeatureClass_conversion(fp_in, shp_dir, index)
-        # zip
-        incl_files = copy.copy(self.indices)
-        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
-        excl_files = list(set(exist_file) - set(incl_files))
-        if len(excl_files)>0:
-            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
-        else:
-            utilities.zipShapefilesInDir(shp_dir, zip_dir)
-    def zip_shp_dir(self, shp_dir, zip_dir, **kwargs):
-        '''
-        Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
-        ZU 20230224
-        Args:
-            shp_dir:        path/to/shp/dir
-            zip_dir:        path/to/zip/dir
-            **kwargs        renamed_files - use case for data_share_inv if renaming from indices.
-                            not awesome protocol
-
-        Returns:
-
-        '''
-        try:
-            incl_files = kwargs['renamed_files']
-        except KeyError:
-            incl_files = copy.copy(self.indices)
-        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
-        excl_files = list(set(exist_file) - set(incl_files))
-        if len(excl_files)>0:
-            print('here ', excl_files)
-            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
-        else:
-            utilities.zipShapefilesInDir(shp_dir, zip_dir)
-            print('there')
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -361,24 +250,7 @@ class metaData(object):
         except KeyError:
             pass
 
-    def selection_index_translate(self, df_str_target):
-        '''
-        Designed to be used after initiating spyder_arcgis_oop from the AGOL class.
-        run this next --> i.e. selection_index_translate('df'). ZU 20220921
-        ARGS
-        df_str_target       self-explanatory
 
-        '''
-        if df_str_target == 'df':
-            prop_str_indices_iloc = 'indices_iloc'
-        else:
-            df_base_str = df_str.replace('df_','')
-            prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
-
-        indices = getattr(self, 'indices')
-        df_target = getattr(self, df_str_target)
-        indices_target = [df_target.index.get_loc(i) for i in indices]
-        setattr(self, prop_str_indices_iloc, indices_target)
     def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
@@ -413,9 +285,6 @@ class metaData(object):
         '''
 
         df = getattr(self, df_str)
-
-        # archive before deleting - this saves an archive csv
-        self.save_archive_csv(df_str)
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
@@ -694,109 +563,6 @@ class metaData(object):
                 tgt_item_md.copy(src_template_md)
                 tgt_item_md.save()
 
-
-
-    def quickie_inventory(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN',
-                        shp = False, standard_credits = True, **kwargs):
-        '''
-        quick grab item description to add to new csv for the gang.  ZRU 20201207
-        updated (slightly 5/11/2021) for functionality with feature classes.
-        ARGUMENTS
-        df_str              string of datatrame to getattr
-        target_col          data location column
-        shp                 True or False.  Nowadays (May 2021) most likely fcs
-                            not shapefiles
-        standard_credits    use same credits throughout.  Saves cut and pasting
-                            credits in spreadsheet
-        '''
-
-        # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
-        df = getattr(self, df_str)
-        fp_base = df.loc[self.indices][target_col].tolist()
-        index_names = df.loc[self.indices].index.to_list()
-        print(index_names)
-
-        # initiate lists
-        purp_list = []
-        abstract_list = []
-        credits_list = []
-
-        # If standard credits stamp
-        credits_stamp = 'Zachary Uhlmann\nMcMillen Corp\nuhlmann@mcmillencorp.com'
-        # If feature classes
-        if not shp:
-            for indice in self.indices:
-                fp_fcs = df.loc[indice][target_col]
-                tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
-                purp_list.append(tgt_item_md.summary)
-                abstract_list.append(tgt_item_md.description)
-                if standard_credits:
-                    credits = credits_stamp
-                else:
-                    credits = tgt_item_md.credits
-                credits_list.append(credits)
-
-        #If SHAPEFILE ---> relic
-        else:
-            # glob strings will create the string to pass to  glob.glob which
-            # uses th *xml wildcard to pull JUST the xml files from shapefile folder
-            glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
-            fp_xml_orig = []
-            for idx, glob_string in enumerate(glob_strings):
-                try:
-                    # ...[0] because it is a list of list - [[path/to/file]]
-                    temp = glob.glob(glob_string)[0]
-                    print(temp)
-                    fp_xml_orig.append(temp)
-                # if file not_uploaded, credit_crush, etc.  ZU 20210122
-                except IndexError:
-                    fp_xml_orig.append(fp_base[idx])
-            ct = 0
-            # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
-            # to append DATA_LOCATION_MCMILLEN key/pair to Item Description
-            # need to fix all columns in this regard when writing xml
-            # FIX THIS it is not prepared to handle other cases.
-            for idx, fp_xml in enumerate(fp_xml_orig):
-                print('indice {}. path {}'.format(self.indices_iloc[idx], fp_xml))# refer to notes below for diff betw trees and elements
-                try:
-                    tree = ET.parse(fp_xml)
-                    # root is the root ELEMENT of a tree
-                    root = tree.getroot()
-                    # remove the mess in root
-                    # Parent for idPurp
-                    dataIdInfo = root.find('dataIdInfo')
-                    # search for element <idPurp> - consult python doc for more methods. find
-                    # stops at first DIRECT child.  use root.iter for recursive search
-                    # if doesn't exist.  Add else statements for if does exist and update with dict
-                    purp = dataIdInfo.find('idPurp')
-                    abstract = dataIdInfo.find('idAbs')
-                    credits = dataIdInfo.find('idCredit')
-                    try:
-                        purp_list.append(purp.text)
-                    except AttributeError:
-                        purp_list.append(None)
-                    try:
-                        abstract_list.append(abstract.text)
-                    except AttributeError:
-                        abstract_list.append(None)
-                    try:
-                        credits_list.append(credits.text)
-                    except AttributeError:
-                        credits_list.append(None)
-                except FileNotFoundError:
-                    str = 'AGOL upload status: {}'.format(fp_base[idx])
-                    purp_list.append(str)
-                    abstract_list.append(None)
-                    credits_list.append(None)
-            # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
-
-        # EXPORT INVENTORY
-        df_quick_inventory = pd.DataFrame(np.column_stack(
-                                [index_names, purp_list, abstract_list, credits_list]),
-                                columns = ['feature_name', 'purpose', 'abstract', 'credits'])
-        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\compare_vers\database_contents\master_gdb\\agol_master_gdb_assessmen_2021c.csv'
-        pd.DataFrame.to_csv(df_quick_inventory, fp_out)
-
     def add_df(self, fp_csv, df_str, index_field):
         '''
         for adding additional dataframes. ZU 20210302
@@ -818,7 +584,7 @@ class metaData(object):
     def take_action(self, df_str, action_type,
                     target_col = 'DATA_LOCATION_MCMILLEN',
                     dry_run = False, replace_action = '', save_df = False,
-                    offline_source = True, offline_target = True, **kwargs):
+                    **kwargs):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
@@ -842,7 +608,6 @@ class metaData(object):
         df = getattr(self, df_str)
 
         # archive before deleting - this saves an archive csv
-        self.save_archive_csv(df_str)
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
@@ -936,8 +701,6 @@ class metaData(object):
                             # note this also creates fp_csv_archive
                             self.add_df(fp_csv_source, df_str_source, 'ITEM')
                             df_source = getattr(self, df_str_source)
-                            # save a base archive if NEVER saved and a daily archive if never saved
-                            self.save_archive_csv(df_str_source)
                         df_source.drop(index, inplace = True)
                         setattr(self, df_str_source, df_source)
 
@@ -971,26 +734,6 @@ class metaData(object):
                 # full path to new fcs
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
 
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    fp_fcs_new_online = copy.copy(fp_fcs_new)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_fcs_new = fp_fcs_new.replace(online_base, offline_base)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-
                 if not dry_run:
                     msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
                     print(fp_fcs_current)
@@ -998,11 +741,6 @@ class metaData(object):
                     arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
                     # Now fp is renamed, so change alias on NEW fcs
                     arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
-
-                # TRANSFORM
-                if offline_source:
-                    fp_fcs_current = copy.copy(fp_fcs_current_online)
-                    fp_fcs_new = copy.copy(fp_fcs_new_online)
 
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
@@ -1053,8 +791,6 @@ class metaData(object):
                     # note this also creates fp_csv_archive
                     self.add_df(fp_csv_source, df_str_source, 'ITEM')
                     df_source = getattr(self, df_str_source)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_source)
 
                 df_source = df_source.rename(index = {index:fc_new_name})
                 # Replace indice with new feat name
@@ -1096,28 +832,7 @@ class metaData(object):
                 rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
 
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_components = fp_fcs_current.split(os.sep)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
+                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
                 for idx, comp in enumerate(fp_components):
@@ -1185,7 +900,6 @@ class metaData(object):
                         self.add_df(fp_csv_target, df_str_target, 'ITEM')
                         df_target = getattr(self, df_str_target)
                         # save a base archive if NEVER saved and a daily archive if never saved
-                        self.save_archive_csv(df_str_target)
 
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -1197,7 +911,6 @@ class metaData(object):
                     self.add_df(fp_csv_source, df_str_source, 'ITEM')
                     df_source = getattr(self, df_str_source)
                     # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_source)
 
                 # for featureclasstofeatureclass
                 if pd.isnull(dset_move):
@@ -1358,30 +1071,8 @@ class metaData(object):
                     rename = False
 
                 fp_components = fp_fcs_current.split(os.sep)
-
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_components = fp_fcs_current.split(os.sep)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
-
+                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
+                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
@@ -1403,7 +1094,7 @@ class metaData(object):
                     fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
                     inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
                     fp_csv_source = os.path.join(inventory_dir, fname_csv)
-                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
+                    print('FP CSV SOURCE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1436,8 +1127,6 @@ class metaData(object):
                     # note this also creates fp_csv_archive
                     self.add_df(fp_csv_target, df_str_target, 'ITEM')
                     df_target = getattr(self, df_str_target)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_target)
 
                 # for featureclasstofeatureclass
                 if pd.isnull(dset_move):
@@ -1470,18 +1159,6 @@ class metaData(object):
                         except KeyError:
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
                         debug_idx = 4
-
-                    # TRANSFORM
-                    # if offline_source:
-                    #     fp_fcs_current = copy.copy(fp_fcs_current_online)
-                    if offline_target:
-                        fp_components = fp_fcs_new.split(os.sep)
-                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                        online_base = olt.loc[gdb_str, 'online']
-                        offline_base = olt.loc[gdb_str, 'offline']
-                        fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
-                    # TARGET DF UPDATES
-                    # Assemble Series to append to Master DF
 
                     col_name_original = df_item['COL_NAME_ARCHIVAL']
                     debug_idx = 41
@@ -1542,7 +1219,7 @@ class metaData(object):
 
                     if rename:
                         # Replace indice with new feat name
-                        print('1217')
+                        print('1217 - renaming')
                         idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
                         idt = idt[0]
                         print('index = {}'.format(idt))
@@ -1574,83 +1251,31 @@ class metaData(object):
                         logging.info(e)
 
 
-        elif action_type == 'gp':
-            pass
+        elif action_type in ['fc_to_fc_conv']:
+            var_dict = kwargs['var_dict']
+            fp_fcs_current = var_dict['feat_in']
+            index = self.indices[0]
+            df_item = df.loc[index]
 
-        else:
-            if action_type in  ['create_poly', 'create_line', 'create_point']:
-                # For adding new item to maestro and take_action(action_type = create_<type>...)
-                for index in self.indices:
-                    print('HERE')
-                    df_item = df.loc[index]
-                    dset_move = df_item['MOVE_LOCATION_DSET']
+            fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
-                    if offline_target:
-                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                    else:
-                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
+            dset = df_item['MOVE_LOCATION_DSET']
+            # NO DSET passed
+            if pd.isnull(dset):
+                pass
+            else:
+                fp_move = os.path.join(fp_move, dset)
 
-                    # NO DSET passed
-                    if pd.isnull(dset_move):
-                        dset_move=''
-
-                    fp_dset = os.path.join(fp_move, dset_move)
-                    # check to make sure output dset exists before proceeding
-                    if not arcpy.Exists(fp_dset):
-                        arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
-
-                    feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
-                                        'create_point':'POINT'}
-                    feat_type = feat_type_dict[action_type]
-                    fp_fcs_new = os.path.join(fp_move, index)
-
-                    feat_name = copy.copy(index)
-                    msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs_new)
-                    # flag_index
-                    if not dry_run:
-                        arcpy.CreateFeatureclass_management(fp_dset, feat_name, feat_type,
-                                                            spatial_reference = self.prj_file,
-                                                            has_m = 'No', has_z = 'No')
-
-            elif action_type in ['fc_to_fc_conv']:
-                var_dict = kwargs['var_dict']
-                fp_fcs_current = var_dict['feat_in']
-                index = self.indices[0]
-                df_item = df.loc[index]
-
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                    print('in offline: ', fp_move)
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
-                    print('in online: ', fp_move)
-
-
-                dset = df_item['MOVE_LOCATION_DSET']
-                # NO DSET passed
-                if pd.isnull(dset):
-                    pass
-                else:
-                    fp_move = os.path.join(fp_move, dset)
-
-                msg_str = 'FC to FC conversion: \n'
-                msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_fcs_current)
-                feat_name = copy.copy(index)
-                fp_fcs_new = os.path.join(fp_move, feat_name)
-                msg_str = '{}  FEAT_OUT: ---  {}\n'.format(msg_str, fp_fcs_new)
-                if not dry_run:
-                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_move, feat_name)
+            msg_str = 'FC to FC conversion: \n'
+            msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_fcs_current)
+            feat_name = copy.copy(index)
+            fp_fcs_new = os.path.join(fp_move, feat_name)
+            msg_str = '{}  FEAT_OUT: ---  {}\n'.format(msg_str, fp_fcs_new)
+            if not dry_run:
+                arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_move, feat_name)
 
             # documentation to add to table
             logging.info(msg_str)
-
-            # TRANSFORM
-            if offline_target:
-                fp_components = fp_fcs_new.split(os.sep)
-                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                online_base = olt.loc[gdb_str, 'online']
-                offline_base = olt.loc[gdb_str, 'offline']
-                fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
                 # Dict will be UPDATED below if kwarg specified
             d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
@@ -1742,91 +1367,6 @@ class metaData(object):
         setattr(self, df_name, df_symm_diff)
         print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
 
-    def merge_feats(self, df_str, target_fc, action = 'merge', **kwargs):
-        '''
-        belongs in python 2 mxd_utilities with arcpy.Mapping module, but that shit's
-        broken.  ZU 3/3/2021.  updated 3/10/21
-        ARGUMENTS
-        kwargs[field_mappings]      list of fields to RETAIN.  Additionally, orig_fname
-                                    and orig_fpath will be added
-        df_str                      select dataframe from self
-        target_fc                   output fc
-        action                      just merge at this point
-        '''
-
-        arcpy.env.overwriteOutput = True
-        merge_lyrs = []
-        # if field mappings requested
-        try:
-            fields_to_map = kwargs['field_mappings']
-            if not isinstance(fields_to_map, list):
-                fields_to_map = [fields_to_map]
-            field_mappings = arcpy.FieldMappings()
-            field_mappings_true = True
-        except KeyError:
-            field_mappings_true = False
-
-        for i, index in enumerate(self.indices):
-            df = getattr(self, df_str)
-            # replace or else unicode error
-            fp_fcs = df.loc[index]['layer_source'].replace('\\','/')
-            fcs_name = os.path.basename(fp_fcs)
-            if arcpy.Exists(fp_fcs):
-                lyr_name = 'merge_lyr_{}'.format(i + 1)
-                fcs_obj = arcpy.FeatureClassToFeatureClass_conversion(fp_fcs, 'in_memory', lyr_name)
-                # get feature path
-                lyr_path = fcs_obj[0]
-                # add new field
-                print('adding fname {}'.format(fcs_name))
-                arcpy.AddField_management(lyr_path, 'orig_fname', 'text', field_length = 50)
-                arcpy.CalculateField_management(lyr_path, 'orig_fname', '"{}"'.format(fcs_name), "PYTHON")
-                arcpy.AddField_management(lyr_path, 'orig_fpath', 'text',field_length = 254)
-                arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"'+fp_fcs+'"', "PYTHON")
-                # arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"{}"'.format(fp_fcs), "PYTHON")
-                print('adding fcs to merge list:\n{}'.format(fcs_name))
-                merge_lyrs.append(lyr_path)  #list of feat names
-                if field_mappings_true:
-                    field_mappings.addTable(lyr_path)
-            else:
-                print('feature with ACTION == delete does not exist:\n{}'.format(fcs_name))
-        # direct from field mappings arc documentation
-        fields_to_map.extend(['orig_fname', 'orig_fpath'])
-        if field_mappings_true:
-            for field in field_mappings.fields:
-                if field.name not in fields_to_map:
-                    field_mappings.removeFieldMap(field_mappings.findFieldMapIndex(field.name))
-            arcpy.Merge_management(merge_lyrs, target_fc, field_mappings)
-        else:
-            arcpy.Merge_management(merge_lyrs, target_fc)
-    def replace_indices(self, df_str, **kwargs):
-        '''
-        For dataframes from csv with no value (math.nan) from pd.DataFrame.read_csv
-        due to...no values in csv.  This version requires user to set indices
-        using self.selection_idx.  Additionally, this version is simply for standalone
-        shapefiles or feature classes (i.e. not within gdb) and takes name automatically
-        from base filename.  ZRU 04/05/2021
-        ARGS
-        df_str          i.e. df_working
-        '''
-        df = getattr(self, df_str)
-        try:
-            kwargs['shapefile']
-            orig_index = df.index.to_list()
-            indices_iloc = self.indices_iloc
-            fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN.to_list()
-            print(fp_fcs)
-            # flag_index
-            # example of zip syntax for indices_iloc
-            for idx, item in zip(indices_iloc, fp_fcs):
-                path, ext = os.path.splitext(item)
-                new_indice = os.path.split(path)[-1]
-                print('replaceing with {}'.format(new_indice))
-                orig_index[idx] = new_indice
-            df.index = orig_index
-            setattr(self, df_str, df)
-        except KeyError:
-            print('did it pass')
-            pass
     def create_base_properties(self, df_str):
         '''
         adds base properties for dataframes such as fp_csv and fp_log
@@ -1855,31 +1395,6 @@ class metaData(object):
         setattr(self, fp_csv_archive_prop_str, '{}_archive.csv'.format(basepath))
         fp_log = '{}_logfile.log'.format(basepath)
         setattr(self, fp_log_prop_str, fp_log)
-
-    def save_archive_csv(self, df_str):
-
-        if df_str == 'df':
-            # if df
-            str_csv_archive_obj = 'fp_csv_archive'
-            str_csv_archive_temp_obj = 'fp_csv_archive_temp'
-        else:
-            # strip away the df_
-            df_base_str = df_str.replace('df_', '')
-            str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
-            str_csv_archive_temp_obj = 'fp_csv_archive_temp_{}'.format(df_base_str)
-
-        # 2) path to csv archive
-        fp_csv_archive = getattr(self, str_csv_archive_obj)
-
-        # create archive if first time managing database
-        if not os.path.exists(fp_csv_archive):
-            # initiate archive file for day
-            print('save an archive:\n{}'.format(fp_csv_archive))
-            pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
-
-        # # perhaps useful later for cleanup?
-        # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]
-        # date_obj = datetime.date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:]))
 
     def cast_columns(self, df_str):
         '''
@@ -2571,47 +2086,7 @@ class AgolAccess(metaData):
         df_agol_raw = df_agol_raw.set_index('ITEM')
         setattr(self, 'df_agol_raw', df_agol_raw)
 
-    def email_group(self):
-        signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmillencorp.com'
-        #
-        # Group User Info: dict with keys - owner, admins, users
-        try:
-            members_dict = krrp_geospatial.get_members()
-        except NameError:
-            self.get_group('krrp_geospatial')
-            members_dict = self.krrp_geospatial.get_members()
-        # create list of lists
-        list_list = [members_dict[key] for key in members_dict.keys()]
-        # flatten list
-        all_members = [member for members in list_list for member in members if isinstance(members, list)]
 
-        zach = members_dict['owner']
-        subject = 'Klamath River Renewal ArcGIS Online Reorganizing'
-        email_body = '''Hi everybody,\n\nApologies on the formatting of this
-                        message but I have limited communication functionality
-                        in Groups for ArcGIS Online, particularly formatting text.
-                        I wanted to let everyone know that we have rearranged
-                        some content on our ArcGIS Online Group "KRRP_Geospatial".
-                        I updated and added metadata to the existing datasets -
-                        feature layers and shapefiles - to ensure that Item
-                        Descriptions in ArcGIS products are informative and
-                        archival.  This includes metadata describing
-                        data origins, status (current or
-                        archival), file location, type, etc.\n\n
-                        I also parsed the existing geodatabases (gdb)
-                        into individual shapefiles and will REMOVE the
-                        gdbs.  The only data this pertains to is the Wetlands.gdb
-                        and requested_layers_working.gdb (FERC bdrs
-                        and LoW_60Design).  The exact contents of those gdbs are
-                        now available as individual shapefiles.  I have yet to
-                        remove them, so if anybody objects please let me know.
-                        I wanted to give everyone a heads up in case those files
-                        slated for replacement are used in personal maps online.
-                        \n\nFeel free to contact me if you have questions.  Also,
-                        please RESPOND WITH YOUR EMAIL ADDRESS FOR FUTURE COMMUNICATION.
-                        That way I can format e-mails properly.   {}.
-                        \n\n'''.format(signature)
-        self.krrp_geospatial.notify(all_members, subject, email_body, 'email')
 
 class DbaseManagement(metaData):
     '''
@@ -2678,99 +2153,4 @@ x`        target_col              name of column with fp or gdb path
         setattr(self, df_str_target, df_target)
 
 
-    # # used to remove subelements made messing arounc
-    # el_list = ['idTestZRU', 'idPurp']
-    # for el_str in el_list:
-    #     el_remove = root.find(el_str)
-    #     try:
-    #         root.remove(el_remove)
-    #     except TypeError:
-    #         pass
-    # tree.write(fp_xml)
-
-# XML NOTES
-# 1) ATTRIBUTTES are useful for metadata (data about data)
-# 8/6/2020
-# Use attributes for Metadata (https://www.w3schools.com/xml/xml_attributes.asp):
-# SEE the id="501".  GOOD IDEA
-# <messages>
-#     <note id="501">
-#         <to>bnasty</to>
-#         <from>zach</from>
-#     </note>
-#     note id="502">
-#         <to>mom</to>
-#         <from>zach</from>
-#     </note>
-# </messages>
-
-# 2) TREES and ELEMENTS
-# 8/6/2020
-# from here: https://docs.python.org/2/library/xml.etree.elementtree.html
-# XML is an inherently hierarchical data format, and the most natural way to represent it is
-# with a tree. ET has two classes for this purpose - ElementTree represents the whole XML document
-# as a tree, and Element represents a single node in this tree. Interactions with the whole
-# document (reading and writing to/from files) are usually done on the ElementTree level.
-# Interactions with a single XML element and its sub-elements are done on the Element level.
-
-# 3)  RANDOM
-# dir from ET object
-# root iterates with [child for child in root] to datatype xml.etree.ElementTree.Element with dir of each element or child
-# ['__class__', '__copy__', '__deepcopy__', '__delattr__', '__delitem__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__',
-# '__getattribute__', '__getitem__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__len__',
-#'__lt__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setitem__', '__setstate__',
-# '__sizeof__', '__str__', '__subclasshook__', 'append', 'attrib', 'clear', 'extend', 'find', 'findall', 'findtext', 'get',
-# 'getchildren', 'getiterator', 'insert', 'items', 'iter', 'iterfind', 'itertext', 'keys', 'makeelement', 'remove', 'set', 'tag', 'tail', 'text']
-
-# # 4) share items
-# feat_layer_list = mcm_gis.content.search(query = 'owner: uhlmann@mcmillencorp.com', item_type = 'Feature Layer Collection', max_items = 50)
-# target_tag = 'wetlands'
-# # find features which are wetlands
-# feats = [feat for feat in feat_layer_list if target_tag in feat.tags]
-#
-# # publishing is EASY:
-# for feat in feats:
-#     feat.publish()
-# # sharing is EASY
-# for feat in feats:
-#     feat.share(groups = [krrp_geospatial])
-# # for feat in feats:
-# #     print(feat)
-
-
-# # 4) One off eagle data
-# eagle_gdb = 'eagle_features\\KlamathEagleImpactAnalysis_20200714_gdb\\KlamathEagleImpactAnalysis_20200714.gdb'
-# fp_gdb = os.path.join(fp_new_data, eagle_gdb)
-# fcs = ['BaldEagleTerritoryZones_20200424', 'EagleTerritoryPoints_20200415_Proj',
-#     'EagleViewingLocations_20200312', 'GoldenEagleTerritoryZones_20200424',
-#     'GoldenEagleViewsheds_20200114']
-# fp_fcs = [os.path.join(fp_gdb, fc) for fc in fcs]
-# [arcpy.FeatureClassToGeodatabase_conversion(fc, fp_out) for fc in fp_fcs]
-
-# # 4) GIS Random tidbits
-# # print content
-# krrp_content = krrp_geospatial.content()
-# # string search from parse_dir
-# target_content = krrp_content[5]
-# print(target_content)
-# target_id = target_content.id
-# feature_collection = mcm_gis.content.get(target_id)
-# fp_download = 'C:\\Users\\uhlmann\\box_offline\\test_download'
-# gdb_name = 'eagle.gdb'
-# result = feature_collection.export(gdb_name, 'File Geodatabase')
-# result.download(fp_download)
-
-
-# # dir(feat) from features mcm_gis.content.search()
-# '_ux_item_type', '_workdir', 'access', 'accessInformation', 'add_comment', 'add_relationship',
-#  'appCategories', 'app_info', 'avgRating', 'banner', 'categories', 'clear', 'comments', 'content_status',
-#  'copy', 'copy_feature_layer_collection', 'create_thumbnail', 'create_tile_service', 'created', 'culture',
-#   'delete', 'delete_rating', 'delete_relationship', 'dependencies', 'dependent_to', 'dependent_upon',
-#   'description', 'documentation', 'download', 'download_metadata', 'download_thumbnail', 'export', 'extent',
-#    'fromkeys', 'get', 'get_data', 'get_thumbnail', 'get_thumbnail_link', 'groupDesignations', 'guid',
-#    'homepage', 'id', 'industries', 'isOrgItem', 'itemid', 'items', 'keys', 'languages', 'largeThumbnail',
-#    'layers', 'licenseInfo', 'listed', 'metadata', 'modified', 'move', 'name', 'numComments', 'numRatings',
-#    'numViews', 'owner', 'ownerFolder', 'pop', 'popitem', 'properties', 'protect', 'protected', 'proxies',
-#    'proxyFilter', 'publish', 'rating', 'reassign_to', 'register', 'related_items', 'resources', 'scoreCompleteness',
-#    'screenshots', 'setdefault', 'share', 'shared_with', 'snippet', 'spatialReference', 'status', 'tables', 'tags',
-#     'thumbnail', 'title', 'type', 'typeKeywords', 'unregister', 'unshare', 'update', 'url', 'usage', 'values']
+  

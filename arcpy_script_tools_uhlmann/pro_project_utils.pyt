@@ -211,26 +211,26 @@ class project_lyR_inv(object):
         aprx = arcpy.mp.ArcGISProject(prodoc)
         lyt_list = aprx.listLayouts()
 
-        lyt_name, ds_list, lyr_name, map_element = [], [], [], []
+        lyt_name, ds_list, lyr_name, map_element, map_name = [], [], [], [], []
         for lyt in lyt_list:
-            el = lyt.listElements()
-            el_map = [e.map for e in el if e.type == 'MAPFRAME_ELEMENT']
+            # el = lyt.listElements()
+            el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
             for em in el:
-                if em.type == 'MAPFRAME_ELEMENT':
-                    for lyr in em.map.listLayers():
-                        if lyr.visible:
-                            lyr_name.append(lyr.name)
-                            lyt_name.append(lyt.name)
-                            map_element.append(em.name)
-                            try:
-                                ds_list.append(lyr.dataSource)
-                            except AttributeError:
-                                ds_list.append('NA')
-                        else:
-                            pass
+                for lyr in em.map.listLayers():
+                    if lyr.visible:
+                        lyr_name.append(lyr.name)
+                        lyt_name.append(lyt.name)
+                        map_element.append(em.name)
+                        map_name.append(em.map.name)
+                        try:
+                            ds_list.append(lyr.dataSource)
+                        except AttributeError:
+                            ds_list.append('NA')
+                    else:
+                        pass
 
-        df = pd.DataFrame(np.column_stack([lyt_name, map_element,lyr_name, ds_list]),
-                          columns = ['layout','map_element','layer','source'])
+        df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list]),
+                          columns = ['layout','map_element','map_name','layer','source'])
 
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)

@@ -1,13 +1,11 @@
-import copy
 import arcpy
-import os
-
 # AMAZING RESOURE
 #https://gis.stackexchange.com/questions/339744/python-toolbox-only-update-parameter-when-specific-parameter-changes
 import pandas as pd
 import numpy as np
 import os
 import copy
+import ntpath
 
 class ToolBox(object):
     def __init__(self):
@@ -122,6 +120,7 @@ class project_lyT_inv(object):
         df.to_csv(csv)
 
         return
+
 class project_lyR_inv(object):
     '''
     To identify layers from map elements in all layouts.  Outputs layer name, layout name, data source.
@@ -165,7 +164,13 @@ class project_lyR_inv(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-        parameters = [param0,param1,param2,param3]
+        param4 = arcpy.Parameter(
+            displayName="Unique Layer Inventory",
+            name = "unuque_lyr_inventory",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input")
+        parameters = [param0,param1,param2,param3,param4]
         return parameters
     def isLicensed(self):
         '''
@@ -184,16 +189,19 @@ class project_lyR_inv(object):
             prodoc_selected = True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         elif parameters[0].altered and not parameters[0].hasBeenValidated:
             parameters[1].value=None
             prodoc_selected=True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         else:
             prodoc_selected  = False
         if prodoc_selected:
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         return parameters
 
 
@@ -211,26 +219,26 @@ class project_lyR_inv(object):
         aprx = arcpy.mp.ArcGISProject(prodoc)
         lyt_list = aprx.listLayouts()
 
-        lyt_name, ds_list, lyr_name, map_element = [], [], [], []
+        lyt_name, ds_list, lyr_name, map_element, map_name = [], [], [], [], []
         for lyt in lyt_list:
-            el = lyt.listElements()
-            el_map = [e.map for e in el if e.type == 'MAPFRAME_ELEMENT']
+            # el = lyt.listElements()
+            el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
             for em in el:
-                if em.type == 'MAPFRAME_ELEMENT':
-                    for lyr in em.map.listLayers():
-                        if lyr.visible:
-                            lyr_name.append(lyr.name)
-                            lyt_name.append(lyt.name)
-                            map_element.append(em.name)
-                            try:
-                                ds_list.append(lyr.dataSource)
-                            except AttributeError:
-                                ds_list.append('NA')
-                        else:
-                            pass
+                for lyr in em.map.listLayers():
+                    if lyr.visible:
+                        lyr_name.append(lyr.name)
+                        lyt_name.append(lyt.name)
+                        map_element.append(em.name)
+                        map_name.append(em.map.name)
+                        try:
+                            ds_list.append(lyr.dataSource)
+                        except AttributeError:
+                            ds_list.append('NA')
+                    else:
+                        pass
 
-        df = pd.DataFrame(np.column_stack([lyt_name, map_element,lyr_name, ds_list]),
-                          columns = ['layout','map_element','layer','source'])
+        df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list]),
+                          columns = ['layout','map_element','map_name','layer','source'])
 
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)
@@ -239,6 +247,20 @@ class project_lyR_inv(object):
         csv = os.path.join(parameters[2].valueAsText,fname)
         df.to_csv(csv)
 
+        if parameters[4].value is not None:
+            fname = fname.replace('.csv','_Unique_Lyrs.csv')
+            csv = os.path.join(parameters[2].valueAsText, fname)
+            def join_list(v):
+                vn = v.to_list()
+                vn = list(set(vn))
+                vn = ', '.join(vn)
+                return (vn)
+
+            groupby_source = df.groupby('source').agg({'map_name': join_list})
+            groupby_source = groupby_source.reset_index()
+
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source.source]
+            groupby_source['ITEM'] = fnames
+            groupby_source.to_csv(csv)
+
         return
-
-

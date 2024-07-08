@@ -32,13 +32,13 @@ class metaData(object):
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, subproject_str, fp_csv_lookup, use_item_desc = False,
+    def __init__(self,  prj_file, subproject_str, use_item_desc = False,
                 df_str = 'df', df_index_col = 'ITEM'):
         '''
         KEYWORD ARGS:
         fill in now that reworked
         '''
-        # fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
+        fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
         lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro

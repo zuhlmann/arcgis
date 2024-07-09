@@ -2088,69 +2088,16 @@ class AgolAccess(metaData):
 
 
 
-class DbaseManagement(metaData):
+class APRX_Overhaul(metaData):
     '''
     cleaning up gdbs
     '''
 
     def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
-        super().__init__(fp_csv)
+        self.csv_aprx_overhaul = csv_aprx_overhaul
 
-    def flag_gdb_dset(self, df_str, target_col, flag_val, new_col_name = 'protect'):
-        '''
-        identify base paths or datasets within gdbs (via full fp) to protect from
-        ANY deletion. ZRU 3/31/2021
+    def create_
 
-        ARGS
-        df_str                  for csv added during add_df
-x`        target_col              name of column with fp or gdb path
-        flag_val               gdb or subdirectory or dset to flag
-        new_col_name            default == 'protect'.  This will serve as flag for
-                                categorically disqualifying row for deletion.
-        '''
-
-        df = getattr(self, df_str)
-        target_list = df[target_col].tolist()
-        target_list = [os.path.realpath(item) for item in target_list]
-        # populate new col if it doesn't exist
-        # it will exist if run multiple times with different flag_vals
-        if new_col_name not in df.columns:
-            df[new_col_name] = False
-        # get col idx for assigning values
-        col_idx = df.columns.get_loc(new_col_name)
-        for idx, fp in enumerate(target_list):
-            for component in fp.split(os.sep):
-                if flag_val == component:
-                    # figure out how to set with iloc
-                    df.iloc[idx, col_idx] = True
-                    # break will only apply to inner loops
-                    break
-
-        setattr(self, df_str, df)
-
-    def symmetric_diff_basic(self, df_str_source, source_col, df_str_target, target_col, mark_remove = True):
-        # get dataframes
-        df_source = getattr(self, df_str_source)
-        df_target = getattr(self, df_str_target)
-
-        # find overlapping values for action
-        set_source = set(df_source[source_col].to_list())
-        set_target = set(df_target[target_col].to_list())
-        target_vals = list(set_target - set_source)
-
-        if mark_remove:
-            new_col_name = 'remove'
-        else:
-            new_col_name = 'protect'
-
-        #probably unnecessary, but in case funciton run multiple times
-        if new_col_name not in df_target.columns:
-            df_target[new_col_name] = False
-
-        for idx in list(range(len(df_target))):
-            if df_target.loc[idx, target_col] in target_vals:
-                df_target.loc[idx, new_col_name] = True
-        setattr(self, df_str_target, df_target)
 
 
   

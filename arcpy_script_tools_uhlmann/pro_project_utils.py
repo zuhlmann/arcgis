@@ -168,7 +168,7 @@ class project_lyR_inv(object):
             displayName="Unique Layer Inventory",
             name = "unuque_lyr_inventory",
             datatype="GPBoolean",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input")
         parameters = [param0,param1,param2,param3,param4]
         return parameters

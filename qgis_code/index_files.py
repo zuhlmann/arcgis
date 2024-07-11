@@ -15,7 +15,7 @@ y0 = 625850
 overlap = 0.05
 # split between the two tiles
 o_factor = (1-overlap)
-layout_width = 12.3
+layout_width = 12
 layout_ht = 8
 ft_to_in_scale = 1000
 # multiply by 0.5 because we are starting at centroid.  dx + dx = full indice width
@@ -36,7 +36,7 @@ for c in range(cols):
 features = [i for i in range(len(polys))]
 crs = "EPSG:6559"
 gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys}, crs=crs)
-fp_out = r'C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\data_received\indices\wallowa_indices_v1.shp'
+fp_out = r'C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\data_received\indices\wallowa_indices_v2.shp'
 gdr.to_file(fp_out)
 
 # # load df

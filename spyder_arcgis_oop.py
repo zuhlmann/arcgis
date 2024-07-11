@@ -1600,9 +1600,9 @@ class metaData(object):
                         arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
 
                     feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
-                                        'create_point':'POINT'}
+                                      'create_point':'POINT'}
                     feat_type = feat_type_dict[action_type]
-                    fp_fcs_new = os.path.join(fp_move, index)
+                    fp_fcs_new = os.path.join(fp_move, dset_move, index)
 
                     feat_name = copy.copy(index)
                     msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs_new)
@@ -1611,6 +1611,63 @@ class metaData(object):
                         arcpy.CreateFeatureclass_management(fp_dset, feat_name, feat_type,
                                                             spatial_reference = self.prj_file,
                                                             has_m = 'No', has_z = 'No')
+                    # documentation to add to table
+                    logging.info(msg_str)
+
+                    d = {'FEATURE_DATASET': dset_move,
+                         'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+
+                    # columns to transfer from source to target
+                    merge_cols = df_item['MERGE_COLUMNS']
+                    debug_idx = 42
+                    if not pd.isnull(merge_cols):
+                        print('MERGE COLUMNS: ', merge_cols)
+                        keys = [c.strip() for c in merge_cols.split(',')]
+                        vals = df.loc[index, keys]
+                        d.update(dict(zip(keys, vals)))
+                    debug_idx = 43
+                    ser_append = pd.Series(data=d,
+                                           index=list(d.keys()),
+                                           name=feat_name)
+
+                    df_target, df_str_target, fp_csv_target = self.return_df(fp_move)
+                    # append new row from Series
+                    debug_idx = 7
+                    # first drop index in case multiple times running due to error
+                    try:
+                        df_target.drop(feat_name, inplace=True)
+                        print('1205; item already exists in target gdb')
+                    except KeyError:
+                        pass
+
+                    # append to target gdb
+                    df_target = df_target.append(ser_append)
+
+                    # similar in function to updating dictionary, but instead, updating row in df if new vals
+                    df_join = pd.DataFrame(d, index=[index])
+                    # saves name to csv column above index
+                    df_join.index.name = copy.copy(df.index.name)
+                    setattr(self, 'debug_df_join', df_join)
+                    setattr(self, 'debug_df', df)
+                    col_order_orig = df.columns.to_list()
+                    idx_order_orig = df.index.to_list()
+                    df = df_join.combine_first(df)
+                    debug_idx = 81
+                    # If ValueError: cannot reindex from duplicate axis, this means there are duplicate row indices, i.e. ITEM duplicated
+                    # NOTE! does not have to be the indices from agol_obj.indices.  Anywhere on csv with duplicate rows will trigger error
+                    df = df.reindex(idx_order_orig)
+                    debug_idx = 82
+                    # or else gets reordered alphabetically
+                    df = df.reindex(columns=col_order_orig)
+
+                    # SAVE TO TARGET_DF every Iter in case Exception
+                    setattr(self, df_str_target, df_target)
+                    setattr(self, df_str, df)
+
+                    if save_df:
+                        pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                        pd.DataFrame.to_csv(df_target, fp_csv_target)
+
 
             elif action_type in ['fc_to_fc_conv']:
                 var_dict = kwargs['var_dict']
@@ -1641,75 +1698,46 @@ class metaData(object):
                 if not dry_run:
                     arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_move, feat_name)
 
-            # documentation to add to table
-            logging.info(msg_str)
+                # documentation to add to table
+                logging.info(msg_str)
 
-            # TRANSFORM
-            if offline_target:
-                fp_components = fp_fcs_new.split(os.sep)
-                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                online_base = olt.loc[gdb_str, 'online']
-                offline_base = olt.loc[gdb_str, 'offline']
-                fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
 
-                # Dict will be UPDATED below if kwarg specified
-            d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
-                'DATA_LOCATION_MCMILLEN':[fp_fcs_new.replace(os.sep, '//')]}
 
-            df_append = pd.DataFrame(d)
-            df_append = df_append.set_index('ITEM')
+    def return_df(self, fp_move):
+        '''
+        Attempted to abstract some things, did not work.  ended up with narrow utility
+        Args:
+            fp_move:
 
-            # Get TARGET DF/CSV/STR
-            fp_components = fp_fcs_new.split(os.sep)
-            for idx, comp in enumerate(fp_components):
-                if '.gdb' in comp:
-                    # Get Source STR
-                    tgt_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+        Returns:
+            all the variables related to df_target
+        '''
 
-                    if tgt_gdb_or_dir_str in viable_gdbs:
-                        standalone = False
-                    else:
-                        standalone = True
-                    # Once gdb is found in path, then break
-                    break
-                # translation - there was no gdb in fp_fcs_orig
-                elif idx == (len(fp_components) - 1):
-                    # No gdb found == shapefile passed - use dir/folder
-                    standalone = True
-            if not standalone:
-                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-                fp_csv_target = os.path.join(inventory_dir, fname_csv)
-                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
-            else:
-                fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
-                df_str_target = 'df_{}_standalone'.format(self.subproject_str)
+        # Get TARGET DF/CSV/STR
+        fp_components_target = fp_move.split(os.sep)
+        tgt_gdb_or_dir = fp_components_target[-1]
+        # dir as target
+        if '.gdb' not in tgt_gdb_or_dir:
+            tgt_gdb_or_dir = fp_components_target[-1]
+            tgt_gdb_or_dir_str = '{}_dir'.format(tgt_gdb_or_dir)
+        # GDB as target
+        else:
+            tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
 
-            # Only grabs TargetGDB once per gdb
-            try:
-                df_target = getattr(self, df_str_target)
-            # if dataframe NOT already added via self.add_df
-            except AttributeError:
-                print('populating target')
-                # note this also creates fp_csv_archive
-                self.add_df(fp_csv_target, df_str_target, 'ITEM')
-                df_target = getattr(self, df_str_target)
+        inventory_dir = self.lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+        fname_csv = self.lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+        fp_csv_target = os.path.join(inventory_dir, fname_csv)
+        df_str_target = self.lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+        # Only grabs TargetGDB once per gdb
+        try:
+            df_target = getattr(self, df_str_target)
+        # if dataframe NOT already added via self.add_df
+        except AttributeError:
+            print('populating target')
+            self.add_df(fp_csv_target, df_str_target, 'ITEM')
+            df_target = getattr(self, df_str_target)
+        return(df_target, df_str_target, fp_csv_target)
 
-            # Since adding new row, it's append
-            df_target = df_target.append(df_append)
-            # since updating existing NOT append
-            print(df)
-            print('\n')
-            print(df_append)
-            df.update(df_append)
-            print('AFTERWARDS/n')
-            print(df)
-            setattr(self, df_str_target, df_target)
-            setattr(self, df_str, df)
-
-            if save_df:
-                pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
-                pd.DataFrame.to_csv(df_target, fp_csv_target)
 
     def df_sets(self, df_list, col_list):
         '''

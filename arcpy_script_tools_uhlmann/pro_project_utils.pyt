@@ -168,7 +168,7 @@ class project_lyR_inv(object):
             displayName="Unique Layer Inventory",
             name = "unuque_lyr_inventory",
             datatype="GPBoolean",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input")
         parameters = [param0,param1,param2,param3,param4]
         return parameters
@@ -248,7 +248,7 @@ class project_lyR_inv(object):
         df.to_csv(csv)
 
         if parameters[4].value is not None:
-            fname = fname.replace('.csv','_Unique_Lyrs.csv')
+            fname = fname.replace('.csv','_unique.csv')
             csv = os.path.join(parameters[2].valueAsText, fname)
             def join_list(v):
                 vn = v.to_list()

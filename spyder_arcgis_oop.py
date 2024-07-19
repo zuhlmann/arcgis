@@ -838,6 +838,8 @@ class metaData(object):
 
 
         arcpy.env.addOutputsToMap = False
+        # for use in abstracted function
+        setattr(self, 'target_column', target_col)
         # load dataframe
         df = getattr(self, df_str)
 
@@ -867,7 +869,7 @@ class metaData(object):
         dict_col_name_orig = {'original':'DATA_LOCATION_MCM_ORIGINAL',
                                 'staging':'DATA_LOCATION_MCM_STAGING',
                                 'previous':'DATA_LOCATION_MCM_PREVIOUS'}
-
+        setattr(self, 'dict_archival_col', dict_col_name_orig)
         lookup_table = copy.copy(self.lookup_table)
         # if gdb not in viable subproject, then add to poo poo platter
         project_str = lookup_table[lookup_table.subproject == self.subproject_str].project.values[0]
@@ -918,9 +920,7 @@ class metaData(object):
                                 # No gdb found == shapefile passed - use dir/folder
                                 standalone = True
                         if not standalone:
-                            fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
-                            inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
-                            fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                            fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
                             df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                         else:
                             # clunky way of grabbing any inventory dir value
@@ -1035,9 +1035,7 @@ class metaData(object):
                         # No gdb found == shapefile passed - use dir/folder
                         standalone = True
                 if not standalone:
-                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
-                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
-                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1142,10 +1140,7 @@ class metaData(object):
                         # No gdb found == shapefile passed - use dir/folder
                         standalone = True
                 if not standalone:
-                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
-                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
-                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
-                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
+                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1171,9 +1166,7 @@ class metaData(object):
                     src_tgt_same = False
 
                 if not src_tgt_same:
-                    inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-                    fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-                    fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
                     df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                     # Only grabs TargetGDB once per gdb
                     try:
@@ -1400,9 +1393,7 @@ class metaData(object):
                         standalone = True
 
                 if not standalone:
-                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
-                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
-                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
                     print('FP CSV SOURSE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
@@ -1421,10 +1412,7 @@ class metaData(object):
                 # GDB as target
                 else:
                     tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
-
-                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-                fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_gdb_inv_csv']
                 print('CSV TARGET:    --->',  fp_csv_target)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
@@ -1483,28 +1471,7 @@ class metaData(object):
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
 
-                    col_name_original = df_item['COL_NAME_ARCHIVAL']
-                    debug_idx = 41
-                    if not pd.isnull(col_name_original):
-                        col_name_original = dict_col_name_orig[col_name_original]
-                        df.at[index, col_name_original] = fp_fcs_current
-                        d = {col_name_original: fp_fcs_current,
-                             'FEATURE_DATASET': dset_move,
-                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
-                    # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
-                    # to master, and now decide to move back to archival.
-                    else:
-                        d = {'FEATURE_DATASET': dset_move,
-                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
-                    # columns to transfer from source to target
-                    merge_cols = df_item['MERGE_COLUMNS']
-                    debug_idx = 42
-                    if not pd.isnull(merge_cols):
-                        print('MERGE COLUMNS: ', merge_cols)
-                        keys = [c.strip() for c in merge_cols.split(',')]
-                        vals = df.loc[index, keys]
-                        d.update(dict(zip(keys, vals)))
-                    debug_idx =43
+                    d = self.return_append_dict(df_str, index, fp_fcs_new, target_col)
                     ser_append = pd.Series(data=d,
                                            index=list(d.keys()),
                                            name=feat_name)
@@ -1614,22 +1581,6 @@ class metaData(object):
                     # documentation to add to table
                     logging.info(msg_str)
 
-                    d = {'FEATURE_DATASET': dset_move,
-                         'DATA_LOCATION_MCMILLEN': fp_fcs_new}
-
-                    # columns to transfer from source to target
-                    merge_cols = df_item['MERGE_COLUMNS']
-                    debug_idx = 42
-                    if not pd.isnull(merge_cols):
-                        print('MERGE COLUMNS: ', merge_cols)
-                        keys = [c.strip() for c in merge_cols.split(',')]
-                        vals = df.loc[index, keys]
-                        d.update(dict(zip(keys, vals)))
-                    debug_idx = 43
-                    ser_append = pd.Series(data=d,
-                                           index=list(d.keys()),
-                                           name=feat_name)
-
                     df_target, df_str_target, fp_csv_target = self.return_df(fp_move)
                     # append new row from Series
                     debug_idx = 7
@@ -1641,14 +1592,16 @@ class metaData(object):
                         pass
 
                     # append to target gdb
+                    d = self.return_append_dict(df_str, index,fp_fcs_new, target_col)
+                    ser_append = pd.Series(data=d,
+                                           index=list(d.keys()),
+                                           name=feat_name)
                     df_target = df_target.append(ser_append)
 
                     # similar in function to updating dictionary, but instead, updating row in df if new vals
                     df_join = pd.DataFrame(d, index=[index])
                     # saves name to csv column above index
                     df_join.index.name = copy.copy(df.index.name)
-                    setattr(self, 'debug_df_join', df_join)
-                    setattr(self, 'debug_df', df)
                     col_order_orig = df.columns.to_list()
                     idx_order_orig = df.index.to_list()
                     df = df_join.combine_first(df)
@@ -1738,7 +1691,37 @@ class metaData(object):
             df_target = getattr(self, df_str_target)
         return(df_target, df_str_target, fp_csv_target)
 
+    def return_append_dict(self, df_str, idx_current,fp_fcs_new, target_col):
+        df = getattr(self,df_str)
+        df_item = df.loc[idx_current]
+        dset_move = df_item['MOVE_LOCATION_DSET']
 
+        col_name_original = df_item['COL_NAME_ARCHIVAL']
+
+        if not pd.isnull(col_name_original):
+            col_name_original = self.dict_archival_col[col_name_original]
+            fp_fcs_current = os.path.normpath(df_item[target_col])
+            df.at[idx_current, col_name_original] = fp_fcs_current
+            d = {col_name_original: fp_fcs_current,
+                 'FEATURE_DATASET': dset_move,
+                 'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+        # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
+        # to master, and now decide to move back to archival.
+        else:
+            d = {'FEATURE_DATASET': dset_move,
+                 'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+        # columns to transfer from source to target
+        merge_cols = df_item['MERGE_COLUMNS']
+        debug_idx = 42
+        if not pd.isnull(merge_cols):
+            print('MERGE COLUMNS: ', merge_cols)
+            keys = [c.strip() for c in merge_cols.split(',') if c == self.target_column]
+            # Remove TC - DATA_LOCATION_MCMILLEN if present
+            vals = df.loc[idx_current, keys]
+            d.update(dict(zip(keys, vals)))
+        debug_idx = 43
+        setattr(self, df_str, df)
+        return(d)
     def df_sets(self, df_list, col_list):
         '''
         utility to find overlapping and symmetric differences between different

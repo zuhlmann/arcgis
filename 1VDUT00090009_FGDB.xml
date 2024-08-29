@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<metadata>
+	<idinfo>
+		<citation>
+			<citeinfo>
+				<origin>U.S. Geological Survey</origin>
+				<pubdate>19750401</pubdate>
+				<title>Aerial Photos</title>
+				<geoform>Photo</geoform>
+				<pubinfo>
+					<publish>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</publish>
+					<pubplace>Sioux Falls, South Dakota</pubplace>
+				</pubinfo>
+				<onlink>https://doi.org/10.5066/F7610XKM</onlink>
+				<serinfo>
+					<issue>Aerial Photography</issue>
+					<sername>Single Frame Aerial Photography</sername>
+				</serinfo>
+			</citeinfo>
+		</citation>
+		<descript>
+			<abstract>The Aerial Photography Single Frame Records collection is a large and diverse group of imagery acquired by Federal organizations from 1937 to the present. Over 6.4 million frames of photographic images are available for download as medium and high resolution digital products. The high resolution data provide access to photogrammetric quality scans of aerial photographs with sufficient resolution to reveal landscape detail and to facilitate the interpretability of landscape features. Coverage is predominantly over the United States and includes portions of Central America and Puerto Rico. Individual photographs vary in scale, size, film type, quality, and coverage.
+</abstract>
+			<purpose>USGS and Non USGS aerial photography were collected for various government projects such as mapping. The photographs also serve as a valuable research tool for the scientific community and general public.
+</purpose>
+		</descript>
+		<timeperd>
+			<current>Ground Condition</current>
+			<timeinfo>
+				<grouping>
+					<sngdate>
+						<caldate>19750401</caldate>
+					</sngdate>
+				</grouping>
+			</timeinfo>
+		</timeperd>
+		<status>
+			<progress>In Work</progress>
+			<update>As Needed</update>
+		</status>
+		<spdom>
+			<bounding>
+				<westbc>-83.535025</westbc>
+				<northbc>35.45</northbc>
+				<eastbc>-83.338907</eastbc>
+				<southbc>35.2894</southbc>
+			</bounding>
+			<dsgpoly>
+				<dsgpolyx>
+					<grouping>
+						<gringlat>35.293956</gringlat>
+						<gringlon>-83.535025</gringlon>
+					</grouping>
+				</dsgpolyx>
+			</dsgpoly>
+		</spdom>
+		<keywords>
+			<theme>
+				<grouping>
+					<themekey>Photographs</themekey>
+					<themekey>Aerial Photography</themekey>
+					<themekey>Imagery</themekey>
+					<themekey>Black-and-White </themekey>
+					<themekey>Panchromatic</themekey>
+					<themekey>Black-and-White Infrared</themekey>
+					<themekey>Earth Science > Radiance or Imagery > Infrared Wavelengths > Infrared Imagery</themekey>
+					<themekey>Natural Color</themekey>
+					<themekey>Color Infrared</themekey>
+					<themekey>Earth Science > Radiance or Imagery > Visible Wavelengths > Visible Imagery</themekey>
+					<themekey>Color</themekey>
+					<themekt>None</themekt>
+				</grouping>
+			</theme>
+			<place>
+				<grouping>
+					<placekey>Central America</placekey>
+					<placekt>U.S. Department of Commerce, 1995, Countries, dependencies, areas of special sovereignty, and their principal administrative divisions, Federal Information Processing Standard 10-4, Washington, D.C., National Institute of Standards and Technology</placekt>
+				</grouping>
+			</place>
+		</keywords>
+		<accconst>Downloading and using these data signifies that the user comprehends and will comply with the USGS Privacy Policy. Reading and understanding all portions of the metadata will protect the interests of both the user and the USGS. Please refer to https://www.usgs.gov/privacy.html.</accconst>
+		<useconst>There is no guarantee of warranty concerning the accuracy of these data. Users should not use these data for critical applications without a full awareness of their limitations. Temporal changes may have occurred since the data were collected and some parts of these data may no longer represent actual surface conditions.
+
+There are no restrictions regarding the use of data distributed by the U.S. Geological Survey (USGS), unless expressly identified prior to or at the time of receipt. We request the following statement be used: Data available from the U.S. Geological Survey. Please refer to https://lta.cr.usgs.gov/ee_help_data_citation for more information on data citation.
+</useconst>
+		<ptcontac>
+			<cntinfo>
+				<grouping>
+					<cntorgp>
+						<cntper>custserv@usgs.gov</cntper>
+						<cntorg>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</cntorg>
+					</cntorgp>
+				</grouping>
+				<cntpos>Customer Service Representative</cntpos>
+				<cntaddr>
+					<addrtype>Mailing and Physical Address</addrtype>
+					<address>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center 47914 252nd Street</address>
+					<city>Sioux Falls</city>
+					<state>South Dakota</state>
+					<postal>57198-0001</postal>
+					<country>USA</country>
+				</cntaddr>
+				<cntfax>605-594-6589</cntfax>
+				<cntvoice>605-594-6151</cntvoice>
+				<cnttdd>1-800-252-4547</cnttdd>
+				<cntemail>custserv@usgs.gov</cntemail>
+				<hours>0800 - 1600 CT, M-F, 1400 - 2200 h GMT</hours>
+				<cntinst>custserv@usgs.gov</cntinst>
+			</cntinfo>
+		</ptcontac>
+		<browse>
+			<browsed>This is a compressed and resampled version of the data set of interest to help validate area of interest, data quality, and the impact of cloud cover, if it exists.</browsed>
+			<browsen>Browse graphic for: https://ims.cr.usgs.gov/browse/aircraft/phoenix/aerial/5SWT/5SWT08052/5SWT08052_020.jpg</browsen>
+			<browset>JPEG</browset>
+		</browse>
+		<secinfo>
+			<secclass>Unclassified</secclass>
+			<sechandl>None</sechandl>
+			<secsys>None</secsys>
+		</secinfo>
+		<native>Oracle</native>
+		<crossref>
+			<citeinfo>
+				<geoform>Photo</geoform>
+				<onlink>https://doi.org/10.5066/F7610XKM</onlink>
+				<origin>U.S. Geological Survey</origin>
+				<pubdate>19750401</pubdate>
+				<pubinfo>
+					<publish>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</publish>
+					<pubplace>Sioux Falls, South Dakota</pubplace>
+				</pubinfo>
+				<serinfo>
+					<sername>Single Frame Aerial Photography</sername>
+				</serinfo>
+				<title>Aerial Photos</title>
+			</citeinfo>
+		</crossref>
+	</idinfo>
+	<dataqual>
+		<attracc>
+			<attraccr>Radiometry is verified by visual inspection of the photo image. Slight systematic radiometric differences may exist between adjacent files; these are due primarily to differences in source image capture dates and sun angles along flight lines. These differences can be observed in an image's general lightness or darkness when it is compared to adjacent file coverages. Tonal balancing may be performed over a group of images during a mosaicing process which may serve to lighten or darken adjacent images to improve their tone.</attraccr>
+		</attracc>
+		<cloud>0  Percent </cloud>
+		<complete>These photographs were retrieved under rigid quality control and product specifications (i.e., stereo coverage, continuous area coverage of map or administrative units).</complete>
+		<lineage>
+			<procstep>
+				<proccont>
+					<cntinfo>
+						<grouping>
+							<cntorgp>
+								<cntper>custserv@usgs.gov</cntper>
+								<cntorg>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</cntorg>
+							</cntorgp>
+						</grouping>
+						<cntpos>Customer Service Representative</cntpos>
+						<cntaddr>
+							<addrtype>Mailing and Physical Address</addrtype>
+							<address>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center 47914 252nd Street</address>
+							<city>Sioux Falls</city>
+							<state>South Dakota</state>
+							<postal>57198-0001</postal>
+							<country>USA</country>
+						</cntaddr>
+						<cntfax>605-594-6589</cntfax>
+						<cntvoice>605-594-6151</cntvoice>
+						<cntemail>custserv@usgs.gov</cntemail>
+						<cnttdd>1-800-252-4547</cnttdd>
+						<hours>0800 - 1600 CT, M-F, 1400 - 2200 h GMT</hours>
+						<cntinst>custserv@usgs.gov</cntinst>
+					</cntinfo>
+				</proccont>
+				<procdate>19750401</procdate>
+				<procdesc>Aerial Photographs were acquired by a variety of government agencies and the military. Aircraft used to collect these photos include General Dynamic's WB-57F; Lockheed C-130B and NP-3A aircraft; Lockheed U-2s and Convair 990 aircraft; and other commercial aircraft. Cameras used on past missions include Zeiss, Hasselblad EL 500, Wild Heerbrugg RC8, and Chicago Aerial KA 62. </procdesc>
+			</procstep>
+			<srcinfo>
+				<srccitea>Aerial Photos</srccitea>
+				<srccite>
+					<citeinfo>
+						<geoform>Photo</geoform>
+						<onlink>https://doi.org/10.5066/F7610XKM</onlink>
+						<origin>U.S. Geological Survey</origin>
+						<pubdate>19750401</pubdate>
+						<pubinfo>
+							<publish>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</publish>
+							<pubplace>Sioux Falls, South Dakota</pubplace>
+						</pubinfo>
+						<title>Aerial Photos</title>
+					</citeinfo>
+				</srccite>
+				<srccontr>Source material from which images are created</srccontr>
+				<srcscale>78000</srcscale>
+				<srctime>
+					<srccurr>Source Photography Date</srccurr>
+					<timeinfo>
+						<grouping>
+							<sngdate>
+								<caldate>19750401</caldate>
+							</sngdate>
+						</grouping>
+					</timeinfo>
+				</srctime>
+				<typesrc>Film</typesrc>
+			</srcinfo>
+		</lineage>
+		<logic>Not Available</logic>
+	</dataqual>
+	<spdoinfo>
+		<grouping>
+			<direct>Raster</direct>
+		</grouping>
+	</spdoinfo>
+	<distinfo>
+		<grouping>
+			<availabl>
+				<timeinfo>
+					<grouping>
+						<sngdate>
+							<caldate>19750401</caldate>
+						</sngdate>
+					</grouping>
+				</timeinfo>
+			</availabl>
+			<distliab>Although these data have been processed successfully on a computer system at the USGS, no warranty expressed or implied is made by the USGS regarding the use of the data on any other system, nor does the act of distribution constitute any such warranty.  </distliab>
+			<distrib>
+				<cntinfo>
+					<grouping>
+						<cntorgp>
+							<cntper>custserv@usgs.gov</cntper>
+							<cntorg>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</cntorg>
+						</cntorgp>
+					</grouping>
+					<cntpos>Customer Service Representative</cntpos>
+					<cntaddr>
+						<addrtype>Mailing and Physical Address</addrtype>
+						<address>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center 47914 252nd Street</address>
+						<city>Sioux Falls</city>
+						<state>South Dakota</state>
+						<postal>57198-0001</postal>
+						<country>USA</country>
+					</cntaddr>
+					<cntvoice>605-594-6151</cntvoice>
+					<cntfax>605-594-6589</cntfax>
+					<cntemail>custserv@usgs.gov</cntemail>
+					<hours>0800 - 1600 CT, M-F, 1400 - 2200 h GMT</hours>
+					<cntinst>custserv@usgs.gov</cntinst>
+					<cnttdd>1-800-252-4547</cnttdd>
+				</cntinfo>
+			</distrib>
+			<stdorder>
+				<fees>Typically, all data available from USGS/EROS are downloadable at no cost to the user. There are some cases when a service fee is required to convert the analog film record to a digital file. This non-refundable fee is $30 per scene/frame.</fees>
+				<grouping>
+					<digform>
+						<digtinfo>
+							<formname>TIFF</formname>
+						</digtinfo>
+						<digtopt>
+							<grouping>
+								<offoptn>
+									<recfmt>Varies</recfmt>
+								</offoptn>
+								<onlinopt>
+									<computer>
+										<grouping>
+											<networka>
+												<networkr>https://earthexplorer.usgs.gov</networkr>
+											</networka>
+										</grouping>
+									</computer>
+								</onlinopt>
+							</grouping>
+						</digtopt>
+					</digform>
+				</grouping>
+				<turnarnd>A majority of the data are available for immediate downloading. Specific data processing may take 24 to 48 hours and film scanning service requests involving payment to USGS can require 3 - 4 weeks upon successful payment of the request.</turnarnd>
+			</stdorder>
+			<techpreq>Adequate computer capability is the only technical prerequisite for viewing data in digital form.</techpreq>
+		</grouping>
+	</distinfo>
+	<metainfo>
+		<grouping>
+			<metrd>As Needed</metrd>
+		</grouping>
+		<metac>None</metac>
+		<metc>
+			<cntinfo>
+				<grouping>
+					<cntorgp>
+						<cntper>custserv@usgs.gov</cntper>
+						<cntorg>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center</cntorg>
+					</cntorgp>
+				</grouping>
+				<cntpos>Customer Service Representative</cntpos>
+				<cntaddr>
+					<addrtype>Mailing and Physical Address</addrtype>
+					<city>Sioux Falls</city>
+					<address>U.S. Geological Survey (USGS) Earth Resources Observation and Science (EROS) Center 47914 252nd Street</address>
+					<state>South Dakota</state>
+					<postal>57198-0001</postal>
+					<country>USA</country>
+				</cntaddr>
+				<cntfax>605-594-6589</cntfax>
+				<cntvoice>605-594-6151</cntvoice>
+				<cntemail>custserv@usgs.gov</cntemail>
+				<hours>0800 - 1600 CT, M-F, 1400 - 2200 h GMT</hours>
+				<cntinst>custserv@usgs.gov</cntinst>
+				<cnttdd>1-800-252-4547</cnttdd>
+			</cntinfo>
+		</metc>
+		<metsi>
+			<metsc>Unclassified</metsc>
+			<metscs>None</metscs>
+			<metshd>None</metshd>
+		</metsi>
+		<metstdn>Content Standard for Digital Geospatial Metadata
+</metstdn>
+		<metstdv>FGDC-STD-001-1998</metstdv>
+		<mettc>Local Time</mettc>
+		<metuc>None</metuc>
+	</metainfo>
+</metadata>

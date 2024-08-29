@@ -47,7 +47,7 @@ def numpy_array_to_raster(output_path,
     output_path -- full path to the raster to be written to disk
     numpy_array -- numpy array containing data to write to raster
     upper_left_tuple -- the upper left point of the numpy array (should be a tuple structured as (x, y))
-    cell_resolution -- the cell resolution of the output raster
+    cell_resolution -- the cell resolution of the output raster [x,y]; prior to 202408 it was a single value
     nband -- the band to write to in the output raster
     no_data -- value in numpy array that should be treated as no data
     gdal_data_type -- gdal data type of raster (see gdal documentation for list of values)
@@ -76,9 +76,9 @@ def numpy_array_to_raster(output_path,
     # https://stackoverflow.com/questions/27166739/description-of-parameters-of-gdal-setgeotransform
     # Follow link to GDAL docs in link for more info
     geotransform = (upper_left_tuple[0],
-                    cell_resolution, 0,
+                    cell_resolution[0], 0,
                     upper_left_tuple[1], 0,
-                    -1 *(cell_resolution))
+                    cell_resolution[1])
 
     # If not assigning proper projection, may mean that OGR does not recognize the Wkt.
     # In that case, try pulling from raster with properly-assigned projection info

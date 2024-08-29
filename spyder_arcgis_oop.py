@@ -156,7 +156,7 @@ class metaData(object):
             utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
-    def zip_shp_dir(self, shp_dir, zip_dir, **kwargs):
+    def zip_shp_dir(self, shp_dir, zip_dir):
         '''
         Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
         ZU 20230224
@@ -170,14 +170,14 @@ class metaData(object):
 
         '''
         try:
-            incl_files = kwargs['renamed_files']
-        except KeyError:
-            incl_files = copy.copy(self.indices)
-        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
-        excl_files = list(set(exist_file) - set(incl_files))
-        if len(excl_files)>0:
-            print('here ', excl_files)
-            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
+            exist_files = [f[:-4] for f in os.listdir(zip_dir) if '.shp' in f]
+            exclude_kw = True
+        except FileNotFoundError:
+            os.mkdir(zip_dir)
+            exclude_kw = False
+        if exclude_kw:
+            print('here ', exist_files)
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = exist_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
             print('there')
@@ -1606,8 +1606,9 @@ class metaData(object):
                     idx_order_orig = df.index.to_list()
                     df = df_join.combine_first(df)
                     debug_idx = 81
-                    # If ValueError: cannot reindex from duplicate axis, this means there are duplicate row indices, i.e. ITEM duplicated
-                    # NOTE! does not have to be the indices from agol_obj.indices.  Anywhere on csv with duplicate rows will trigger error
+                    # If ValueError: cannot reindex from duplicate axis  CHECK FOR DUPLICATE INDICES
+                    # this means there are duplicate row indices, i.e. ITEM duplicated
+                    # NOTE! does not have to be the indices from agol_obj.indices.  ANYWHERE on csv with duplicate rows will trigger error
                     df = df.reindex(idx_order_orig)
                     debug_idx = 82
                     # or else gets reordered alphabetically
@@ -2045,10 +2046,7 @@ class metaData(object):
                 arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fname)
                 items.append(fname)
             zip_dir = os.path.join(base_dir,'zip')
-            if not pd.isnull(fc_new_name):
-                self.zip_shp_dir(shp_dir, zip_dir, renamed_files=items)
-            else:
-                self.zip_shp_dir(shp_dir, zip_dir)
+            self.zip_shp_dir(shp_dir, zip_dir)
         if write_df:
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)

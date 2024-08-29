@@ -68,6 +68,10 @@ class utilities(object):
             # In the case that updating a folder that has already been processed with this function
             # this will retain the first row, and remove the new inventory
             df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
+            # Now find removed
+            removed = set(df_orig.index) - set(df_subdir.index)
+            df_concat['REMOVED']=False
+            df_concat.loc[removed, 'REMOVED']=True
             df_concat.to_csv(updated_csv)
         except KeyError:
             pass

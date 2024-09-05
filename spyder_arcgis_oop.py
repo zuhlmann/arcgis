@@ -2088,15 +2088,6 @@ class AgolAccess(metaData):
 
 
 
-class APRX_Overhaul(metaData):
-    '''
-    cleaning up gdbs
-    '''
-
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
-        self.csv_aprx_overhaul = csv_aprx_overhaul
-
-    def create_
 
 
 

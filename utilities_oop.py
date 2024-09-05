@@ -6,6 +6,7 @@ from pathlib import Path
 from time import gmtime, strftime
 import time
 import math
+import ntpath
 
 class utilities(object):
     '''
@@ -21,7 +22,7 @@ class utilities(object):
         '''
         self.parent_dir=parent_dir
         self.target_col=target_col
-    def subdir_inventory(self, ftype_filters=['.gdb'],**kwargs):
+    def subdir_inventory(self, ftype_filters=['.gdb'],exclude_subdir = [], **kwargs):
         '''
         Updated 20240620 for general usage
         Args:
@@ -43,7 +44,11 @@ class utilities(object):
             ftype_filters.extend(['.cpg','.dbf','.idx','.shx'])
         except KeyError:
             pass
-        self.ftype_filters = copy.copy(ftype_filters)
+        setattr(self, 'ftype_filters', ftype_filters)
+        if isinstance(exclude_subdir,list):
+            setattr(self, 'exclude_subdir', exclude_subdir)
+        elif isinstance(exclude_subdir, str):
+            setattr(self, 'exclude_subdir', [exclude_subdir])
         try:
             new_csv = kwargs['new_inventory']
             df_subdir = self.subdir_inventory_create()
@@ -58,11 +63,7 @@ class utilities(object):
         try:
             updated_csv = kwargs['update_inventory']
             df_orig = pd.read_csv(updated_csv, index_col = self.target_col)
-            try:
-                exclude_dir_list = kwargs['exclude_subdir_list']
-                df_subdir = self.subdir_inventory_create()
-            except KeyError:
-                df_subdir = self.subdir_inventory_create()
+            df_subdir = self.subdir_inventory_create()
             # run through above function
             df_subdir = df_subdir.set_index(self.target_col)
             print('FUCK', df_subdir)
@@ -123,7 +124,6 @@ class utilities(object):
         for f in os.scandir(parent_dir):
             if f.is_file():
                 file_ext = os.path.splitext(f)[-1]
-                subdir=os.path.split(f)[0]
                 # FIND subdir by triggering (or not) exception below
                 # base_subdir = directory name one deeper than parent
                 try:
@@ -164,8 +164,10 @@ class utilities(object):
                 base_subdir_list.append(base_subdir)
                 time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
                 file_size.append(math.floor(os.path.getsize(f.path / 1000)))
+            elif (f.is_dir()) & (os.path.normpath(f.path) in self.exclude_subdir):
+                pass
             # keeps running if another folder encountered
-            else:
+            elif f.name[-4:] != r'.gdb':
                 t0,t1,t2,t3,t4,t5,t6 = self.subdir_inventory_scan(f.path)
                 feat_name.extend(t0)
                 feat_path.extend(t1)
@@ -175,12 +177,48 @@ class utilities(object):
                 time_modified.extend(t5)
                 file_size.extend(t6)
         return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size)
-    def flag_duplicates(self, tc):
-        '''
 
+    def aggregate_rows(self, csv_in, csv_out, group_by_field, agg_field, **kwargs):
+        '''
+        Groupby a field (group_by_field), aggregate all unique values in another field (agg_field)
+        as a new field with values being unique values as string with commas separating values.
+        20240904
         Args:
-            tc:         target_column to look for duplicates
+            csv_in:             path/to/csv source
+            csv_out:            path/to/csv_out; can be same as csv_in
+            group_by_field:     field to groupby
+            agg_field:          field to create unique value comma-separated string
+            kwargs:             count = include field with number of values for agg_field in csv_out
 
         Returns:
 
         '''
+        df = pd.read_csv(csv_in)
+
+        def join_list(v):
+            vn = v.to_list()
+            vn = list(set(vn))
+            vn = ', '.join(vn)
+            return (vn)
+
+        groupby_source = df.groupby(group_by_field).agg({agg_field: join_list})
+        # pulls groupby_field out of index and replaces with numbers (iloc)
+        groupby_source = groupby_source.reset_index()
+
+        try:
+            # use if group_by_field is a file path and you want filename
+            kwargs['extract_filename']
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source[group_by_field]]
+            groupby_source[group_by_field] = fnames
+        except KeyError:
+            pass
+        try:
+            kwargs['count']
+            for idx in groupby_source.index:
+                t = groupby_source.loc[idx, agg_field]
+                t = t.split(',')
+                groupby_source.loc[idx, 'NUMBER_OCCURRENCES']= len(t)
+        except KeyError:
+            pass
+        groupby_source = groupby_source.set_index(group_by_field)
+        groupby_source.to_csv(csv_out)

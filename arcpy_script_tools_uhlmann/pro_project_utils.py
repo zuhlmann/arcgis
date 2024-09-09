@@ -58,7 +58,13 @@ class project_lyT_inv(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-        parameters = [param0,param1,param2,param3]
+        param4 = arcpy.Parameter(
+            displayName="Export Map Inventory",
+            name="map_inventory",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Output")
+        parameters = [param0,param1,param2,param3,param4]
         return parameters
     def isLicensed(self):
         '''
@@ -77,16 +83,19 @@ class project_lyT_inv(object):
             prodoc_selected = True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         elif parameters[0].altered and not parameters[0].hasBeenValidated:
             parameters[1].value=None
             prodoc_selected=True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         else:
             prodoc_selected  = False
         if prodoc_selected:
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         return parameters
 
 
@@ -119,6 +128,19 @@ class project_lyT_inv(object):
         csv = os.path.join(parameters[2].valueAsText,fname)
         df.to_csv(csv)
 
+        # If map inventory
+        if parameters[4].value:
+            project_maps = [m.name for m in aprx.listMaps()]
+            unused_maps = list(set(project_maps) - set(el_map_formatted))
+            df_maps = pd.DataFrame(project_maps, columns = ['map_name'])
+            df_maps = df_maps.set_index('map_name')
+            df_maps.loc[unused_maps,'used_in_layout']=false
+            df_maps.loc[list(set(el_map_formatted)), 'used_in_layout']=True
+            proj_name = os.path.split(aprx.filePath)[-1][:-5]
+            csv_maps = os.path.join(parameters[2].valueAsText, '{}_map_inv.csv'.format(proj_name))
+            df_maps.to_csv(csv_maps)
+        else:
+            pass
         return
 
 class project_lyR_inv(object):
@@ -264,3 +286,4 @@ class project_lyR_inv(object):
             groupby_source.to_csv(csv)
 
         return
+

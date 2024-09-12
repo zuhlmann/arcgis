@@ -2085,10 +2085,95 @@ class AgolAccess(metaData):
                 df_agol_raw = copy.copy(df_temp)
         df_agol_raw = df_agol_raw.set_index('ITEM')
         setattr(self, 'df_agol_raw', df_agol_raw)
+class proProject(metaData):
+    '''
+    INSERT / FLESH OUT
+    '''
+    def __init__(self, fp_aprx, fp_aprx_inv):
+        aprx_name = os.path.split(fp_aprx)[-1][:-5]
+        setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
+        aprx = arcpy.mp.ArcGISProject(fp_aprx)
+        aprx_str = 'aprx_{}'.format(aprx_name)
+        setattr(self, aprx_str, aprx)
+
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col='DATA_LOCATION_MCM')
+        setattr(self, df_aprx_lyR_str, df_aprx_lyR)
+
+        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
+    def get_base_aprx_content(self, aprx_str):
+        '''
+        fetches aprx maps and layouts from init attributes
+        Args:
+            aprx_str:       <aprx name>_aprx
+
+        Returns:
+        '''
+        aprx = getattr(self, aprx_str)
+        m =  aprx.listMaps()
+        map_str = aprx_str.replace('aprx','maps')
+        setattr(self, map_str, m)
+        l = aprx.listLayouts()
+        layout_str = aprx_str.replace('aprx','layouts')
+        setattr(self, layout_str, l)
+   def resource_lyR_move(self, aprx_str, fp_csv_aprx_lyR_inv):
+       # REMAP
+       # 20240904
+
+       import copy
+       aprx = getattr(self, aprx_str)
+
+       maps = aprx.listMaps()
+       layers = []
+       map_name = []
+       ct = 0
+       for m in maps:
+           t = m.listLayers()
+       layers.extend(t)
+       map_name.extend([m.name] * len(t))
+       ct += 1
+       fp_csv_aprx_lyR_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\data_inventories\recreation_PAD_p2_lyR_inv_devel.csv"
+       fp_csv_aprx_lyR_inv = getattr(fp_csv_aprx_lyr_inv)
+       df_lyr_inv = pd.read_csv(fp_csv_aprx_lyR_inv)
+       fp_src_formatted = [os.path.normpath(fp) for fp in df_lyr_inv.source]
+       df_lyr_inv['source'] = fp_src_formatted
+       df_lyr_inv = df_lyr_inv.set_index('source')
+       df_lyr_inv = df_lyr_inv[df_lyr_inv.develop]
+
+       for lyr_src, mn in zip(layers, map_name):
+           # Supports datasource?  i.e. servicer
+           try:
+               lyr_src.dataSource
+               dsource = True
+           except AttributeError:
+               dsource = False
+               pass
+       if dsource:
+           try:
+               dbase_mapped = df_lyr_inv.loc[
+                   os.path.normpath(lyr_src.dataSource), 'connection_dbase']
+               print('MAPNAME {} MAPPED:     {}'.format(mn, lyr_src))
+               cp = lyr_src.connectionProperties
+               cp_replace = copy.deepcopy(cp)
+               cp_replace['connection_info']['database'] = dbase_mapped
+               if cp_replace['workspace_factory'] == r'Shape File':
+
+               cp_replace()
+               lyr_src.updateConnectionProperties(lyr_src.connectionProperties, cp_replace)
+           except KeyError:
+               print('MAPNAME {} NOT MAPPED: {}'.format(mn, lyr_src))
+               pass
+
+   def resource_lyR_maestro(self, aprx_str, df_str)
+                       target_col = 'DATA_LOCATION_MCMILLEN', source_col = 'DATA_LOCATION_MCM_ORIGINAL'):
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        df_gdb_inv = getattr(self, df_str)
+        df_aprx_lyR.
 
 
 
 
 
 
-  

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import ntpath
 import arcpy
@@ -46,7 +47,7 @@ def format_lyR_inv_datasource_moved(csv_remap, csv_inv):
     df_lyr_inv['dbase_connection'] = dbase_connection
     df_lyr_inv.to_csv(csv_inv)
 
-def format_lyR_inv_datasource_standard(csv_inv, df_gdb, match_col, replace_col):
+def format_lyR_inv_datasource_standard(csv_inv, df_gdb, source_col_orig, source_col_new, target_index):
     df_lyr_inv = pd.read_csv(csv_inv)
     fp_lyr = df_gdb.loc[idx, match_col]
     fp_lyR_new = df_gdb.loc[idx, replace_col]
@@ -62,9 +63,6 @@ def format_lyR_inv_datasource_standard(csv_inv, df_gdb, match_col, replace_col):
         df_lyr_inv.at[orig, 'dataset'] = fname
         df_lyr_inv.at[orig, 'dbase_connection'] = shp_dir
     df_lyr_inv.to_csv(csv_inv)
-
-
-
 
 def aggregate_layers(csv_in, csv_out, group_by_field, agg_field):
     '''
@@ -96,7 +94,7 @@ def aggregate_layers(csv_in, csv_out, group_by_field, agg_field):
     groupby_source = groupby_source.set_index('ITEM')
     groupby_source.to_csv(csv_out)
 
-def unique_comma_sep_string(csv_in, string_field):
+def unique_comma_sep_string(df, string_field):
     '''
     After creating lyR inventory, return all unique map names as a list.
     For instance, the map_names column contains values from the aggregate_layers
@@ -116,7 +114,6 @@ def unique_comma_sep_string(csv_in, string_field):
         unique_{}_{}        list of unique split strings from aggregated list.
 
     '''
-    df = pd.read_csv(csv_in)
     l = ', '.join(df[string_field])
     l = l.split(',')
     l = [i.strip() for i in l]
@@ -155,4 +152,37 @@ def project_lyT_inv(prodoc, **kwargs):
         df.to_csv(csv)
     except KeyError:
         return(df)
+
+def project_lyR_inv(prodoc, **kwargs):
+    aprx = arcpy.mp.ArcGISProject(prodoc)
+    lyt_list = aprx.listLayouts()
+
+    lyt_name, ds_list, lyr_name, map_element, map_name = [], [], [], [], []
+    for lyt in lyt_list:
+        # el = lyt.listElements()
+        el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
+        for em in el:
+            for lyr in em.map.listLayers():
+                if lyr.visible and lyr.supports('DATASOURCE'):
+                    lyr_name.append(lyr.name)
+                    lyt_name.append(lyt.name)
+                    map_element.append(em.name)
+                    map_name.append(em.map.name)
+                    try:
+                        ds_list.append(lyr.dataSource)
+                    except AttributeError:
+                        ds_list.append('NA')
+                else:
+                    pass
+
+    df = pd.DataFrame(np.column_stack([lyt_name, map_element, map_name, lyr_name, ds_list]),
+                      columns=['layout', 'map_element', 'map_name', 'layer', 'source'])
+
+    try:
+        csv = kwargs['csv']
+        df.to_csv(csv)
+    except KeyError:
+        return (df)
+
+
 

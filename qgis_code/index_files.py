@@ -5,24 +5,37 @@ from shapely.geometry import LineString
 import geopandas as gpd
 import numpy as np
 #
-# 20230823
+# 20240918
+# Ran again for relative scale;  first adapted for in_to_feet for wallowa
 # Creating indices with ll beginning tile coordinates, num rows, num cols and overlap.  Set overlap to 0
 # if none desired
 
-x0 = 9043750
-y0 = 625850
+x0 = 1408250
+y0 = 257750
 # total overlap for two adjacent indices
 overlap = 0.05
 # split between the two tiles
 o_factor = (1-overlap)
-layout_width = 12.3
-layout_ht = 8
+layout_width = 16
+layout_ht = 7.8
+# Set true for relative, false for 1 inch = n feet scale convention
+relative=True
 ft_to_in_scale = 1000
+relative_scale = 24000
 # multiply by 0.5 because we are starting at centroid.  dx + dx = full indice width
-dx = (ft_to_in_scale * layout_width) *0.5
-dy = (ft_to_in_scale * layout_ht) * 0.5
-rows = 12
-cols = 1
+# _relative and _in2feet are for the two scale representations.  Set one above along with boolean
+dx_relative = (relative_scale * layout_width * (1/12)) * 0.5
+dy_relative = (relative_scale * layout_ht * (1/12)) * 0.5
+dx_in2feet = (ft_to_in_scale * layout_width) *0.5
+dy_in2feet = (ft_to_in_scale * layout_ht) * 0.5
+if relative:
+    dx = dx_relative
+    dy = dy_relative
+else:
+    dx = dx_in2feet
+    dy = dy_in2feet
+rows = 3
+cols = 3
 polys = []
 for c in range(cols):
     for r in range(rows):
@@ -34,9 +47,9 @@ for c in range(cols):
         ll = (x-dx, y-dy)
         polys.append(Polygon([ul,ur,lr,ll]))
 features = [i for i in range(len(polys))]
-crs = "EPSG:6559"
+crs = "EPSG:2926"
 gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys}, crs=crs)
-fp_out = r'C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\data_received\indices\wallowa_indices_v1.shp'
+fp_out = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\staging\indices\cultural_SA_shpo.shp'
 gdr.to_file(fp_out)
 
 # # load df

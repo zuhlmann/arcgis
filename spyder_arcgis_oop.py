@@ -5,9 +5,10 @@
 # coding: utf-8
 
 from __future__ import print_function, unicode_literals, absolute_import
+import os, sys
+sys.path = [p for p in sys.path if '86' not in p]
 from arcgis.gis import GIS
 from arcgis.gis import Group
-import os, sys
 import glob
 import copy
 import pandas as pd
@@ -16,7 +17,6 @@ import utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
-sys.path = [p for p in sys.path if '86' not in p]
 import arcpy
 import logging
 # note this protocol from here because debug was not writing to file
@@ -25,26 +25,28 @@ from imp import reload
 reload(logging)
 
 
-class metaData(object):
+class commonUtils(object):
     '''
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, subproject_str, fp_csv_lookup, use_item_desc = False,
+    def __init__(self):
+        pass
+    def dbase_init(self,  prj_file, subproject_str, fp_csv_lookup, use_item_desc = False,
                 df_str = 'df', df_index_col = 'ITEM'):
         '''
-        KEYWORD ARGS:
-        fill in now that reworked
-        '''
-        lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
+               KEYWORD ARGS:
+               fill in now that reworked
+               '''
+        lookup_table = pd.read_csv(fp_csv_lookup, index_col='gdb_str', dtype='str', encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
         # eventually make submaestroe
         if use_item_desc:
             fp_csv = r'C:\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
         else:
-            fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
-        df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str',encoding = "utf-8")
+            fp_csv = lookup_table[lookup_table.subproject == subproject_str].fp_maestro_csv.values[0]
+        df = pd.read_csv(fp_csv, index_col=df_index_col, na_values='NA', dtype='str', encoding="utf-8")
         setattr(self, 'subproject_str', subproject_str)
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -89,9 +91,11 @@ class metaData(object):
         df = getattr(self, df_str)
 
         if df_str == 'df':
+            prop_str_indices = 'indices'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
+            prop_str_indices = '{}_indices'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
         try:
             target_tag = kwargs['target_tag']
@@ -161,11 +165,7 @@ class metaData(object):
             iloc_action.sort()
             # get index names from iloc vals
             setattr(self, prop_str_indices_iloc, iloc_action)
-            self.indices = df.iloc[iloc_action].index.tolist()
-            print('iloc')
-            print(' --- '.join([str(i) for i in iloc_action]))
-            print('indices')
-            print(' --- '.join(df.iloc[iloc_action].index.tolist()))
+            setattr(self, prop_str_indices, df.iloc[iloc_action].index.tolist())
             # if not tags selection then indices will be     passed
         except KeyError:
             pass
@@ -183,12 +183,12 @@ class metaData(object):
             try:
                 int(indices[0])
                 print('indices {}'.format(indices))
+                setattr(self, prop_str_indices, df.iloc[indices].index.tolist())
                 setattr(self, prop_str_indices_iloc, indices)
-                self.indices = df.iloc[indices].index.tolist()
             # If indices were index_column vals (stirng)
             except ValueError:
                 try:
-                    self.indices = df.loc[indices].index.tolist()
+                    setattr(self, prop_str_indices, df.iloc[indices].index.tolist())
                 #Check that the index_col vals passes EXIST
                 except KeyError:
                     print('index_col indices are not in index.  For examples\n'
@@ -288,11 +288,13 @@ class metaData(object):
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
+            prop_str_indices = 'df_indices'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices = '{}_indices'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
 
         lookup_table = copy.copy(self.lookup_table)
@@ -315,8 +317,9 @@ class metaData(object):
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
         subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
 
+        indices = getattr(self, prop_str_indices)
         indices_iloc = getattr(self, prop_str_indices_iloc)
-        for indice, indice_iloc in zip(self.indices, indices_iloc):
+        for indice, indice_iloc in zip(indices, indices_iloc):
             fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN'])
             if os.path.splitext(fp_fcs)[-1]=='.shp':
                 glob_string = '{}*.xml'.format(fp_fcs)
@@ -611,10 +614,11 @@ class metaData(object):
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
+            prop_str_indices = 'indices'
         else:
             df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
-            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices = '{}_indices'.format(df_base_str)
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
@@ -642,10 +646,10 @@ class metaData(object):
 
         csv = lookup_table_project[lookup_table_project.subproject == self.subproject_str].offline_lookup_table.values[0]
         olt = pd.read_csv(csv, index_col = 'gdb_str')
-
+        indices = getattr(self, prop_str_indices)
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
-            for index in self.indices:
+            for index in indices:
                 fp_fcs_current = os.path.normpath(df.loc[index][target_col])
                 fp_components = fp_fcs_current.split(os.sep)
                 if offline_source:
@@ -716,7 +720,7 @@ class metaData(object):
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
 
         elif action_type in ['rename']:
-            for index in self.indices:
+            for index in indices:
                 print('did we make it here?')
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
@@ -794,11 +798,11 @@ class metaData(object):
 
                 df_source = df_source.rename(index = {index:fc_new_name})
                 # Replace indice with new feat name
-                idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                idt = [i for i, index_val in enumerate(indices) if index_val == index]
                 idt = idt[0]
                 print('index = {}'.format(idt))
-                self.indices[idt] = fc_new_name
-                print('we did it')
+                indices[idt] = fc_new_name
+                setattr(self, prop_str_indices, indices)
 
                 df_source.at[fc_new_name, target_col] = fp_fcs_new.replace(os.sep, '//')
 
@@ -817,7 +821,7 @@ class metaData(object):
 
         elif action_type in ['move']:
 
-            for index in self.indices:
+            for index in indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
@@ -1024,11 +1028,11 @@ class metaData(object):
                     if rename:
                         # Replace indice with new feat name
                         print('1217')
-                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        idt = [i for i, index_val in enumerate(indices) if index_val == index]
                         idt = idt[0]
                         print('index = {}'.format(idt))
-                        self.indices[idt] = feat_name
-                        print('we did it')
+                        indices[idt]=feat_name
+                        setattr(self, prop_str_indices, indices)
                         index = copy.copy(feat_name)
                     debug_idx = 8
                     df.loc[index, 'DATA_LOCATION_MCMILLEN'] = fp_fcs_new
@@ -1059,7 +1063,7 @@ class metaData(object):
 
         elif action_type in ['copy_no_replace', 'copy_replace']:
 
-            for index in self.indices:
+            for index in indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
@@ -1220,10 +1224,11 @@ class metaData(object):
                     if rename:
                         # Replace indice with new feat name
                         print('1217 - renaming')
-                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        idt = [i for i, index_val in enumerate(indices) if index_val == index]
                         idt = idt[0]
                         print('index = {}'.format(idt))
-                        self.indices[idt] = feat_name
+                        indices[idt] = feat_name
+                        setattr(self, prop_str_indices, indices)
                         if action_type == 'copy_replace':
                             df.rename(index={index:feat_name}, inplace=True)
                         else:
@@ -1254,7 +1259,7 @@ class metaData(object):
         elif action_type in ['fc_to_fc_conv']:
             var_dict = kwargs['var_dict']
             fp_fcs_current = var_dict['feat_in']
-            index = self.indices[0]
+            index = indices[0]
             df_item = df.loc[index]
 
             fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
@@ -1478,16 +1483,84 @@ class metaData(object):
         replace_col_source = replace_col_list[0]
         replace_col_target = replace_col_list[1]
         # indices that match target_val in source
-        source_indices = df_source.index[df_source[replace_col_source]==target_val]
-        # file paths most likely
-        vals_match = df_source.loc[source_indices][match_col_source].to_list()
-        # indices in df_target matching source indices
+        if not df_source.index.name==replace_col_source:
+            idx_target = df_source[df_source[match_col_source]==target_val][replace_col_source]
+        else:
+            idx_target = df_source[[df_source[match_col_source]==target_val]].index
+        if not df_target.index.name == replace_col_target:
+            idx_name = df_target.index.name
+            df_target.set_index(replace_col_target, inplace=True)
+            df_target.at[idx_target, match_col_target]=target_val
+            df_target.set_index(idx_name, inplace=True)
+        else:
+            df_target.at[idx_target, match_col_target]=target_val
 
+        setattr(self, '{}_matched'.format(df_str_target), df_target)
 
-        target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
+    def df_to_df_transfer_v2(self, df_str_source, df_str_target, flag_col_src, flag_col_tgt,
+                             flag_val, key_src, key_tgt, merge_cols, **kwargs):
+        '''
+        More for manual transfers.
+        df_str_target           string of dataframe to add values to based off other arguments
+        df_str_source           string of dataframe to transfer values from
+        match_col_list          columns to match from table to table [col_source_str, col_target_str]
+        target_col_list        confusingly TARGET i.e. col we are searching for value in df_source and
+                                col where we are replacing in target
+        target_val              val to search for in replace_col
+        '''
 
-        for indice in target_indices:
-            df_target.at[indice, replace_col_target] = target_val
+        df_source = getattr(self, df_str_source)
+        df_str_working_target = '{}_matched'.format(df_str_target)
+        try:
+            # already working, add to working
+            df_target = getattr(self, df_str_working_target)
+            print('it existed')
+        except AttributeError:
+            # no action yet, add to original
+            print('did not exist')
+            df_target = getattr(self, df_str_target)
+        df_source = df_source.reset_index()
+        df_subset = df_source[df_source[flag_col_src]==flag_val]
+        # if not df_subset.index.name==key_src:
+        #     df_subset = df_subset.set_index(key_src)
+
+        # If for instance merge cols are duplicated in target df i.e. DATA_LOCATION_MCMILLEN
+        # needs to map to DATA_LOCATION_MCMILLEN_RESOURCE for datasource resetting in lyrx
+        try:
+            merge_cols_dict = kwargs['merge_cols_dict']
+            t = []
+            for c in merge_cols:
+                try:
+                    t.append(merge_cols_dict[c])
+                except KeyError:
+                    t.append(c)
+            # Keyed col names to be used to subset df_src (df_subset) during merge
+            merge_cols = t
+            df_subset = df_subset.rename(columns=merge_cols_dict)
+        except KeyError:
+            pass
+        # Format stuff
+        if key_src not in merge_cols:
+            merge_cols.append(key_src)
+        if df_target.index.name==key_tgt:
+            df_target = df_target.reset_index().merge(df_subset[merge_cols], left_on=key_tgt,
+                        right_on=key_src, how='left').set_index(df_target.index.name)
+            debug=7
+        else:
+            index_orig = df_target.index.name
+            df_target = df_target.set_index(key_tgt)
+            df_target = df_target.merge(df_subset[merge_cols], left_index=True,
+                        how='left', right_on=key_src)
+            df_target = df_target.set_index(index_orig)
+
+        # Format flag column name i.e. remove ACTION_Y and rename ACTION_X to ACTION
+        flag_col_tgt_join = '{}_x'.format(flag_col_src)
+        flag_col_src_join = '{}_y'.format(flag_col_tgt)
+        col_names = df_target.columns
+        col_names = [cn for cn in col_names if cn!=flag_col_tgt_join]
+        df_target = df_target[col_names]
+        df_target = df_target.rename(columns={flag_col_src_join:flag_col_src})
+        debg = 7
         setattr(self, '{}_matched'.format(df_str_target), df_target)
 
     def data_sent_tracking(self, fp_csv_tracking, base_dir, action, tracking_dict):
@@ -1577,8 +1650,151 @@ class metaData(object):
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
 
+class proProject(commonUtils):
+    '''
+    INSERT / FLESH OUT
+    '''
+    def __init__(self):
+        print('something')
+    def add_aprx(self,fp_aprx, fp_aprx_inv, target_col = 'DATA_LOCATION_MCMILLEN'):
+        aprx_name = os.path.split(fp_aprx)[-1][:-5]
+        setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
+        aprx = arcpy.mp.ArcGISProject(fp_aprx)
+        aprx_str = 'aprx_{}'.format(aprx_name)
+        setattr(self, aprx_str, aprx)
 
-class AgolAccess(metaData):
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col=target_col)
+        setattr(self, df_aprx_lyR_str, df_aprx_lyR)
+
+        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
+    def get_base_aprx_content(self, aprx_str):
+        '''
+        fetches aprx maps and layouts from init attributes
+        Args:
+            aprx_str:       <aprx name>_aprx
+
+        Returns:
+        '''
+        aprx = getattr(self, aprx_str)
+        m =  aprx.listMaps()
+        map_str = aprx_str.replace('aprx','maps')
+        setattr(self, map_str, m)
+        l = aprx.listLayouts()
+        layout_str = aprx_str.replace('aprx','layouts')
+        setattr(self, layout_str, l)
+    def re_source_lyR_move(self, aprx_str):
+        # REMAP
+        # 20240904
+
+        aprx = getattr(self, aprx_str)
+        # A) Gather Connetion Info
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        df_base_str = df_aprx_lyR_str.replace('df_', '')
+        prop_str_indices = '{}_indices'.format(df_base_str)
+        indices = getattr(self, prop_str_indices)
+        map_str = aprx_str.replace('aprx','maps')
+
+        maps = getattr(self, map_str)
+        layers = []
+        map_name = []
+        ct = 0
+        for m in maps:
+            t = m.listLayers()
+            layers.extend(t)
+            map_name.extend([m.name] * len(t))
+            ct += 1
+        fp_csv_aprx_lyR = getattr(aprx_lyR_csv_str)
+        # normalize path
+        fp_src_formatted = [os.path.normpath(fp) for fp in df_lyr_inv.source]
+        df_aprx_lyR['source'] = fp_src_formatted
+        df_lyr_inv = df_aprx_lyR.set_index('source')
+        df_lyr_inv = df_lyr_inv[df_lyr_inv.develop]
+
+        for lyr_src, mn in zip(layers, map_name):
+            # Supports datasource?  i.e. servicer
+            try:
+                lyr_src.dataSource
+                dsource = True
+            except AttributeError:
+                dsource = False
+                pass
+        if dsource:
+            try:
+                dbase_mapped = df_lyr_inv.loc[os.path.normpath(lyr_src.dataSource), 'connection_dbase']
+                print('MAPNAME {} MAPPED:     {}'.format(mn, lyr_src))
+                cp = lyr_src.connectionProperties
+                cp_replace = copy.deepcopy(cp)
+                cp_replace['connection_info']['database'] = dbase_mapped
+                lyr_src.updateConnectionProperties(lyr_src.connectionProperties, cp_replace)
+            except KeyError:
+                print('MAPNAME {} NOT MAPPED: {}'.format(mn, lyr_src))
+                pass
+
+    def format_lyR_inv_datasource_standard(self, aprx_str, source_new='DATA_LOCATION_MCM_RESOURCE'):
+
+        # A) Gather Connetion Info
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        df_base_str = df_aprx_lyR_str.replace('df_', '')
+        prop_str_indices = '{}_indices'.format(df_base_str)
+        indices = getattr(self, prop_str_indices)
+
+        # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
+        for idx in indices:
+            # idx_lyR = os.path.normpath(df_gdb_inv.loc[idx, source_orig])
+            # fp_new = os.path.normpath(df_gdb_inv.loc[idx, source_new])
+            fp_new = os.path.normpath(df_aprx_lyR.loc[idx, source_new])
+            if fp_new[-4:] == '.shp':
+                dbase_connection, fname = os.path.split(fp_new)
+                df_aprx_lyR.at[idx, 'workspace_factory'] = 'Shape File'
+            else:
+                dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
+                fname = os.path.split(fp_new)[-1]
+                df_aprx_lyR.at[idx, 'workspace_factory'] = 'File Geodatabase'
+            df_aprx_lyR.at[idx, 'dataset'] = fname
+            df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
+        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        setattr(self,df_aprx_lyR_str, df_aprx_lyR)
+        df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
+
+    def re_source_lyR_maestro(self, aprx_str, df_str, source_orig = 'DATA_LOCATION_MCM_ORIGINAL',
+                              source_new='DATA_LOCATION_MCMILLEN'):
+        # B) Connect
+        # A) Gather Connetion Info
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        df_gdb_inv = getattr(self, df_str)
+
+        idx_lyR_all = df_gdb_inv.loc[self.index, source_orig]
+        df_aprx_lyR_subset = df_aprx_lyR.loc[idx_lyR_all]
+        map_names_update = utilities_pro.unique_comma_sep_string(df_aprx_lyR_subset, 'map_name')
+        map_objects = getattr(aprx_str.replace('aprx','maps'))
+        for m in map_objects:
+            if m.name in map_names_update:
+                layers = m.listLayers()
+                for lyr in layers:
+                    try:
+                        wsf = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'workspace_factory']
+                        dc = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dbase_connection']
+                        dset = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dataset']
+
+                        cp = lyr.connectionProperties
+                        cp_replace = copy.deepcopy(cp)
+                        cp_replace['workspace_factory'] = wsf
+                        cp_replace['connection_info']['database'] = dc
+                        cp_replace['dataset'] = dset
+                        lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
+                        pass
+                    except KeyError:
+                        pass
+
+
+
+class AgolAccess(commonUtils):
     '''
     Basic init for AGOL access
     '''
@@ -2086,4 +2302,3 @@ class AgolAccess(metaData):
                 df_agol_raw = copy.copy(df_temp)
         df_agol_raw = df_agol_raw.set_index('ITEM')
         setattr(self, 'df_agol_raw', df_agol_raw)
-

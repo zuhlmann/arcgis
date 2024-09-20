@@ -9,8 +9,26 @@ import arcpy
 
 
 class commonUtils(object):
-    def __init__(self):
-        pass
+    def __repr__(self):
+        cls_name = type(self).__name__
+        return(f'<instance of {cls_name}>')
+
+    def add_df(self, fp_csv, df_str, index_field):
+        '''
+        for adding additional dataframes. ZU 20210302
+        fp_csv              path to new csv
+        df_str               i.e. df2 or mxd_inventory
+        index_field         for assigning index_col in DataFrame constructor
+        '''
+        # save df
+        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype = 'str')
+        setattr(self, df_str, df)
+
+        # save path to csv
+        df_base_str = df_str.replace('df_', '')
+        fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
+        setattr(self, fp_csv_prop_str, fp_csv)
+
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -189,7 +207,6 @@ class commonUtils(object):
             self.indices = df.iloc[iloc_list].index.tolist()
         except KeyError:
             pass
-
     def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
@@ -211,27 +228,16 @@ class commonUtils(object):
         #     print(idx, ' ', item)
         return (parsed_csl_temp)
 
-    def add_df(self, fp_csv, df_str, index_field):
-        '''
-        for adding additional dataframes. ZU 20210302
-        fp_csv              path to new csv
-        df_str               i.e. df2 or mxd_inventory
-        index_field         for assigning index_col in DataFrame constructor
-        '''
-        # save df
-        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype = 'str')
-        setattr(self, df_str, df)
-
-        # save path to csv
-        df_base_str = df_str.replace('df_', '')
-        fp_csv_prop_str = 'fp_csv_{}'.format(df_base_str)
-        setattr(self, fp_csv_prop_str, fp_csv)
 
 class proProject(commonUtils):
     '''
     INSERT / FLESH OUT
     '''
-    def __init__(self, fp_aprx, fp_aprx_inv, target_col = 'DATA_LOCATION_MCMILLEN'):
+    def __init__(self):
+        print('something)'
+        pass
+
+    def add_aprx(self,fp_aprx, fp_aprx_inv, target_col = 'DATA_LOCATION_MCMILLEN'):
         aprx_name = os.path.split(fp_aprx)[-1][:-5]
         setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
         aprx = arcpy.mp.ArcGISProject(fp_aprx)
@@ -244,8 +250,6 @@ class proProject(commonUtils):
 
         aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
         setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
-
-
     def get_base_aprx_content(self, aprx_str):
         '''
         fetches aprx maps and layouts from init attributes
@@ -286,27 +290,26 @@ class proProject(commonUtils):
         df_lyr_inv = df_lyr_inv[df_lyr_inv.develop]
 
         for lyr_src, mn in zip(layers, map_name):
-           # Supports datasource?  i.e. servicer
-           try:
-               lyr_src.dataSource
-               dsource = True
-           except AttributeError:
-               dsource = False
-               pass
+            # Supports datasource?  i.e. servicer
+            try:
+                lyr_src.dataSource
+                dsource = True
+            except AttributeError:
+                dsource = False
+                pass
         if dsource:
-           try:
-               dbase_mapped = df_lyr_inv.loc[os.path.normpath(lyr_src.dataSource), 'connection_dbase']
-               print('MAPNAME {} MAPPED:     {}'.format(mn, lyr_src))
-               cp = lyr_src.connectionProperties
-               cp_replace = copy.deepcopy(cp)
-               cp_replace['connection_info']['database'] = dbase_mapped
-               lyr_src.updateConnectionProperties(lyr_src.connectionProperties, cp_replace)
-           except KeyError:
-               print('MAPNAME {} NOT MAPPED: {}'.format(mn, lyr_src))
-               pass
+            try:
+                dbase_mapped = df_lyr_inv.loc[os.path.normpath(lyr_src.dataSource), 'connection_dbase']
+                print('MAPNAME {} MAPPED:     {}'.format(mn, lyr_src))
+                cp = lyr_src.connectionProperties
+                cp_replace = copy.deepcopy(cp)
+                cp_replace['connection_info']['database'] = dbase_mapped
+                lyr_src.updateConnectionProperties(lyr_src.connectionProperties, cp_replace)
+            except KeyError:
+                print('MAPNAME {} NOT MAPPED: {}'.format(mn, lyr_src))
 
     def format_lyR_inv_datasource_standard(self, aprx_str, df_str, source_orig = 'DATA_LOCATION_MCM_ORIGINAL',
-                             source_new='DATA_LOCATION_MCMILLEN'):
+                                           source_new='DATA_LOCATION_MCMILLEN'):
         # A) Gather Connetion Info
         df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
         df_aprx_lyR = getattr(self, df_aprx_lyR_str)
@@ -326,13 +329,19 @@ class proProject(commonUtils):
             df_aprx_lyR.at[idx_lyR, 'dataset'] = fname
             df_aprx_lyR.at[idx_lyR, 'dbase_connection'] = dbase_connection
             df_aprx_lyR.at[idx_lyR, 'ACTION'] = 'Update'
+            df_aprx_lyR.at[idx_lyR, 'DATA_LOCATION_MCM_RE_SOURCE']=fp_new
         aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        setattr(self, fp_aprx_lyR_str, df_aprx_lyR)
         df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
-
 
     def re_source_lyR_maestro(self, aprx_str, df_str, source_orig = 'DATA_LOCATION_MCM_ORIGINAL',
                               source_new='DATA_LOCATION_MCMILLEN'):
         # B) Connect
+        # A) Gather Connetion Info
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        df_gdb_inv = getattr(self, df_str)
+
         idx_lyR_all = df_gdb_inv.loc[self.index, source_orig]
         df_aprx_lyR_subset = df_aprx_lyR.loc[idx_lyR_all]
         map_names_update = utilities_pro.unique_comma_sep_string(df_aprx_lyR_subset, 'map_name')
@@ -354,7 +363,6 @@ class proProject(commonUtils):
                         lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
                     except KeyError:
                         pass
-
 
 
 

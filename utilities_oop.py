@@ -9,10 +9,6 @@ import math
 import ntpath
 
 class utilities(object):
-    '''
-    ARGS
-    df_index_col            ITEM is default for use with Klamath.
-    '''
     def __init__(self,  parent_dir, target_col):
         '''
 
@@ -22,7 +18,7 @@ class utilities(object):
         '''
         self.parent_dir=parent_dir
         self.target_col=target_col
-    def subdir_inventory(self, ftype_filters=['.gdb'],exclude_subdir = [], **kwargs):
+    def subdir_inventory(self, ftype_filters=['.gdb'], exclude_dir_list = [],**kwargs):
         '''
         Updated 20240620 for general usage
         Args:
@@ -36,19 +32,17 @@ class utilities(object):
             saves csv or returns df
 
         '''
-        from time import gmtime, strftime
         # fp_logfile = os.path.join(parent_dir, 'subdir_inventory_log.log')
+        exclude_dir_list = [os.path.normpath(fp) for fp in exclude_dir_list]
+        setattr(self, 'exclude_dir_list', exclude_dir_list)
         ftype_filters.extend([t.upper() for t in ftype_filters])
         try:
             kwargs['just_shp']
             ftype_filters.extend(['.cpg','.dbf','.idx','.shx'])
         except KeyError:
             pass
-        setattr(self, 'ftype_filters', ftype_filters)
-        if isinstance(exclude_subdir,list):
-            setattr(self, 'exclude_subdir', exclude_subdir)
-        elif isinstance(exclude_subdir, str):
-            setattr(self, 'exclude_subdir', [exclude_subdir])
+        setattr(self, 'ftype_filters',ftype_filters)
+
         try:
             new_csv = kwargs['new_inventory']
             df_subdir = self.subdir_inventory_create()
@@ -71,11 +65,13 @@ class utilities(object):
             # In the case that updating a folder that has already been processed with this function
             # this will retain the first row, and remove the new inventory
             df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
+            # Now find removed
+            removed = set(df_orig.index) - set(df_subdir.index)
+            df_concat['REMOVED']=False
+            df_concat.loc[removed, 'REMOVED']=True
             df_concat.to_csv(updated_csv)
         except KeyError:
             pass
-
-
     def subdir_inventory_create(self):
         '''
         Updated 20240620 for general usage (non .shp)
@@ -90,12 +86,14 @@ class utilities(object):
         '''
         # need to hardcode basically. be better as aclass and methods
         self.parent_dir_depth = len(os.path.normpath(self.parent_dir).split(os.sep))
-        fname, fp, subdir_name, filetype, base_subdir, time_modified, file_size =  self.subdir_inventory_scan(self.parent_dir)
-        col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE','FILESIZE','TIME_MODIFIED',self.target_col]
-        cols = np.column_stack([fname, base_subdir, subdir_name, filetype, file_size, time_modified, fp])
+        fname, fp, subdir_name, filetype, base_subdir, time_modified, file_size, flag =  self.subdir_inventory_scan(self.parent_dir)
+        col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE','FILESIZE','TIME_MODIFIED', 'FLAG',self.target_col]
+        cols = np.column_stack([fname, base_subdir, subdir_name, filetype, file_size, time_modified, flag, fp])
         df_subdir = pd.DataFrame(cols, columns=col_list)
         return(df_subdir)
-    def subdir_inventory_scan(self, parent_dir):
+
+
+    def subdir_inventory_scan(self, parent_dir, **kwargs):
         '''
         Inventory directories and subdirectories for ALL files.  ZU 20240620.
         Created for Tacoma Hatchery for Jodi Burns
@@ -118,12 +116,12 @@ class utilities(object):
         '''
         # https://stackoverflow.com/questions/49664518/python-2-7-using-scandir-to-traverse-all-sub-directories-and-return-list
         # https://stackoverflow.com/questions/30214531/basics-of-recursion-in-python
-        feat_path,feat_name,filetype,subdir_name, base_subdir_list, file_size, time_modified = [],[],[],[],[],[],[]
-        subdir_list =[]
+        feat_path,feat_name,filetype,subdir_name, base_subdir_list, file_size, time_modified, flag = [],[],[],[],[],[],[],[]
         # to use for top subparent dir list
         for f in os.scandir(parent_dir):
             if f.is_file():
                 file_ext = os.path.splitext(f)[-1]
+                subdir=os.path.split(f)[0]
                 # FIND subdir by triggering (or not) exception below
                 # base_subdir = directory name one deeper than parent
                 try:
@@ -139,11 +137,17 @@ class utilities(object):
                     filetype.append(file_ext)
                     subdir_name.append(Path(f.path).parent.name)
                     base_subdir_list.append(base_subdir)
-                    time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
-                    # 1000/1024 because Kibibyte not KiLibyte - https://superuser.com/questions/1528837/file-explorer-size-property-less-than-file-size-in-properties
-                    # divide by 1000 to go bytes to kibibyte
-                    size_math = Path(f.path).stat().st_size * (1000 / 1024) / 1000
-                    file_size.append(math.ceil(size_math))
+                    try:
+                        time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
+                        flag.append('None')
+                        # 1000/1024 because Kibibyte not KiLibyte - https://superuser.com/questions/1528837/file-explorer-size-property-less-than-file-size-in-properties
+                        # divide by 1000 to go bytes to kibibyte
+                        size_math = Path(f.path).stat().st_size * (1000 / 1024) / 1000
+                        file_size.append(math.ceil(size_math))
+                    except FileNotFoundError:
+                        time_modified.append('-9999')
+                        file_size.append(-9999)
+                        flag.append('Filepath_length')
                 else:
                     pass
                     # logging.info('SKIPPED THIS FILE due to file type filter: {}'.format(f.path))
@@ -164,11 +168,10 @@ class utilities(object):
                 base_subdir_list.append(base_subdir)
                 time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
                 file_size.append(math.floor(os.path.getsize(f.path / 1000)))
-            elif (f.is_dir()) & (os.path.normpath(f.path) in self.exclude_subdir):
-                pass
+                flag.append('None')
             # keeps running if another folder encountered
-            elif f.name[-4:] != r'.gdb':
-                t0,t1,t2,t3,t4,t5,t6 = self.subdir_inventory_scan(f.path)
+            elif os.path.normpath(f.path) not in self.exclude_dir_list:
+                t0,t1,t2,t3,t4,t5,t6,t7 = self.subdir_inventory_scan(f.path)
                 feat_name.extend(t0)
                 feat_path.extend(t1)
                 subdir_name.extend(t2)
@@ -176,7 +179,11 @@ class utilities(object):
                 base_subdir_list.extend(t4)
                 time_modified.extend(t5)
                 file_size.extend(t6)
-        return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size)
+                flag.extend(t7)
+            else:
+                # unsure if we need this else statement
+                pass
+        return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size,flag)
 
     def aggregate_rows(self, csv_in, csv_out, group_by_field, agg_field, **kwargs):
         '''

@@ -106,6 +106,40 @@ for idx,row in df.iterrows():
     gdal.Warp(tgt_dset, src_dset, options=options_warp)
 
 
+# Greengen Clip
+ct = 0
+shp_name = ''
+fld
+tgt_val
+for n in sc_num:
+    tgt_val = 'SC {}'.format(n)
+    sql_clause = "SELECT * FROM {} WHERE {} = '{}'".format(shp_name, fld, tgt_val)
+    options = gdal.WarpOptions(resampleAlg=gdal.GRA_NearestNeighbour, format=ot,\
+                               cutlineDSName=fp_cutline, cutlineLayer = shp_name, cropToCutline=True, cutlineSQL= sql_clause, \
+                               srcSRS=src, dstSRS=tgt, )
+
+    options_translate = gdal.TranslateOptions(format=ot, bandList=[1, 2, 3], \
+                                              creationOptions=["WORLDFILE=YES"])
+
+    vf = tgt_val.replace(' ','_')
+
+    # # DEM tgt dset
+    # fname = r'eklutna2022_topobathy_stream_nn_{}.tif'.format(vf)
+    # # fname = r'eklutna2020_BE_nn_{}.tif'.format(vf)
+    # tgt_dset = os.path.join(dir_out, fname)
+
+    # Aerial tgt dset
+    tile_num = eklut_indices_dict[n]
+    src_dset = '{}{}.tif'.format(aerial_base_str, tile_num)
+    tgt_dset = os.path.join(dir_out, '2022_Eklutna_Aerial_nn_{}_tile{}.{}'.format(vf,n,ext))
+    print(src_dset)
+    print(tgt_dset)
+
+    # gdal.Warp(tgt_dset, src_dset, options = options)
+    gdal.Translate(tgt_dset, src_dset, options = options_translate)
+    ct+=1
+
+
 
 
 

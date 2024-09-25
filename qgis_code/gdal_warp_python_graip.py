@@ -4,9 +4,11 @@ import os
 import copy
 
 src_dset = r'E:\box_offline\projects\graip\USGS_1M_DEM_2019_mosaic_ft.tif'
+src_dset = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\LIDAR\LIDAR_USGS_2019_official\USGS_1M_DEM_2019_mosaic.tif"
 # src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\EklutnaRiver_BE_DEM_UTM6.tif'
 dir_out = r'E:\box_offline\projects\graip\clips\buffered'
-dir_out = r'E:\box_offline\ProTutorial2024\clips'
+dir_out = r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\LIDAR\LIDAR_USGS_2019_official'
+
 
 # CA Zone2 = EPSG 6418
 src = osr.SpatialReference()

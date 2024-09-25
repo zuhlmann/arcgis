@@ -1761,38 +1761,67 @@ class proProject(commonUtils):
         setattr(self,df_aprx_lyR_str, df_aprx_lyR)
         df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
 
-    def re_source_lyR_maestro(self, aprx_str, df_str, source_orig = 'DATA_LOCATION_MCM_ORIGINAL',
-                              source_new='DATA_LOCATION_MCMILLEN'):
+    def re_source_lyR_maestro(self, aprx_str):
         # B) Connect
         # A) Gather Connetion Info
         df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
         df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        df_gdb_inv = getattr(self, df_str)
+        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+        prop_str_indices = '{}_indices'.format(df_aprx_lyR_str[3:])
 
-        idx_lyR_all = df_gdb_inv.loc[self.index, source_orig]
-        df_aprx_lyR_subset = df_aprx_lyR.loc[idx_lyR_all]
-        map_names_update = utilities_pro.unique_comma_sep_string(df_aprx_lyR_subset, 'map_name')
-        map_objects = getattr(aprx_str.replace('aprx','maps'))
+        # Logfile - fix base properties to incorporate
+        fp_logfile = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\greengen_logfile.log"
+        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
+        banner = '    {}    '.format('-'*50)
+        call_str = 're_source_lyR_maestro {}:\n'.format(aprx_str)
+        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
+        logging.info(msg_str)
+
+        indices = getattr(self, prop_str_indices)
+        df_aprx_lyR_subset = df_aprx_lyR.loc[indices]
+        map_names_update = df_aprx_lyR_subset['map_name']
+        map_names_update = ','.join(map_names_update)
+        map_names_update = [v.strip() for v in map_names_update.split(',')]
+        map_names_update = list(set(map_names_update))
+        map_objects = getattr(self, aprx_str.replace('aprx','maps'))
         for m in map_objects:
             if m.name in map_names_update:
                 layers = m.listLayers()
                 for lyr in layers:
                     try:
-                        wsf = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'workspace_factory']
-                        dc = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dbase_connection']
-                        dset = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dataset']
+                        lyr.dataSource
+                        dsource = True
+                    except AttributeError:
+                        dsource = False
+                    # If datasource enables
+                    if dsource:
+                        try:
+                            idx = copy.copy(os.path.normpath(lyr.dataSource))
+                            wsf = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'workspace_factory']
+                            dc = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dbase_connection']
+                            dset = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dataset']
 
-                        cp = lyr.connectionProperties
-                        cp_replace = copy.deepcopy(cp)
-                        cp_replace['workspace_factory'] = wsf
-                        cp_replace['connection_info']['database'] = dc
-                        cp_replace['dataset'] = dset
-                        lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
+                            # cp = lyr.connectionProperties
+                            # cp_replace = copy.deepcopy(cp)
+                            # cp_replace['workspace_factory'] = wsf
+                            # cp_replace['connection_info']['database'] = dc
+                            # cp_replace['dataset'] = dset
+                            # lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
+                            new_path = df_aprx_lyR.loc[os.path.normpath(lyr.dataSource),'DATA_LOCATION_MCM_RESOURCE']
+                            df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
+                            # Once successful, remove map name of resource layer from list
+                            map_name = [mn.strip() for mn in df_aprx_lyR.loc[idx, 'map_name'].split(',')]
+                            map_name = [mn for mn in map_name if mn!=m.name]
+                            df_aprx_lyR.at[idx, 'map_name']=map_name
+                            logging.info(r'SUCCESS\nMAP: {} \nLAYER'.format(m.name, idx))
+                            # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
+                        except KeyError as e:
+                            logging.info(e)
+                            logging.info(r'FAIL\nMAP: {} \nLAYER'.format(m.name, idx))
+                    else:
                         pass
-                    except KeyError:
-                        pass
-
-
 
 class AgolAccess(commonUtils):
     '''

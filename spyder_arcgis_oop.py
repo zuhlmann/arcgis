@@ -1799,9 +1799,9 @@ class proProject(commonUtils):
                     if dsource:
                         try:
                             idx = copy.copy(os.path.normpath(lyr.dataSource))
-                            wsf = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'workspace_factory']
-                            dc = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dbase_connection']
-                            dset = df_aprx_lyR_subset.loc[os.path.normpath(lyr.dataSource), 'dataset']
+                            wsf = df_aprx_lyR_subset.loc[idx, 'workspace_factory']
+                            dc = df_aprx_lyR_subset.loc[idx, 'dbase_connection']
+                            dset = df_aprx_lyR_subset.loc[idx, 'dataset']
 
                             # cp = lyr.connectionProperties
                             # cp_replace = copy.deepcopy(cp)
@@ -1809,12 +1809,13 @@ class proProject(commonUtils):
                             # cp_replace['connection_info']['database'] = dc
                             # cp_replace['dataset'] = dset
                             # lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
-                            new_path = df_aprx_lyR.loc[os.path.normpath(lyr.dataSource),'DATA_LOCATION_MCM_RESOURCE']
+                            new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
                             df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
                             # Once successful, remove map name of resource layer from list
                             map_name = [mn.strip() for mn in df_aprx_lyR.loc[idx, 'map_name'].split(',')]
                             map_name = [mn for mn in map_name if mn!=m.name]
                             df_aprx_lyR.at[idx, 'map_name']=map_name
+                            setattr(self, df_aprx_lyR_str, df_aprx_lyR)
                             logging.info(r'SUCCESS\nMAP: {} \nLAYER'.format(m.name, idx))
                             # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
                         except KeyError as e:

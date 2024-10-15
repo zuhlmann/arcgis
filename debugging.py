@@ -8,7 +8,6 @@ subproject = 'greengen_ferc_v2'
 fp_pathlist = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\path_list_updated.csv"
 aprx_str = 'aprx_greengen_ferc'
 
-
 # TOLT
 import spyder_arcgis_oop as agolZ
 import importlib

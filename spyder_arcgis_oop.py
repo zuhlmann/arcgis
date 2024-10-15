@@ -288,7 +288,7 @@ class commonUtils(object):
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
-            prop_str_indices = 'df_indices'
+            prop_str_indices = 'indices'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
@@ -932,6 +932,7 @@ class commonUtils(object):
                     feat_name = copy.copy(index)
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
+                    feat_name = feat_name.replace('.shp','')
 
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
@@ -1148,6 +1149,7 @@ class commonUtils(object):
                     feat_name = copy.copy(index)
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
+                    feat_name = feat_name.replace('.shp','')
 
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
@@ -1778,6 +1780,7 @@ class proProject(commonUtils):
         date_str = datetime.datetime.today().strftime('%D %H:%M')
         msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
         logging.info(msg_str)
+        map_temp, layer_temp=[],[]
 
         indices = getattr(self, prop_str_indices)
         df_aprx_lyR_subset = df_aprx_lyR.loc[indices]
@@ -1803,26 +1806,33 @@ class proProject(commonUtils):
                             dc = df_aprx_lyR_subset.loc[idx, 'dbase_connection']
                             dset = df_aprx_lyR_subset.loc[idx, 'dataset']
 
-                            # cp = lyr.connectionProperties
-                            # cp_replace = copy.deepcopy(cp)
-                            # cp_replace['workspace_factory'] = wsf
-                            # cp_replace['connection_info']['database'] = dc
-                            # cp_replace['dataset'] = dset
-                            # lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
+                            cp = lyr.connectionProperties
+                            cp_replace = copy.deepcopy(cp)
+                            cp_replace['workspace_factory'] = wsf
+                            cp_replace['connection_info']['database'] = dc
+                            cp_replace['dataset'] = dset
+                            lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
                             new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
                             df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
                             # Once successful, remove map name of resource layer from list
-                            map_name = [mn.strip() for mn in df_aprx_lyR.loc[idx, 'map_name'].split(',')]
+                            maps_debug = df_aprx_lyR.loc[idx, 'map_name']
+                            map_name = [mn.strip() for mn in maps_debug.split(',')]
+                            # this will be a list; turn back into comma separated string
                             map_name = [mn for mn in map_name if mn!=m.name]
+                            map_name=','.join(map_name)
                             df_aprx_lyR.at[idx, 'map_name']=map_name
                             setattr(self, df_aprx_lyR_str, df_aprx_lyR)
-                            logging.info(r'SUCCESS\nMAP: {} \nLAYER'.format(m.name, idx))
-                            # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
+                            logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
+                            df_aprx_lyR.to_csv(aprx_lyR_csv_str)
                         except KeyError as e:
-                            logging.info(e)
-                            logging.info(r'FAIL\nMAP: {} \nLAYER'.format(m.name, idx))
+                            map_temp.append(m.name)
+                            layer_temp.append(idx)
                     else:
                         pass
+        df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
+        df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
+        aprx = getattr(self, aprx_str)
+        aprx.save()
 
 class AgolAccess(commonUtils):
     '''

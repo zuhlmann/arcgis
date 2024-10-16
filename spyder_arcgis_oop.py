@@ -1755,15 +1755,18 @@ class proProject(commonUtils):
                 df_aprx_lyR.at[idx, 'workspace_factory'] = 'Shape File'
             else:
                 dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
-                fname = os.path.split(fp_new)[-1]
-                df_aprx_lyR.at[idx, 'workspace_factory'] = 'File Geodatabase'
+                df_aprx_lyR.at[idx, 'workspace_factory'] = 'FileGDB'
+                fp_comps = fp_new.split(os.sep)
+                fname, dset = fp_comps[-1], fp_comps[-2]
+                if 'gdb' not in dset:
+                    df_aprx_lyR.at[idx, 'feature_dataset']=dset
             df_aprx_lyR.at[idx, 'dataset'] = fname
             df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
         aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
         setattr(self,df_aprx_lyR_str, df_aprx_lyR)
         df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
 
-    def re_source_lyR_maestro(self, aprx_str):
+    def re_source_lyR_maestro(self, aprx_str, df_map_matrix):
         # B) Connect
         # A) Gather Connetion Info
         df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
@@ -1784,55 +1787,113 @@ class proProject(commonUtils):
 
         indices = getattr(self, prop_str_indices)
         df_aprx_lyR_subset = df_aprx_lyR.loc[indices]
-        map_names_update = df_aprx_lyR_subset['map_name']
-        map_names_update = ','.join(map_names_update)
-        map_names_update = [v.strip() for v in map_names_update.split(',')]
-        map_names_update = list(set(map_names_update))
+        df_map_matrix_subset = df_map_matrix.loc[indices]
         map_objects = getattr(self, aprx_str.replace('aprx','maps'))
+        # Remove maps not in Use i.e. not in matrix or inventoried
+        map_objects = [mo for mo in map_objects if mo.name in df_map_matrix.columns]
         for m in map_objects:
-            if m.name in map_names_update:
-                layers = m.listLayers()
-                for lyr in layers:
-                    try:
-                        lyr.dataSource
-                        dsource = True
-                    except AttributeError:
-                        dsource = False
-                    # If datasource enables
-                    if dsource:
-                        try:
-                            idx = copy.copy(os.path.normpath(lyr.dataSource))
-                            wsf = df_aprx_lyR_subset.loc[idx, 'workspace_factory']
-                            dc = df_aprx_lyR_subset.loc[idx, 'dbase_connection']
-                            dset = df_aprx_lyR_subset.loc[idx, 'dataset']
-
-                            cp = lyr.connectionProperties
-                            cp_replace = copy.deepcopy(cp)
-                            cp_replace['workspace_factory'] = wsf
-                            cp_replace['connection_info']['database'] = dc
-                            cp_replace['dataset'] = dset
-                            lyr.updateConnectionProperties(lyr.connectionProperties, cp_replace)
-                            new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
-                            df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
-                            # Once successful, remove map name of resource layer from list
-                            maps_debug = df_aprx_lyR.loc[idx, 'map_name']
-                            map_name = [mn.strip() for mn in maps_debug.split(',')]
-                            # this will be a list; turn back into comma separated string
-                            map_name = [mn for mn in map_name if mn!=m.name]
-                            map_name=','.join(map_name)
-                            df_aprx_lyR.at[idx, 'map_name']=map_name
-                            setattr(self, df_aprx_lyR_str, df_aprx_lyR)
-                            logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
-                            df_aprx_lyR.to_csv(aprx_lyR_csv_str)
-                        except KeyError as e:
-                            map_temp.append(m.name)
-                            layer_temp.append(idx)
+            tgt_layers = df_map_matrix_subset.index[df_map_matrix_subset[m.name]].to_list()
+            layers = m.listLayers()
+            for lyr in layers:
+                try:
+                    if lyr.dataSource in tgt_layers:
+                        # dataSource and in tgt_layer
+                        resource = True
                     else:
-                        pass
+                        resource = False
+                except AttributeError:
+                    # does not have dataSource attribute (i.e. map server or...something)
+                    resource = False
+                if resource:
+                    try:
+                        idx = copy.copy(os.path.normpath(lyr.dataSource))
+                        wsf = df_aprx_lyR_subset.loc[idx, 'workspace_factory']
+                        dbase_connection = df_aprx_lyR_subset.loc[idx, 'dbase_connection']
+                        dataset = df_aprx_lyR_subset.loc[idx, 'dataset']
+                        feature_dataset = df_aprx_lyR_subset.loc[idx, 'feature_dataset']
+
+                        lyr_cim = lyr.getDefinition('V3')
+                        # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
+                        dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
+                        dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
+                        dc.workspaceFactory = wsf
+                        # check for feature dataset
+                        if not pd.isnull(dataset):
+                            dc.featureDataset = feature_dataset
+                        dc.dataset = dataset
+                        lyr_cim.featureTable.dataConnection = dc
+                        lyr.setDefinition(lyr_cim)
+
+                        new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
+                        df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
+                        # Once successful, remove map name of resource layer from list
+                        maps_debug = df_aprx_lyR.loc[idx, 'map_name']
+                        map_name = [mn.strip() for mn in maps_debug.split(',')]
+                        # this will be a list; turn back into comma separated string
+                        map_name = [mn for mn in map_name if mn!=m.name]
+                        map_name=','.join(map_name)
+                        df_aprx_lyR.at[idx, 'map_name']=map_name
+                        setattr(self, df_aprx_lyR_str, df_aprx_lyR)
+                        logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
+                        logging.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
+                    except KeyError as e:
+                        map_temp.append(m.name)
+                        layer_temp.append(idx)
+                else:
+                    pass
         df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
         df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
         aprx = getattr(self, aprx_str)
         aprx.save()
+        # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
+    def aprx_map_inv(self, aprx_str, csv_out):
+        src_list, map_list = [],[]
+        map_objects = getattr(self, aprx_str.replace('aprx', 'maps'))
+        for m in map_objects:
+            layers = m.listLayers()
+            for lyr in layers:
+                try:
+                    src = lyr.dataSource
+                    src_list.append(src)
+                    map_list.append(m.name)
+                except AttributeError:
+                    pass
+        df = pd.DataFrame(np.column_stack([src_list, map_list]), columns=['DATA_LOCATION_MCMILLEN', 'MAP_NAME'])
+        df.to_csv(csv_out)
+    def expand_rows(self, aprx_str, csv_out):
+        '''
+        Outputs a True False matrix flagging which map utilizes which layer.
+        For use in making re-sourceing more efficient.  Parses comma separated
+        string column map_name ["map1", "map2", "mapn"] from lyR_inv as primary input.
+        20241015
+        Args:
+            aprx_str:       yeah
+            csv_out:        for mapping grid dataframe
+
+        Returns:
+
+        '''
+        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
+        maps = df_aprx_lyR.map_name
+        maps_unique=[y.strip() for x in maps for y in x.split(',')]
+        maps_unique=list(set(maps_unique))
+        maps_unique=list(set(maps_unique))
+        layers = df_aprx_lyR.index
+        vals = np.full([len(layers), len(maps_unique)], False)
+        df_maps_join = pd.DataFrame(vals, columns = maps_unique)
+        index = pd.Index(layers)
+        df_maps_join = df_maps_join.set_index(index)
+        for idx in df_aprx_lyR.index:
+            map_list = df_aprx_lyR.loc[idx, 'map_name']
+            map_list = [mn.strip() for mn in map_list.split(',')]
+            for mn in map_list:
+                df_maps_join.at[idx, mn]=True
+        df_maps_join.to_csv(csv_out)
+
+
+
+
 
 class AgolAccess(commonUtils):
     '''

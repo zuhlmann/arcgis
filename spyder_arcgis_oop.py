@@ -1658,19 +1658,20 @@ class proProject(commonUtils):
     '''
     def __init__(self):
         print('something')
-    def add_aprx(self,fp_aprx, fp_aprx_inv, target_col = 'DATA_LOCATION_MCMILLEN'):
+    def add_aprx(self,fp_aprx,fp_aprx_inv, add_lyR_inv=True,target_col = 'DATA_LOCATION_MCMILLEN'):
         aprx_name = os.path.split(fp_aprx)[-1][:-5]
         setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
         aprx = arcpy.mp.ArcGISProject(fp_aprx)
         aprx_str = 'aprx_{}'.format(aprx_name)
         setattr(self, aprx_str, aprx)
 
-        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-        df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col=target_col)
-        setattr(self, df_aprx_lyR_str, df_aprx_lyR)
+        if add_lyR_inv:
+            df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+            df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col=target_col)
+            setattr(self, df_aprx_lyR_str, df_aprx_lyR)
 
-        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
-        setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
+            aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
+            setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
     def get_base_aprx_content(self, aprx_str):
         '''
         fetches aprx maps and layouts from init attributes
@@ -1683,58 +1684,9 @@ class proProject(commonUtils):
         m =  aprx.listMaps()
         map_str = aprx_str.replace('aprx','maps')
         setattr(self, map_str, m)
-        l = aprx.listLayouts()
-        layout_str = aprx_str.replace('aprx','layouts')
-        setattr(self, layout_str, l)
-    def re_source_lyR_move(self, aprx_str):
-        # REMAP
-        # 20240904
-
-        aprx = getattr(self, aprx_str)
-        # A) Gather Connetion Info
-        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
-        df_base_str = df_aprx_lyR_str.replace('df_', '')
-        prop_str_indices = '{}_indices'.format(df_base_str)
-        indices = getattr(self, prop_str_indices)
-        map_str = aprx_str.replace('aprx','maps')
-
-        maps = getattr(self, map_str)
-        layers = []
-        map_name = []
-        ct = 0
-        for m in maps:
-            t = m.listLayers()
-            layers.extend(t)
-            map_name.extend([m.name] * len(t))
-            ct += 1
-        fp_csv_aprx_lyR = getattr(aprx_lyR_csv_str)
-        # normalize path
-        fp_src_formatted = [os.path.normpath(fp) for fp in df_lyr_inv.source]
-        df_aprx_lyR['source'] = fp_src_formatted
-        df_lyr_inv = df_aprx_lyR.set_index('source')
-        df_lyr_inv = df_lyr_inv[df_lyr_inv.develop]
-
-        for lyr_src, mn in zip(layers, map_name):
-            # Supports datasource?  i.e. servicer
-            try:
-                lyr_src.dataSource
-                dsource = True
-            except AttributeError:
-                dsource = False
-                pass
-        if dsource:
-            try:
-                dbase_mapped = df_lyr_inv.loc[os.path.normpath(lyr_src.dataSource), 'connection_dbase']
-                print('MAPNAME {} MAPPED:     {}'.format(mn, lyr_src))
-                cp = lyr_src.connectionProperties
-                cp_replace = copy.deepcopy(cp)
-                cp_replace['connection_info']['database'] = dbase_mapped
-                lyr_src.updateConnectionProperties(lyr_src.connectionProperties, cp_replace)
-            except KeyError:
-                print('MAPNAME {} NOT MAPPED: {}'.format(mn, lyr_src))
-                pass
+        # l = aprx.listLayouts()
+        # layout_str = aprx_str.replace('aprx','layouts')
+        # setattr(self, layout_str, l)
 
     def format_lyR_inv_datasource_standard(self, aprx_str, source_new='DATA_LOCATION_MCM_RESOURCE'):
 
@@ -1775,7 +1727,7 @@ class proProject(commonUtils):
         prop_str_indices = '{}_indices'.format(df_aprx_lyR_str[3:])
 
         # Logfile - fix base properties to incorporate
-        fp_logfile = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\greengen_logfile.log"
+        fp_logfile = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\FLA\data_inv\greengen_logfile.log"
         logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
         banner = '    {}    '.format('-'*50)
         call_str = 're_source_lyR_maestro {}:\n'.format(aprx_str)
@@ -1793,12 +1745,16 @@ class proProject(commonUtils):
         map_objects = [mo for mo in map_objects if mo.name in df_map_matrix.columns]
         for m in map_objects:
             tgt_layers = df_map_matrix_subset.index[df_map_matrix_subset[m.name]].to_list()
+            if m.name=='phouse_route3':
+                logging.info('TARGET LAYERS: {}'.format(tgt_layers))
             layers = m.listLayers()
             for lyr in layers:
                 try:
                     if lyr.dataSource in tgt_layers:
                         # dataSource and in tgt_layer
                         resource = True
+                        if m.name=='phouse_route3':
+                            logging.info(lyr.dataSource)
                     else:
                         resource = False
                 except AttributeError:
@@ -1817,11 +1773,14 @@ class proProject(commonUtils):
                         dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
                         dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
                         dc.workspaceFactory = wsf
-                        # check for feature dataset
-                        if not pd.isnull(dataset):
-                            dc.featureDataset = feature_dataset
                         dc.dataset = dataset
-                        lyr_cim.featureTable.dataConnection = dc
+                        # check for feature dataset
+                        if not pd.isnull(feature_dataset):
+                            dc.featureDataset = feature_dataset
+                        if wsf=='Raster':
+                            lyr_cim.dataConnection = dc
+                        elif wsf in ('Shape', 'FileGDB'):
+                            lyr_cim.featureTable.dataConnection = dc
                         lyr.setDefinition(lyr_cim)
 
                         new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
@@ -1837,28 +1796,73 @@ class proProject(commonUtils):
                         logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
                         logging.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
                     except KeyError as e:
+                        logging.info('EXCEPTION {}'.format(e))
                         map_temp.append(m.name)
                         layer_temp.append(idx)
                 else:
                     pass
-        df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
-        df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
+        # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
+        # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
         aprx = getattr(self, aprx_str)
         aprx.save()
         # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
-    def aprx_map_inv(self, aprx_str, csv_out):
-        src_list, map_list = [],[]
-        map_objects = getattr(self, aprx_str.replace('aprx', 'maps'))
+    def aprx_map_inv(self, aprx_path, **kwargs):
+        '''
+        20241021
+        Args:
+            aprx_path:      path/to/aprs
+            csv_out:        path to lyR inventory
+        Returns:
+
+        '''
+        aprx = arcpy.mp.ArcGISProject(aprx_path)
+        map_objects = aprx.listMaps()
+        src_list, map_list = [], []
         for m in map_objects:
             layers = m.listLayers()
             for lyr in layers:
-                try:
+                if lyr.visible and lyr.supports('DATASOURCE'):
                     src = lyr.dataSource
                     src_list.append(src)
                     map_list.append(m.name)
-                except AttributeError:
-                    pass
-        df = pd.DataFrame(np.column_stack([src_list, map_list]), columns=['DATA_LOCATION_MCMILLEN', 'MAP_NAME'])
+        del map_objects
+        del aprx
+
+        item = [os.path.split(fp)[-1] for fp in src_list]
+        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME']
+        df = pd.DataFrame(np.column_stack([item, src_list, map_list]), columns=cols)
+        return(df)
+
+    def aprx_map_inv2(self, csv_in, csv_out):
+        '''
+        20241021
+        Args:
+            csv_in:         path/to/aprx inventory (if exists for bulk; i.e. Tolt)
+            csv_out:        path to lyR inventory
+        Returns:
+
+        '''
+        df = pd.read_csv(csv_in)
+        df = df[df.FLAG]
+        src_list, map_list, aprx_list = [], [], []
+        for idx in df.index:
+            aprx_path = df.loc[idx, 'APRX_PATH']
+            aprx_str = df.loc[idx, 'APRX_STR']
+            aprx = arcpy.mp.ArcGISProject(aprx_path)
+            map_objects = aprx.listMaps()
+            for m in map_objects:
+                layers = m.listLayers()
+                for lyr in layers:
+                    if lyr.visible and lyr.supports('DATASOURCE'):
+                        src = lyr.dataSource
+                        src_list.append(src)
+                        map_list.append(m.name)
+                        aprx_list.append(aprx_str)
+            del map_objects
+            del aprx
+
+        cols = ['DATA_LOCATION_MCMILLEN', 'MAP_NAME', 'APRX']
+        df = pd.DataFrame(np.column_stack([src_list, map_list, aprx_list]), columns=cols)
         df.to_csv(csv_out)
     def expand_rows(self, aprx_str, csv_out):
         '''
@@ -1891,9 +1895,134 @@ class proProject(commonUtils):
                 df_maps_join.at[idx, mn]=True
         df_maps_join.to_csv(csv_out)
 
+    def join_list(self, v):
+        vn = v.to_list()
+        vn = list(set(vn))
+        vn = ', '.join(vn)
+        return (vn)
+    def aggregate_rows(self, df, group_by_field, agg_field,**kwargs):
+        '''
+        Groupby a field (group_by_field), aggregate all unique values in another field (agg_field)
+        as a new field with values being unique values as string with commas separating values.
+        20240904
+        Args:
+            csv_in:             path/to/csv source
+            csv_out:            path/to/csv_out; can be same as csv_in
+            group_by_field:     field to groupby
+            agg_field:          field to create unique value comma-separated string
+            kwargs:             count = include field with number of values for agg_field in csv_out
 
+        Returns:
 
+        '''
+        # The method .agg({agg_field: <function>}) will perform <function> over the agg_field
+        # i.e. join_list aggregated over map_name column
+        groupby_source = df.groupby(group_by_field).agg({agg_field: self.join_list})
+        # pulls groupby_field out of index and replaces with numbers (iloc)
+        groupby_source = groupby_source.reset_index()
 
+        try:
+            # use if group_by_field is a file path and you want filename
+            kwargs['extract_filename']
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source[group_by_field]]
+            groupby_source[group_by_field] = fnames
+        except KeyError:
+            pass
+        try:
+            kwargs['count']
+            for idx in groupby_source.index:
+                t = groupby_source.loc[idx, agg_field]
+                t = t.split(',')
+                groupby_source.loc[idx, 'NUMBER_OCCURRENCES']= len(t)
+        except KeyError:
+            pass
+        groupby_source = groupby_source.set_index(group_by_field)
+        try:
+            kwargs['carry_fields']
+            df_join = df.drop_duplicates([group_by_field]).reset_index()
+            # Don't bring in Agg Field i.e. map_name
+            df_join = df_join[[c for c in df_join.columns if c!=agg_field]]
+            # cols_rename = {f"{c}_y":c for c in df.columns if c!=group_by_field}
+            groupby_source = groupby_source.merge(df_join, on=group_by_field, how='left')
+            # groupby_source = groupby_source.rename(columns=cols_rename)
+        except KeyError:
+            pass
+        return(groupby_source)
+    def concatenate_aggregate(self, csv_in, csv_out, split_field, group_by_field, agg_field):
+        '''
+        Used for multiple aprx ReSourcing wherein need to groupby map_names in each aprx.
+        Layer X may be used in 4 different APRXs.  In this case, there will be 4 Layer X
+        or DATA_SOURCE rows, one for each aprx and a map_name 'map1,map2,mapn' string for each
+        20241016
+        Args:
+            csv_in:         lyR_in_csv to aggregate
+            csv_out:        path/to/final/csv
+            split_field:    for instance groupby map_name but per aprx.  so split by aprx and
+                            comma sep string map_names for each aprx.
+            group_by_field  field to groupby i.e. DATA_SOURCE
+            agg_field       field to generate comma separated string of values i.e. map_name
+
+        Returns:
+
+        '''
+        df = pd.read_csv(csv_in)
+        split_vals = list(set(df[split_field].to_list()))
+        for v in split_vals:
+            df_temp = df[df[split_field]==v]
+            df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field)
+            df_temp_agg[split_field]=v
+            if 'df_concat' not in locals():
+                df_concat = copy.copy(df_temp_agg)
+            else:
+                df_concat = pd.concat([df_concat, df_temp_agg])
+        df_concat.to_csv(csv_out)
+    def aprx_broken_source_inv(self,  aprx_str, fp_lyR_inv):
+        '''
+        Create inventory to feed to fixing file paths.  INitially for when pro project moved
+        and need to resource due to dumb ESRI relative path messup.  20241017
+        Args:
+            aprx_str:           self explanatory
+
+        Returns:
+
+        '''
+        maps_str = aprx_str.replace('aprx','maps')
+        maps = getattr(self, maps_str)
+        map_name,layer_name,fp, raster =[],[],[],[]
+        for m in maps:
+            for lyr in m.listLayers():
+                if (lyr.isBroken and lyr.supports('DATASOURCE')):
+                    fp.append(lyr.dataSource)
+                    if lyr.isFeatureLayer:
+                        raster.append(False)
+                    elif lyr.isRasterLayer:
+                        raster.append(True)
+        broken=[True]*len(raster)
+        cols = ['DATA_LOCATION_MCMILLEN', 'IS_RASTER','IS_BROKEN']
+        df_join=pd.DataFrame(np.column_stack([fp,raster,broken]), columns = cols)
+        df_join = df_join.drop_duplicates(subset=['DATA_LOCATION_MCMILLEN'])
+        df_lyR_inv=pd.read_csv(fp_lyR_inv)
+        df_lyR_inv=df_lyR_inv.merge(df_join, on='DATA_LOCATION_MCMILLEN', how='left')
+        df_lyR_inv.to_csv(fp_lyR_inv)
+    def aprx_broken_source_inv2(self, csv_out):
+        '''
+        Step 2 in fixing dumb ESRI path when moved.
+        After running step 2, manually create columns and val for .replace
+        Then run this to save csv with correct source column
+        Args:
+            csv_out:        path/to/broken_source_inv
+
+        Returns:
+
+        '''
+        df = pd.read_csv(csv_out)
+        for idx in df.index:
+            orig=df.loc[idx,'DATA_LOCATION_BROKEN']
+            t=df.loc[idx,'target']
+            r=df.loc[idx,'replace']
+            corrected=orig.replace(t,r)
+            df.loc[idx,'DATA_LOCATION_MCM_RESOURCE']=corrected
+            df.to_csv(csv_out)
 
 class AgolAccess(commonUtils):
     '''

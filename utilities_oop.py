@@ -185,13 +185,13 @@ class utilities(object):
                 pass
         return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size,flag)
 
-    def aggregate_rows(self, csv_in, csv_out, group_by_field, agg_field, **kwargs):
+    def aggregate_rows(self, df, csv_out, group_by_field, agg_field, **kwargs):
         '''
         Groupby a field (group_by_field), aggregate all unique values in another field (agg_field)
         as a new field with values being unique values as string with commas separating values.
         20240904
         Args:
-            csv_in:             path/to/csv source
+            df:                 dataframe with agg_field formatted as string (if numeric)
             csv_out:            path/to/csv_out; can be same as csv_in
             group_by_field:     field to groupby
             agg_field:          field to create unique value comma-separated string
@@ -200,7 +200,6 @@ class utilities(object):
         Returns:
 
         '''
-        df = pd.read_csv(csv_in)
 
         def join_list(v):
             vn = v.to_list()

@@ -74,3 +74,4 @@ subdir_inv_obj.subdir_inventory(ft_filt, exclude_sd, new_inventory = csv_lyt_inv
 # df = pd.read_csv(csv_lyt_inv)
 # csv_folders = r'C:\Box\MCM Projects\Klamath River Renewal Corp\4.0 Data Collection\Crescent City Harbor Data\Unzipped Files\unzipped_folders_buoyID.csv'
 # subdir_inv_obj.aggregate_rows(csv_lyt_inv, csv_folders, 'FINAL_SUBDIR', 'BUOY', data_type='integer')
+

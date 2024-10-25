@@ -1658,7 +1658,7 @@ class proProject(commonUtils):
     '''
     def __init__(self):
         print('something')
-    def add_aprx(self,fp_aprx, target_col = 'DATA_LOCATION_MCMILLEN', kwargs**):
+    def add_aprx(self,fp_aprx, target_col = r'DATA_LOCATION_MCMILLEN', **kwargs):
         aprx_name = os.path.split(fp_aprx)[-1][:-5]
         setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
         aprx = arcpy.mp.ArcGISProject(fp_aprx)
@@ -1666,13 +1666,15 @@ class proProject(commonUtils):
         setattr(self, aprx_str, aprx)
 
         try:
-            fp_aprx_inv = kwargs['add_lyR_inv']
-            df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-            df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col=target_col)
+            fp_lyR_inv = kwargs['add_lyR_inv']
+            df_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+            df_aprx_lyR = pd.read_csv(fp_lyR_inv, index_col=target_col)
             setattr(self, df_aprx_lyR_str, df_aprx_lyR)
 
             aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
             setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
+        except KeyError:
+            pa
     def add_maps(self, aprx_str):
         '''
         fetches aprx maps and layouts from init attributes
@@ -1685,14 +1687,26 @@ class proProject(commonUtils):
         m =  aprx.listMaps()
         map_str = aprx_str.replace('aprx','maps')
         setattr(self, map_str, m)
+    def add_layouts(self, aprx_str):
+        '''
+        fetches aprx maps and layouts from init attributes
+        NEVER USED
+        Args:
+            aprx_str:       <aprx name>_aprx
+
+        Returns:
+        '''
+        aprx = getattr(self, aprx_str)
+        l =  aprx.listLayouts()
+        map_str = aprx_str.replace('aprx','layouts')
+        setattr(self, layout_str, l)
 
     def format_lyR_inv_datasource_standard(self, aprx_str, source_new='DATA_LOCATION_MCM_RESOURCE'):
 
         # A) Gather Connetion Info
         base_str = aprx_str[5:]
-        df_aprx_lyR_resource_str = 'df_{}_lyR_resource'.format(base_str)
+        df_aprx_lyR_str = 'df_{}_lyR'.format(base_str)
         df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        df_base_str = df_aprx_lyR_str.replace('df_', '')
         prop_str_indices = '{}_indices'.format(base_str)
         indices = getattr(self, prop_str_indices)
 
@@ -1848,10 +1862,11 @@ class proProject(commonUtils):
         df = pd.DataFrame(np.column_stack([item, src_list, map_list]), columns=cols)
         return(df)
 
-    def aprx_map_inv2(self, csv_in, csv_out):
+    def aprx_map_inv2(self, csv_in, csv_out, ):
         '''
         20241021
         Compiling single inv from multiple aprx paths via aprx inv
+        Need a True/False FLAG field to subset rows to inventory
         Args:
             csv_in:         path/to/aprx inventory (if exists for bulk; i.e. Tolt)
             csv_out:        path to lyR inventory
@@ -1862,8 +1877,8 @@ class proProject(commonUtils):
         df = df[df.FLAG]
         src_list, map_list, aprx_list = [], [], []
         for idx in df.index:
-            aprx_path = df.loc[idx, 'APRX_PATH']
-            aprx_str = df.loc[idx, 'APRX_STR']
+            aprx_path = df.loc[idx, 'DATA_LOCATION_MCMILLEN_APRX']
+            aprx_str = df.loc[idx, 'APRX']
             aprx = arcpy.mp.ArcGISProject(aprx_path)
             map_objects = aprx.listMaps()
             for m in map_objects:

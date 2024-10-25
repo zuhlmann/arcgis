@@ -27,17 +27,18 @@ pro_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
 pro_obj.add_aprx(fp_aprx, fp_lyR_inv,True, 'DATA_LOCATION_MCMILLEN')
 pro_obj.get_base_aprx_content(aprx_str)
 #
-# Create Broken Filepath Inv
-# A) Inventory broken layers
-pro_obj.aprx_broken_source_inv(aprx_str, fp_lyR_inv)
+# # Create Broken Filepath Inv
+# # A) Inventory broken layers
+# pro_obj.aprx_broken_source_inv(aprx_str, fp_lyR_inv)
 
 # # A2) Create fixed path column
 # # Manually add 'target' and 'replace' vals for DATA_LOCATION.replace('target','replace')
 # # to iterate and create DATA_LOCATION_RESOURCE
-# pro_obj.aprx_broken_source_inv2(fp_lyR_inv)
+# pro_obj.selection_idx('df_FLA_road_improvement_lyR', target_action='fix')
+# pro_obj.aprx_broken_source_inv2(fp_lyR_inv,'aprx_FLA_road_improvement')
 #
-# # Add ReSource info
-# # pro_obj.add_df(fp_lyR_inv, 'df_greengen_ferc_lyR', 'random')
+# # # Add ReSource info
+# # # pro_obj.add_df(fp_lyR_inv, 'df_greengen_ferc_lyR', 'random')
 # pro_obj.selection_idx('df_FLA_road_improvement_lyR', target_action='fix')
 # pro_obj.format_lyR_inv_datasource_standard('aprx_FLA_road_improvement')
 
@@ -45,13 +46,13 @@ pro_obj.aprx_broken_source_inv(aprx_str, fp_lyR_inv)
 csv_map_matrix = r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\FLA\data_inv\map_matrix.csv'
 # pro_obj.expand_rows(aprx_str, csv_map_matrix)
 
-# # D) Resource Time
-# # load maps
-# import pandas as pd
-# pro_obj.selection_idx('df_FLA_road_improvement_lyR', target_action='fix')
-# # pro_obj.get_base_aprx_content(aprx_str)
-# df_map_matrix = pd.read_csv(csv_map_matrix, index_col='DATA_LOCATION_MCMILLEN')
-# pro_obj.re_source_lyR_maestro(aprx_str, df_map_matrix)
+# D) Resource Time
+# load maps
+import pandas as pd
+pro_obj.selection_idx('df_FLA_road_improvement_lyR', target_action='fix')
+# pro_obj.get_base_aprx_content(aprx_str)
+df_map_matrix = pd.read_csv(csv_map_matrix, index_col='DATA_LOCATION_MCMILLEN')
+pro_obj.re_source_lyR_maestro(aprx_str, df_map_matrix)
 
 
 

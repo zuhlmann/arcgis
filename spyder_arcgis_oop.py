@@ -1658,21 +1658,22 @@ class proProject(commonUtils):
     '''
     def __init__(self):
         print('something')
-    def add_aprx(self,fp_aprx,fp_aprx_inv, add_lyR_inv=True,target_col = 'DATA_LOCATION_MCMILLEN'):
+    def add_aprx(self,fp_aprx, target_col = 'DATA_LOCATION_MCMILLEN', kwargs**):
         aprx_name = os.path.split(fp_aprx)[-1][:-5]
         setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
         aprx = arcpy.mp.ArcGISProject(fp_aprx)
         aprx_str = 'aprx_{}'.format(aprx_name)
         setattr(self, aprx_str, aprx)
 
-        if add_lyR_inv:
+        try:
+            fp_aprx_inv = kwargs['add_lyR_inv']
             df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
             df_aprx_lyR = pd.read_csv(fp_aprx_inv, index_col=target_col)
             setattr(self, df_aprx_lyR_str, df_aprx_lyR)
 
             aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
             setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
-    def get_base_aprx_content(self, aprx_str):
+    def add_maps(self, aprx_str):
         '''
         fetches aprx maps and layouts from init attributes
         Args:
@@ -1684,17 +1685,15 @@ class proProject(commonUtils):
         m =  aprx.listMaps()
         map_str = aprx_str.replace('aprx','maps')
         setattr(self, map_str, m)
-        # l = aprx.listLayouts()
-        # layout_str = aprx_str.replace('aprx','layouts')
-        # setattr(self, layout_str, l)
 
     def format_lyR_inv_datasource_standard(self, aprx_str, source_new='DATA_LOCATION_MCM_RESOURCE'):
 
         # A) Gather Connetion Info
-        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        base_str = aprx_str[5:]
+        df_aprx_lyR_resource_str = 'df_{}_lyR_resource'.format(base_str)
         df_aprx_lyR = getattr(self, df_aprx_lyR_str)
         df_base_str = df_aprx_lyR_str.replace('df_', '')
-        prop_str_indices = '{}_indices'.format(df_base_str)
+        prop_str_indices = '{}_indices'.format(base_str)
         indices = getattr(self, prop_str_indices)
 
         # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
@@ -1702,18 +1701,35 @@ class proProject(commonUtils):
             # idx_lyR = os.path.normpath(df_gdb_inv.loc[idx, source_orig])
             # fp_new = os.path.normpath(df_gdb_inv.loc[idx, source_new])
             fp_new = os.path.normpath(df_aprx_lyR.loc[idx, source_new])
-            if fp_new[-4:] == '.shp':
-                dbase_connection, fname = os.path.split(fp_new)
-                df_aprx_lyR.at[idx, 'workspace_factory'] = 'Shape File'
+            if not df_aprx_lyR.loc[idx, 'IS_RASTER']:
+                if fp_new[-4:] == '.shp':
+                    dbase_connection, fname = os.path.split(fp_new)
+                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Shape File'
+                else:
+                    dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
+                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'FileGDB'
+                    fp_comps = fp_new.split(os.sep)
+                    fname, dset = fp_comps[-1], fp_comps[-2]
+                    if 'gdb' not in dset:
+                        df_aprx_lyR.at[idx, 'feature_dataset']=dset
+                df_aprx_lyR.at[idx, 'dataset'] = fname
+                df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
             else:
-                dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
-                df_aprx_lyR.at[idx, 'workspace_factory'] = 'FileGDB'
-                fp_comps = fp_new.split(os.sep)
-                fname, dset = fp_comps[-1], fp_comps[-2]
-                if 'gdb' not in dset:
-                    df_aprx_lyR.at[idx, 'feature_dataset']=dset
-            df_aprx_lyR.at[idx, 'dataset'] = fname
-            df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
+                fp_comps = fp_new.split('.gdb')
+                if len(fp_comps)==2:
+                    dbase_connection = '{}.gdb'.format(fp_comps[0])
+                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Raster'
+                    fp_comps = fp_new.split(os.sep)
+                    fname, dset = fp_comps[-1], fp_comps[-2]
+                    if 'gdb' not in dset:
+                        df_aprx_lyR.at[idx, 'feature_dataset'] = dset
+                else:
+                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Raster'
+                    fp_comps = os.path.split(fp_new)
+                    dbase_connection = fp_comps[0]
+                    fname=fp_comps[-1]
+                df_aprx_lyR.at[idx, 'dataset'] = fname
+                df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
         aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
         setattr(self,df_aprx_lyR_str, df_aprx_lyR)
         df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
@@ -1744,17 +1760,14 @@ class proProject(commonUtils):
         # Remove maps not in Use i.e. not in matrix or inventoried
         map_objects = [mo for mo in map_objects if mo.name in df_map_matrix.columns]
         for m in map_objects:
+            # Pulls layers with TRUE in each map column from matrix
             tgt_layers = df_map_matrix_subset.index[df_map_matrix_subset[m.name]].to_list()
-            if m.name=='phouse_route3':
-                logging.info('TARGET LAYERS: {}'.format(tgt_layers))
             layers = m.listLayers()
             for lyr in layers:
                 try:
                     if lyr.dataSource in tgt_layers:
                         # dataSource and in tgt_layer
                         resource = True
-                        if m.name=='phouse_route3':
-                            logging.info(lyr.dataSource)
                     else:
                         resource = False
                 except AttributeError:
@@ -1777,21 +1790,22 @@ class proProject(commonUtils):
                         # check for feature dataset
                         if not pd.isnull(feature_dataset):
                             dc.featureDataset = feature_dataset
+                        # Different object structure with Raster
                         if wsf=='Raster':
                             lyr_cim.dataConnection = dc
-                        elif wsf in ('Shape', 'FileGDB'):
+                        elif wsf in ('Shapefile', 'FileGDB'):
                             lyr_cim.featureTable.dataConnection = dc
                         lyr.setDefinition(lyr_cim)
 
                         new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
                         df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
                         # Once successful, remove map name of resource layer from list
-                        maps_debug = df_aprx_lyR.loc[idx, 'map_name']
+                        maps_debug = df_aprx_lyR.loc[idx, 'MAP_NAME']
                         map_name = [mn.strip() for mn in maps_debug.split(',')]
                         # this will be a list; turn back into comma separated string
                         map_name = [mn for mn in map_name if mn!=m.name]
                         map_name=','.join(map_name)
-                        df_aprx_lyR.at[idx, 'map_name']=map_name
+                        df_aprx_lyR.at[idx, 'MAP_NAME']=map_name
                         setattr(self, df_aprx_lyR_str, df_aprx_lyR)
                         logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
                         logging.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
@@ -1808,6 +1822,7 @@ class proProject(commonUtils):
         # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
     def aprx_map_inv(self, aprx_path, **kwargs):
         '''
+        Inventory of single aprx from aprx path
         20241021
         Args:
             aprx_path:      path/to/aprs
@@ -1836,6 +1851,7 @@ class proProject(commonUtils):
     def aprx_map_inv2(self, csv_in, csv_out):
         '''
         20241021
+        Compiling single inv from multiple aprx paths via aprx inv
         Args:
             csv_in:         path/to/aprx inventory (if exists for bulk; i.e. Tolt)
             csv_out:        path to lyR inventory
@@ -2004,7 +2020,7 @@ class proProject(commonUtils):
         df_lyR_inv=pd.read_csv(fp_lyR_inv)
         df_lyR_inv=df_lyR_inv.merge(df_join, on='DATA_LOCATION_MCMILLEN', how='left')
         df_lyR_inv.to_csv(fp_lyR_inv)
-    def aprx_broken_source_inv2(self, csv_out):
+    def aprx_broken_source_inv2(self, csv_out, aprx_str):
         '''
         Step 2 in fixing dumb ESRI path when moved.
         After running step 2, manually create columns and val for .replace
@@ -2015,14 +2031,19 @@ class proProject(commonUtils):
         Returns:
 
         '''
-        df = pd.read_csv(csv_out)
-        for idx in df.index:
-            orig=df.loc[idx,'DATA_LOCATION_BROKEN']
+
+        df_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
+        df = getattr(self, df_lyR_str)
+        df_base_str = df_lyR_str.replace('df_', '')
+        prop_str_indices = '{}_indices'.format(df_base_str)
+        indices = getattr(self, prop_str_indices)
+        for idx in indices:
+            orig=copy.copy(idx)
             t=df.loc[idx,'target']
             r=df.loc[idx,'replace']
             corrected=orig.replace(t,r)
             df.loc[idx,'DATA_LOCATION_MCM_RESOURCE']=corrected
-            df.to_csv(csv_out)
+        df.to_csv(csv_out)
 
 class AgolAccess(commonUtils):
     '''

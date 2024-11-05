@@ -1499,71 +1499,42 @@ class commonUtils(object):
 
         setattr(self, '{}_matched'.format(df_str_target), df_target)
 
-    def df_to_df_transfer_v2(self, df_str_source, df_str_target, flag_col_src, flag_col_tgt,
-                             flag_val, key_src, key_tgt, merge_cols, **kwargs):
+    def df_to_df_transfer_v2(self, df_src, df_tgt, flag_col_src, flag_val, key_src,
+                             key_tgt, merge_cols_dict, concat=False):
         '''
         More for manual transfers.
-        df_str_target           string of dataframe to add values to based off other arguments
-        df_str_source           string of dataframe to transfer values from
-        match_col_list          columns to match from table to table [col_source_str, col_target_str]
-        target_col_list        confusingly TARGET i.e. col we are searching for value in df_source and
-                                col where we are replacing in target
-        target_val              val to search for in replace_col
+        flag_col_src            name of column to transfer to ID rows and flag_col_tgt i.e. action
+        flag_val                val for loc in src df to loc and transfer to tgt
+        key_src                name of column to receive vals from flag_col_src
+        key_tgt                name of column to receive vals from flag_col_src
+        merge_cols_dict         dict of col names to replace or add vals from src to tgt.
+                                Replicate k:v if the column names match between df_src and df_tgt
+        concat                  If want to add non intersecting rows from src to tgt in addition to
+                                the whole other protocol
         '''
+        if df_src.index.name!=key_src:
+            df_src = df_src.set_index(key_src)
 
-        df_source = getattr(self, df_str_source)
-        df_str_working_target = '{}_matched'.format(df_str_target)
-        try:
-            # already working, add to working
-            df_target = getattr(self, df_str_working_target)
-            print('it existed')
-        except AttributeError:
-            # no action yet, add to original
-            print('did not exist')
-            df_target = getattr(self, df_str_target)
-        df_source = df_source.reset_index()
-        df_subset = df_source[df_source[flag_col_src]==flag_val]
-        # if not df_subset.index.name==key_src:
-        #     df_subset = df_subset.set_index(key_src)
-
-        # If for instance merge cols are duplicated in target df i.e. DATA_LOCATION_MCMILLEN
-        # needs to map to DATA_LOCATION_MCMILLEN_RESOURCE for datasource resetting in lyrx
-        try:
-            merge_cols_dict = kwargs['merge_cols_dict']
-            t = []
-            for c in merge_cols:
-                try:
-                    t.append(merge_cols_dict[c])
-                except KeyError:
-                    t.append(c)
-            # Keyed col names to be used to subset df_src (df_subset) during merge
-            merge_cols = t
-            df_subset = df_subset.rename(columns=merge_cols_dict)
-        except KeyError:
-            pass
-        # Format stuff
-        if key_src not in merge_cols:
-            merge_cols.append(key_src)
-        if df_target.index.name==key_tgt:
-            df_target = df_target.reset_index().merge(df_subset[merge_cols], left_on=key_tgt,
-                        right_on=key_src, how='left').set_index(df_target.index.name)
-            debug=7
+        reset_idx=False
+        if df_tgt.index.name != key_tgt:
+            idx_name = df_tgt.index.name
+            df_tgt = df_tgt.reset_index().set_index(key_tgt)
+            reset_idx=True
+        if isinstance(flag_val, list):
+            df_src_subset = df_src[df_src[flag_col_src].isin(flag_val)]
         else:
-            index_orig = df_target.index.name
-            df_target = df_target.set_index(key_tgt)
-            df_target = df_target.merge(df_subset[merge_cols], left_index=True,
-                        how='left', right_on=key_src)
-            df_target = df_target.set_index(index_orig)
+            df_src_subset = df_src[df_src[flag_col_src] == flag_val]
 
-        # Format flag column name i.e. remove ACTION_Y and rename ACTION_X to ACTION
-        flag_col_tgt_join = '{}_x'.format(flag_col_src)
-        flag_col_src_join = '{}_y'.format(flag_col_tgt)
-        col_names = df_target.columns
-        col_names = [cn for cn in col_names if cn!=flag_col_tgt_join]
-        df_target = df_target[col_names]
-        df_target = df_target.rename(columns={flag_col_src_join:flag_col_src})
-        debg = 7
-        setattr(self, '{}_matched'.format(df_str_target), df_target)
+        merge_idx = list(set(df_tgt.index).intersection(df_src_subset.index))
+        for col_src, col_tgt in merge_cols_dict.items():
+            df_tgt.loc[merge_idx, col_tgt] = df_src_subset.loc[merge_idx, col_src]
+        if concat:
+            concat_idx = list(set(df_src_subset.index) - set(df_tgt.loc[merge_idx]))
+            df_tgt = pd.concat([df_tgt, df_src_subset.loc[concat_idx]])
+        if reset_idx:
+            df_tgt = df_tgt.set_index(idx_name)
+
+        return(df_tgt)
 
     def data_sent_tracking(self, fp_csv_tracking, base_dir, action, tracking_dict):
         '''
@@ -1651,31 +1622,54 @@ class commonUtils(object):
                                                   'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
+    def parse_csString_utils(self, csString, **kwargs):
+        '''
+        Parse Comma-Sep Strings utilities.  Add to kwargs for  more scenarios.
+        Args:
+            csString:           Comma Separated String
+            **kwargs:           kwargs[remove] = pass value to remove from csString
+        Returns:
+            csString_updated    updated csString i.e. with tgt_val removed
 
+        '''
+        try:
+            tgt_val = kwargs['remove_item']
+            csString_updated = [v.strip() for v in csString.split(',') if v.strip() != tgt_val]
+            csString_updated = ','.join(csString_updated)
+            return(csString_updated)
+        except KeyError:
+            pass
 class proProject(commonUtils):
     '''
     INSERT / FLESH OUT
     '''
     def __init__(self):
         print('something')
-    def add_aprx(self,fp_aprx, target_col = r'DATA_LOCATION_MCMILLEN', **kwargs):
-        aprx_name = os.path.split(fp_aprx)[-1][:-5]
-        setattr(self, 'fp_{}'.format(aprx_name), fp_aprx)
+    def proProject_init(self, fp_pathlist_aprx):
+        setattr(self, 'fp_pl_aprx', fp_pathlist_aprx)
+        pl_aprx =pd.read_excel(fp_pathlist_aprx, index_col='subproject')
+        setattr(self, 'pl_aprx', pl_aprx)
+    def add_aprx(self,subproject, target_col = r'DATA_LOCATION_MCMILLEN', add_lyR_inv = True,**kwargs):
+        fp_aprx=self.pl_aprx.loc[subproject,'fp_aprx']
+        setattr(self, 'fp_{}'.format(subproject), fp_aprx)
         aprx = arcpy.mp.ArcGISProject(fp_aprx)
-        aprx_str = 'aprx_{}'.format(aprx_name)
+        aprx_str = 'aprx_{}'.format(subproject)
         setattr(self, aprx_str, aprx)
+        if add_lyR_inv:
+            try:
+                kwargs['lyR_maestro']
+                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+                df_lyR_str = f"df_{subproject}_lyR_maestro"
+                fp_lyR_str = f"fp_{subproject}_lyR_maestro"
+            except KeyError:
+                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+                df_lyR_str = f"df_{subproject}_lyR"
+                fp_lyR_str = f"fp_{subproject}_lyR"
 
-        try:
-            fp_lyR_inv = kwargs['add_lyR_inv']
-            df_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-            df_aprx_lyR = pd.read_csv(fp_lyR_inv, index_col=target_col)
-            setattr(self, df_aprx_lyR_str, df_aprx_lyR)
-
-            aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
-            setattr(self, aprx_lyR_csv_str, fp_aprx_inv)
-        except KeyError:
-            pa
-    def add_maps(self, aprx_str):
+            df_lyR_inv = pd.read_csv(fp_lyR_inv, index_col=target_col)
+            setattr(self, df_lyR_str, df_lyR_inv)
+            setattr(self, fp_lyR_str, fp_lyR_inv)
+    def add_maps(self, subproject):
         '''
         fetches aprx maps and layouts from init attributes
         Args:
@@ -1683,9 +1677,9 @@ class proProject(commonUtils):
 
         Returns:
         '''
-        aprx = getattr(self, aprx_str)
+        aprx = getattr(self, f"aprx_{subproject}")
         m =  aprx.listMaps()
-        map_str = aprx_str.replace('aprx','maps')
+        map_str = f"{subproject}_maps"
         setattr(self, map_str, m)
     def add_layouts(self, aprx_str):
         '''
@@ -1701,81 +1695,93 @@ class proProject(commonUtils):
         map_str = aprx_str.replace('aprx','layouts')
         setattr(self, layout_str, l)
 
-    def format_lyR_inv_datasource_standard(self, aprx_str, source_new='DATA_LOCATION_MCM_RESOURCE'):
+    def format_lyR_inv_datasource_standard(self, subproject, source_new='DATA_LOCATION_MCM_RESOURCE', **kwargs):
 
         # A) Gather Connetion Info
-        base_str = aprx_str[5:]
-        df_aprx_lyR_str = 'df_{}_lyR'.format(base_str)
-        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        prop_str_indices = '{}_indices'.format(base_str)
+        try:
+            kwargs['lyR_maestro']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+        except KeyError:
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
+        prop_str_indices = '{}_lyR_indices'.format(subproject)
         indices = getattr(self, prop_str_indices)
 
         # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
         for idx in indices:
             # idx_lyR = os.path.normpath(df_gdb_inv.loc[idx, source_orig])
             # fp_new = os.path.normpath(df_gdb_inv.loc[idx, source_new])
-            fp_new = os.path.normpath(df_aprx_lyR.loc[idx, source_new])
-            if not df_aprx_lyR.loc[idx, 'IS_RASTER']:
+            fp_new = os.path.normpath(df.loc[idx, source_new])
+            if not df.loc[idx, 'IS_RASTER']:
                 if fp_new[-4:] == '.shp':
                     dbase_connection, fname = os.path.split(fp_new)
-                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Shape File'
+                    df.at[idx, 'workspace_factory'] = 'Shape File'
                 else:
                     dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
-                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'FileGDB'
+                    df.at[idx, 'workspace_factory'] = 'FileGDB'
                     fp_comps = fp_new.split(os.sep)
                     fname, dset = fp_comps[-1], fp_comps[-2]
                     if 'gdb' not in dset:
-                        df_aprx_lyR.at[idx, 'feature_dataset']=dset
-                df_aprx_lyR.at[idx, 'dataset'] = fname
-                df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
+                        df.at[idx, 'feature_dataset']=dset
+                df.at[idx, 'dataset'] = fname
+                df.at[idx, 'dbase_connection'] = dbase_connection
             else:
                 fp_comps = fp_new.split('.gdb')
                 if len(fp_comps)==2:
                     dbase_connection = '{}.gdb'.format(fp_comps[0])
-                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Raster'
+                    df.at[idx, 'workspace_factory'] = 'Raster'
                     fp_comps = fp_new.split(os.sep)
                     fname, dset = fp_comps[-1], fp_comps[-2]
                     if 'gdb' not in dset:
-                        df_aprx_lyR.at[idx, 'feature_dataset'] = dset
+                        df.at[idx, 'feature_dataset'] = dset
                 else:
-                    df_aprx_lyR.at[idx, 'workspace_factory'] = 'Raster'
+                    df.at[idx, 'workspace_factory'] = 'Raster'
                     fp_comps = os.path.split(fp_new)
                     dbase_connection = fp_comps[0]
                     fname=fp_comps[-1]
-                df_aprx_lyR.at[idx, 'dataset'] = fname
-                df_aprx_lyR.at[idx, 'dbase_connection'] = dbase_connection
-        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
-        setattr(self,df_aprx_lyR_str, df_aprx_lyR)
-        df_aprx_lyR.to_csv(getattr(self, aprx_lyR_csv_str))
+                df.at[idx, 'dataset'] = fname
+                df.at[idx, 'dbase_connection'] = dbase_connection
+        setattr(self, fp_csv_lyR, df)
+        df.to_csv(fp_csv_lyR)
 
-    def re_source_lyR_maestro(self, aprx_str, df_map_matrix):
+    def re_source_lyR_maestro(self, subproject, **kwargs):
         # B) Connect
         # A) Gather Connetion Info
-        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        aprx_lyR_csv_str = 'fp_{}_lyR_inv'.format(aprx_str[5:])
-        prop_str_indices = '{}_indices'.format(df_aprx_lyR_str[3:])
+        try:
+            kwargs['lyR_maestro']
+            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+            prop_str_indices = '{}_lyR_maestro_indices'.format(subproject)
+        except KeyError:
+            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+            prop_str_indices = '{}_lyR_indices'.format(subproject)
+        df_lyR_inv = pd.read_csv(fp_lyR_inv, index_col='DATA_LOCATION_MCMILLEN')
+        fp_lyR_inv_update = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df_lyR_inv_update = pd.read_csv(fp_lyR_inv_update, index_col='DATA_LOCATION_MCMILLEN')
 
-        # Logfile - fix base properties to incorporate
-        fp_logfile = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\FLA\data_inv\greengen_logfile.log"
-        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
-        banner = '    {}    '.format('-'*50)
-        call_str = 're_source_lyR_maestro {}:\n'.format(aprx_str)
-        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
-        date_str = datetime.datetime.today().strftime('%D %H:%M')
-        msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
-        logging.info(msg_str)
-        map_temp, layer_temp=[],[]
+        # Initiate map removal accounting if needed
+        if r'MAP_NAME_UPDATED' not in df_lyR_inv_update.columns:
+            df_lyR_inv_update['MAP_NAME_UPDATED']=df_lyR_inv_update['MAP_NAME']
 
         indices = getattr(self, prop_str_indices)
-        df_aprx_lyR_subset = df_aprx_lyR.loc[indices]
+
+        # INIT LOGFILE
+        self.init_logfile(subproject)
+
+        map_temp, layer_temp=[],[]
+        df_lyR_inv_subset = df_lyR_inv.loc[indices]
+        fp_map_matrix = self.pl_aprx.loc[subproject, 'fp_map_matrix']
+        df_map_matrix = pd.read_csv(fp_map_matrix, index_col='DATA_LOCATION_MCMILLEN')
+        # Returns rows in index and columns with any True valeus
+        # mask = df_map_matrix=='CHANGE'
         df_map_matrix_subset = df_map_matrix.loc[indices]
-        map_objects = getattr(self, aprx_str.replace('aprx','maps'))
+        map_objects = getattr(self, f"{subproject}_maps")
         # Remove maps not in Use i.e. not in matrix or inventoried
-        map_objects = [mo for mo in map_objects if mo.name in df_map_matrix.columns]
-        for m in map_objects:
+        # map_objects = [mo for mo in map_objects if mo.name in df_map_matrix_subset.columns]
+        idx_cols=[c for c in df_map_matrix_subset.columns if 'CHANGE' in df_map_matrix_subset[c].values]
+        map_objects_subset = [mo for mo in map_objects if mo.name in idx_cols]
+        for m in map_objects_subset:
             # Pulls layers with TRUE in each map column from matrix
-            tgt_layers = df_map_matrix_subset.index[df_map_matrix_subset[m.name]].to_list()
+            tgt_layers = df_map_matrix_subset[df_map_matrix_subset[m.name]=='CHANGE'].index
             layers = m.listLayers()
             for lyr in layers:
                 try:
@@ -1790,10 +1796,10 @@ class proProject(commonUtils):
                 if resource:
                     try:
                         idx = copy.copy(os.path.normpath(lyr.dataSource))
-                        wsf = df_aprx_lyR_subset.loc[idx, 'workspace_factory']
-                        dbase_connection = df_aprx_lyR_subset.loc[idx, 'dbase_connection']
-                        dataset = df_aprx_lyR_subset.loc[idx, 'dataset']
-                        feature_dataset = df_aprx_lyR_subset.loc[idx, 'feature_dataset']
+                        wsf = df_lyR_inv_subset.loc[idx, 'workspace_factory']
+                        dbase_connection = df_lyR_inv_subset.loc[idx, 'dbase_connection']
+                        dataset = df_lyR_inv_subset.loc[idx, 'dataset']
+                        feature_dataset = df_lyR_inv_subset.loc[idx, 'feature_dataset']
 
                         lyr_cim = lyr.getDefinition('V3')
                         # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
@@ -1811,30 +1817,43 @@ class proProject(commonUtils):
                             lyr_cim.featureTable.dataConnection = dc
                         lyr.setDefinition(lyr_cim)
 
-                        new_path = df_aprx_lyR.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
-                        df_aprx_lyR.at[idx,'DATA_LOCATION_MCMILLEN']=new_path
+                        new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
+                        df_lyR_inv.at[idx,'RESOURCED']=True
                         # Once successful, remove map name of resource layer from list
-                        maps_debug = df_aprx_lyR.loc[idx, 'MAP_NAME']
-                        map_name = [mn.strip() for mn in maps_debug.split(',')]
-                        # this will be a list; turn back into comma separated string
-                        map_name = [mn for mn in map_name if mn!=m.name]
-                        map_name=','.join(map_name)
-                        df_aprx_lyR.at[idx, 'MAP_NAME']=map_name
-                        setattr(self, df_aprx_lyR_str, df_aprx_lyR)
-                        logging.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
-                        logging.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
+                        csString = df_lyR_inv_update.loc[idx, 'MAP_NAME_UPDATED']
+                        csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
+                        df_lyR_inv_update.at[idx, 'MAP_NAME_UPDATED'] = csString_updated
+                        df_lyR_str = f"df_{subproject}_lyR"
+                        setattr(self, df_lyR_str, df_lyR_inv_update)
+
+                        df_map_matrix.loc[idx,m.name]='FIXED'
+                        setattr(self, f"df_map_matrix_{subproject}", df_map_matrix)
+
+                        self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
+                        self.logger.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
                     except KeyError as e:
-                        logging.info('EXCEPTION {}'.format(e))
+                        self.logger.info('EXCEPTION {}'.format(e))
                         map_temp.append(m.name)
                         layer_temp.append(idx)
                 else:
                     pass
         # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
         # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
-        aprx = getattr(self, aprx_str)
-        aprx.save()
-        # df_aprx_lyR.to_csv(aprx_lyR_csv_str)
-    def aprx_map_inv(self, aprx_path, **kwargs):
+        # aprx = getattr(self, f"aprx_{subproject}")
+        # aprx.save()
+
+    def init_logfile(self, subproject):
+        logger = logging.getLogger(subproject)
+        fp_logfile = self.pl_aprx.loc[subproject, 'fp_logfile']
+        logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
+        banner = '    {}    '.format('-' * 50)
+        call_str = 're_source_lyR_maestro {}:\n'.format(subproject)
+        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
+        logging.info(msg_str)
+        setattr(self, 'logger', logger)
+    def aprx_map_inv(self, aprx_path):
         '''
         Inventory of single aprx from aprx path
         20241021
@@ -1846,11 +1865,18 @@ class proProject(commonUtils):
         '''
         aprx = arcpy.mp.ArcGISProject(aprx_path)
         map_objects = aprx.listMaps()
-        src_list, map_list = [], []
+        src_list, map_list,broken, raster = [],[],[],[]
         for m in map_objects:
             layers = m.listLayers()
             for lyr in layers:
                 if lyr.visible and lyr.supports('DATASOURCE'):
+                    broken.append(lyr.isBroken)
+                    if lyr.isFeatureLayer:
+                        raster.append(False)
+                    elif lyr.isRasterLayer:
+                        raster.append(True)
+                    else:
+                        raster.append(False)
                     src = lyr.dataSource
                     src_list.append(src)
                     map_list.append(m.name)
@@ -1858,11 +1884,12 @@ class proProject(commonUtils):
         del aprx
 
         item = [os.path.split(fp)[-1] for fp in src_list]
-        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME']
-        df = pd.DataFrame(np.column_stack([item, src_list, map_list]), columns=cols)
+        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME','IS_RASTER','IS_BROKEN']
+        vals = np.column_stack([item, src_list, map_list, raster, broken])
+        df = pd.DataFrame(vals, columns=cols)
         return(df)
 
-    def aprx_map_inv2(self, csv_in, csv_out, ):
+    def aprx_map_inv2(self, csv_in, csv_out):
         '''
         20241021
         Compiling single inv from multiple aprx paths via aprx inv
@@ -1875,56 +1902,46 @@ class proProject(commonUtils):
         '''
         df = pd.read_csv(csv_in)
         df = df[df.FLAG]
-        src_list, map_list, aprx_list = [], [], []
+        src_list, map_list, broken, raster = [], [], [], []
         for idx in df.index:
             aprx_path = df.loc[idx, 'DATA_LOCATION_MCMILLEN_APRX']
             aprx_str = df.loc[idx, 'APRX']
-            aprx = arcpy.mp.ArcGISProject(aprx_path)
-            map_objects = aprx.listMaps()
-            for m in map_objects:
-                layers = m.listLayers()
-                for lyr in layers:
-                    if lyr.visible and lyr.supports('DATASOURCE'):
-                        src = lyr.dataSource
-                        src_list.append(src)
-                        map_list.append(m.name)
-                        aprx_list.append(aprx_str)
-            del map_objects
-            del aprx
-
-        cols = ['DATA_LOCATION_MCMILLEN', 'MAP_NAME', 'APRX']
-        df = pd.DataFrame(np.column_stack([src_list, map_list, aprx_list]), columns=cols)
-        df.to_csv(csv_out)
-    def expand_rows(self, aprx_str, csv_out):
+            if 'df_concat' not in locals():
+                df_concat = self.aprx_map_inv(aprx_path)
+                df_concat['APRX']=len(df_concat)*[aprx_str]
+            else:
+                t = self.aprx_map_inv(aprx_path)
+                t['APRX']=len(t)*[aprx_str]
+                df_concat=pd.concat([df_concat, t])
+        df_concat.to_csv(csv_out)
+    def expand_rows(self, subproject, csv_out):
         '''
         Outputs a True False matrix flagging which map utilizes which layer.
         For use in making re-sourceing more efficient.  Parses comma separated
         string column map_name ["map1", "map2", "mapn"] from lyR_inv as primary input.
         20241015
         Args:
-            aprx_str:       yeah
+            subproject:       yeah
             csv_out:        for mapping grid dataframe
 
         Returns:
 
         '''
-        df_aprx_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-        df_aprx_lyR = getattr(self, df_aprx_lyR_str)
-        maps = df_aprx_lyR.map_name
+        df_lyR_inv=pd.read_csv(self.pl_aprx.loc[subproject, 'fp_lyR_inv'], index_col='DATA_LOCATION_MCMILLEN')
+        maps = df_lyR_inv.MAP_NAME
         maps_unique=[y.strip() for x in maps for y in x.split(',')]
         maps_unique=list(set(maps_unique))
-        maps_unique=list(set(maps_unique))
-        layers = df_aprx_lyR.index
-        vals = np.full([len(layers), len(maps_unique)], False)
+        layers = df_lyR_inv.index
+        vals = np.full([len(layers), len(maps_unique)], r'-----')
         df_maps_join = pd.DataFrame(vals, columns = maps_unique)
         index = pd.Index(layers)
         df_maps_join = df_maps_join.set_index(index)
-        for idx in df_aprx_lyR.index:
-            map_list = df_aprx_lyR.loc[idx, 'map_name']
+        for idx in df_lyR_inv.index:
+            map_list = df_lyR_inv.loc[idx, 'MAP_NAME']
             map_list = [mn.strip() for mn in map_list.split(',')]
             for mn in map_list:
-                df_maps_join.at[idx, mn]=True
-        df_maps_join.to_csv(csv_out)
+                df_maps_join.at[idx, mn]='CHANGE'
+        df_maps_join.to_csv(csv_out, index=True, index_label='DATA_LOCATION_MCMILLEN')
 
     def join_list(self, v):
         vn = v.to_list()
@@ -1942,6 +1959,7 @@ class proProject(commonUtils):
             group_by_field:     field to groupby
             agg_field:          field to create unique value comma-separated string
             kwargs:             count = include field with number of values for agg_field in csv_out
+                                carry_field = list of field(s) to keep - can include agg field
 
         Returns:
 
@@ -1969,17 +1987,18 @@ class proProject(commonUtils):
             pass
         groupby_source = groupby_source.set_index(group_by_field)
         try:
-            kwargs['carry_fields']
+            keep_fld = kwargs['carry_fields']
+            keep_fld.append(group_by_field)
             df_join = df.drop_duplicates([group_by_field]).reset_index()
             # Don't bring in Agg Field i.e. map_name
-            df_join = df_join[[c for c in df_join.columns if c!=agg_field]]
+            df_join = df_join[[c for c in df_join.columns if c in keep_fld]]
             # cols_rename = {f"{c}_y":c for c in df.columns if c!=group_by_field}
             groupby_source = groupby_source.merge(df_join, on=group_by_field, how='left')
             # groupby_source = groupby_source.rename(columns=cols_rename)
         except KeyError:
             pass
         return(groupby_source)
-    def concatenate_aggregate(self, csv_in, csv_out, split_field, group_by_field, agg_field):
+    def concatenate_aggregate(self, csv_in, csv_out, split_field, group_by_field, agg_field, **kwargs):
         '''
         Used for multiple aprx ReSourcing wherein need to groupby map_names in each aprx.
         Layer X may be used in 4 different APRXs.  In this case, there will be 4 Layer X
@@ -1992,7 +2011,7 @@ class proProject(commonUtils):
                             comma sep string map_names for each aprx.
             group_by_field  field to groupby i.e. DATA_SOURCE
             agg_field       field to generate comma separated string of values i.e. map_name
-
+            kwargs:         carry_field = list of field(s) to keep - can include agg field
         Returns:
 
         '''
@@ -2000,42 +2019,22 @@ class proProject(commonUtils):
         split_vals = list(set(df[split_field].to_list()))
         for v in split_vals:
             df_temp = df[df[split_field]==v]
-            df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field)
+            try:
+                keep_fld = kwargs['carry_fields']
+                df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field, carry_fields = keep_fld)
+            except KeyError:
+                df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field)
             df_temp_agg[split_field]=v
+            # is_raster = df_temp.drop_duplicates(subset=[group_by_field])
+            # is_raster=is_raster['IS_RASTER']
+            # df_temp_agg['IS_RASTER']=is_raster.to_list()
             if 'df_concat' not in locals():
                 df_concat = copy.copy(df_temp_agg)
             else:
                 df_concat = pd.concat([df_concat, df_temp_agg])
         df_concat.to_csv(csv_out)
-    def aprx_broken_source_inv(self,  aprx_str, fp_lyR_inv):
-        '''
-        Create inventory to feed to fixing file paths.  INitially for when pro project moved
-        and need to resource due to dumb ESRI relative path messup.  20241017
-        Args:
-            aprx_str:           self explanatory
 
-        Returns:
-
-        '''
-        maps_str = aprx_str.replace('aprx','maps')
-        maps = getattr(self, maps_str)
-        map_name,layer_name,fp, raster =[],[],[],[]
-        for m in maps:
-            for lyr in m.listLayers():
-                if (lyr.isBroken and lyr.supports('DATASOURCE')):
-                    fp.append(lyr.dataSource)
-                    if lyr.isFeatureLayer:
-                        raster.append(False)
-                    elif lyr.isRasterLayer:
-                        raster.append(True)
-        broken=[True]*len(raster)
-        cols = ['DATA_LOCATION_MCMILLEN', 'IS_RASTER','IS_BROKEN']
-        df_join=pd.DataFrame(np.column_stack([fp,raster,broken]), columns = cols)
-        df_join = df_join.drop_duplicates(subset=['DATA_LOCATION_MCMILLEN'])
-        df_lyR_inv=pd.read_csv(fp_lyR_inv)
-        df_lyR_inv=df_lyR_inv.merge(df_join, on='DATA_LOCATION_MCMILLEN', how='left')
-        df_lyR_inv.to_csv(fp_lyR_inv)
-    def aprx_broken_source_inv2(self, csv_out, aprx_str):
+    def aprx_broken_source_inv2(self, subproject, **kwargs):
         '''
         Step 2 in fixing dumb ESRI path when moved.
         After running step 2, manually create columns and val for .replace
@@ -2046,11 +2045,13 @@ class proProject(commonUtils):
         Returns:
 
         '''
-
-        df_lyR_str = 'df_{}_lyR'.format(aprx_str[5:])
-        df = getattr(self, df_lyR_str)
-        df_base_str = df_lyR_str.replace('df_', '')
-        prop_str_indices = '{}_indices'.format(df_base_str)
+        try:
+            kwargs['lyR_maestro']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+        except KeyError:
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
+        prop_str_indices = '{}_lyR_indices'.format(subproject)
         indices = getattr(self, prop_str_indices)
         for idx in indices:
             orig=copy.copy(idx)
@@ -2058,7 +2059,7 @@ class proProject(commonUtils):
             r=df.loc[idx,'replace']
             corrected=orig.replace(t,r)
             df.loc[idx,'DATA_LOCATION_MCM_RESOURCE']=corrected
-        df.to_csv(csv_out)
+        df.to_csv(fp_csv_lyR)
 
 class AgolAccess(commonUtils):
     '''

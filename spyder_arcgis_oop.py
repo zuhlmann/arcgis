@@ -304,14 +304,14 @@ class commonUtils(object):
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
-        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
+        # logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
 
         # Save call string to logfile
         banner = '    {}    '.format('-'*50)
         fct_call_str = 'Performing function write_xml'
         date_str = datetime.datetime.today().strftime('%D %H:%M')
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
-        logging.info(msg_str)
+        # logging.info(msg_str)
 
         # key/val and key lists for add and subtract purpose list respectively
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
@@ -482,7 +482,7 @@ class commonUtils(object):
                 else:
                     pass
 
-                logging.info(msg_str)
+                # logging.info(msg_str)
 
                 for el, el_title, el_text in zip(element_list, element_title, element_text_list):
                     # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
@@ -1517,8 +1517,9 @@ class commonUtils(object):
 
         reset_idx=False
         if df_tgt.index.name != key_tgt:
-            idx_name = df_tgt.index.name
-            df_tgt = df_tgt.reset_index().set_index(key_tgt)
+            idx_name = copy.copy(df_tgt.index.name)
+            df_tgt.reset_index(inplace=True)
+            df_tgt.set_index(key_tgt, inplace=True)
             reset_idx=True
         if isinstance(flag_val, list):
             df_src_subset = df_src[df_src[flag_col_src].isin(flag_val)]
@@ -1529,10 +1530,21 @@ class commonUtils(object):
         for col_src, col_tgt in merge_cols_dict.items():
             df_tgt.loc[merge_idx, col_tgt] = df_src_subset.loc[merge_idx, col_src]
         if concat:
+            # find rows that were not originally in tgt
             concat_idx = list(set(df_src_subset.index) - set(df_tgt.loc[merge_idx]))
-            df_tgt = pd.concat([df_tgt, df_src_subset.loc[concat_idx]])
+            # first remap select src columns to tgt columns from dict
+            # subet to ommitted rows and src_cols
+            cols_append=list(set(df_tgt.columns).intersection(set(df_src.columns)))
+            # if src col names to key - append and find key
+            cols_append.extend(list(merge_cols_dict.keys()))
+            cols_append = list(set(cols_append))
+            # key the few col names contained in dict
+            df_src_subset = df_src_subset.loc[concat_idx, cols_append]
+            df_src_subset.rename(columns=merge_cols_dict, inplace=True)
+            df_tgt = pd.concat([df_tgt, df_src_subset])
         if reset_idx:
-            df_tgt = df_tgt.set_index(idx_name)
+            df_tgt.reset_index(inplace=True)
+            df_tgt.set_index(idx_name, inplace=True)
 
         return(df_tgt)
 
@@ -1827,6 +1839,7 @@ class proProject(commonUtils):
                         setattr(self, df_lyR_str, df_lyR_inv_update)
 
                         df_map_matrix.loc[idx,m.name]='FIXED'
+                        df_map_matrix.to_csv(fp_map_matrix)
                         setattr(self, f"df_map_matrix_{subproject}", df_map_matrix)
 
                         self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
@@ -2060,6 +2073,48 @@ class proProject(commonUtils):
             corrected=orig.replace(t,r)
             df.loc[idx,'DATA_LOCATION_MCM_RESOURCE']=corrected
         df.to_csv(fp_csv_lyR)
+
+    def dict_key_utility(self, vals_to_key, the_dict):
+        '''
+        20241105
+        Args:
+            vals_to_key:            List of values to key from dictionary
+            the_dict:                   dictionary to key original list
+
+        Returns:
+            keyed_list              If key, then rekeyed, if none, then original val
+        '''
+        keyed_list=[]
+        for orig in vals_to_key:
+            try:
+                keyed = the_dict[orig]
+            except KeyError:
+                keyed = copy.copy(orig)
+            keyed_list.append(keyed)
+        return(keyed_list)
+    def flag_csString_val(self, df_str, col_to_parse, tgt_val, col_to_flag):
+        '''
+
+        Args:
+            df_str:
+            col_to_parse:       column to parse in df
+            tgt_val:            i.e. PSP_2024
+            col_to_flag:        which col to insert flag
+
+        Returns:
+
+        '''
+        df = getattr(self, df_str)
+        # creates a list of lists
+        csString_orig_list=self.parse_comma_sep_list(df_str, col_to_parse)
+        if col_to_flag not in df.columns:
+            df[col_to_flag]=False
+        for idx_int, idx in enumerate(df.index):
+            if tgt_val in csString_orig_list[idx_int]:
+                df.at[idx, col_to_flag]=True
+            else:
+                pass
+        return(df)
 
 class AgolAccess(commonUtils):
     '''

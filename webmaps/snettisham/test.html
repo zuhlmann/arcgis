@@ -1,0 +1,160 @@
+
+
+<html lang="pt">
+<head>
+  <title>Leaflet Example</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+    crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+    integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+    crossorigin="">
+  </script>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js" 
+	integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" 
+	crossorigin="anonymous">
+  </script>
+     
+  <style>
+
+/* https://meteolitoral.com/novo7.html */
+	
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-tooltip-pane .temp {
+   color:white;
+  font-weight: bold;
+  background: transparent;
+  border:0;
+  box-shadow: none;
+  font-size:1.1em;
+}
+	
+</style>
+  
+</head>
+
+<body>
+
+  <!--  <div class='custom-popup' id="map" style="width: 100%; height: 100%;"></div>-->
+    <div id="map" style="width: 100%; height: 100%;"></div>
+</body>
+<script>
+	var map = L.map('map').setView([39.6320,  -8.4753], 7);
+	   
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		minZoom: 3,
+		maxZoom: 19,
+		attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+	}).addTo(map);
+
+$.getJSON('test.geojson', function(data) {
+
+	var datalayer = L.geoJson(data, {
+		/*onEachFeature: function (feature, featureLayer) {
+            featureLayer.bindPopup(feature.properties.date);
+        },*/
+
+
+		pointToLayer: function (feature, latlng) {
+      		 
+			
+			if (feature.properties.temp >= 30.0) {
+				return new L.CircleMarker([latlng.lat, latlng.lng],
+					{radius: 15,
+					fillColor: "#ffcc00",// cor do circulo
+					fillOpacity: 0.8, //opacidade do circulo
+					color: "#555555", //cor linha exterior
+					weight: 0.2,// grossura linha exterior
+					opacity: .1, //opacidade linha exterior
+				})
+			};
+			if (feature.properties.temp >= 25.0) {
+				return new L.CircleMarker([latlng.lat, latlng.lng],
+					{radius: 15,
+					fillColor: "red",// cor do circulo
+					fillOpacity: 0.8, //opacidade do circulo
+					color: "#555555", //cor linha exterior
+					weight: 0.2,// grossura linha exterior
+					opacity: .1, //opacidade linha exterior
+				})
+			};
+			if (feature.properties.temp >= 20.0) {
+				return new L.CircleMarker([latlng.lat, latlng.lng],
+					{radius: 15,
+					fillColor: "orange",// cor do circulo
+					fillOpacity: 0.8, //opacidade do circulo
+					color: "#555555", //cor linha exterior
+					weight: 0.2,// grossura linha exterior
+					opacity: .1, //opacidade linha exterior
+				})
+			}; 
+			if (feature.properties.temp >= 15.0) {
+				return new L.CircleMarker([latlng.lat, latlng.lng],
+					{radius: 15,
+					fillColor: "#ffcc00",// cor do circulo
+					fillOpacity: 0.8, //opacidade do circulo
+					color: "#555555", //cor linha exterior
+					weight: 0.2,// grossura linha exterior
+					opacity: .1, //opacidade linha exterior
+				})
+			} 
+			if (feature.properties.temp >= 10.0) {
+				return new L.CircleMarker([latlng.lat, latlng.lng],
+					{radius: 15,
+					fillColor: "green",// cor do circulo
+					fillOpacity: 0.8, //opacidade do circulo
+					color: "#555555", //cor linha exterior
+					weight: 0.2,// grossura linha exterior
+					opacity: .1, //opacidade linha exterior
+				})
+			};
+		},	
+		
+		onEachFeature: function(feature, layer) {
+			//tooltip
+			var temp = L.tooltip({
+				permanent: true,
+				direction: 'center',
+				className: 'temp'
+			})
+			.setContent(feature.properties.temp)
+			.setLatLng(layer.getLatLng())
+		    temp.addTo(map); 
+			
+			
+			
+			//popup
+			var popupText = "<b><span style='background-color:#fff;color:#ff5500'>" + feature.properties.place +
+			"</span></b><br>Temperatura:<b> " + feature.properties.temp +
+			"</b> º<br>Humidade:<b> " + feature.properties.humid +
+			"</b> %<br>Vento:<b> " + feature.properties.vento +
+			"</b> km/h<br><a href='" + feature.properties.url + "'>Previsão</a>";
+		
+			layer.bindPopup(popupText, {
+				closeButton: true,
+				offset: L.point(0, 0)
+			});
+			layer.on('click', function() {
+				layer.openPopup();
+			});
+			
+			
+			
+    	},
+
+    }).addTo(map);
+});
+
+
+var scale = L.control.scale({metric:true,imperial:false, maxWidth:200})
+		scale.addTo(map) 
+
+</script>
+</body>
+</html>

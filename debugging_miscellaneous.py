@@ -34,18 +34,18 @@ importlib.reload(sys.modules['utilities_oop'])
 import pandas as pd
 import copy
 
-tc = 'DATA_LOCATION_MCMILLEN'
-parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
-csv_lyt_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\map_documents_aprx_inv.csv"
-subdir_inv_obj = utilities_oop.utilities(parent_dir, tc)
+# tc = 'DATA_LOCATION_MCMILLEN'
+# parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
+# csv_lyt_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\map_documents_aprx_inv.csv"
+# subdir_inv_obj = utilities_oop.utilities(parent_dir, tc)
 
 # # a) no filetype filter
 # subdir_inv_obj.subdir_inventory(new_inventory = csv_lyt_inv)
 
-# b) filetype fileter
-ft_filt = ['.gdb','.cpg','.dbf','.idx','.shx','.xml','.shp','.ipynb']
-exclude_sd = ['aprx_inventories','archive','backups']
-subdir_inv_obj.subdir_inventory(ft_filt, exclude_sd, new_inventory = csv_lyt_inv)
+# # b) filetype fileter
+# ft_filt = ['.gdb','.cpg','.dbf','.idx','.shx','.xml','.shp','.ipynb']
+# exclude_sd = ['aprx_inventories','archive','backups']
+# subdir_inv_obj.subdir_inventory(ft_filt, exclude_sd, new_inventory = csv_lyt_inv)
 
 # # b2) filter filetype
 # projects = ['geosyntec_pad_H20_p2', 'recreation_PAD_p2','SFT_common_maps','terrrestrial_PAD']
@@ -75,3 +75,27 @@ subdir_inv_obj.subdir_inventory(ft_filt, exclude_sd, new_inventory = csv_lyt_inv
 # csv_folders = r'C:\Box\MCM Projects\Klamath River Renewal Corp\4.0 Data Collection\Crescent City Harbor Data\Unzipped Files\unzipped_folders_buoyID.csv'
 # subdir_inv_obj.aggregate_rows(csv_lyt_inv, csv_folders, 'FINAL_SUBDIR', 'BUOY', data_type='integer')
 
+# ela_dam
+# 20241113
+import sys
+sys.path.append('c:/users/uhlmann/code')
+import spyder_arcgis_oop as agolZ
+import importlib
+importlib.reload(sys.modules['spyder_arcgis_oop'])
+pro_obj = agolZ.proProject()
+csv=r"C:\Box\MCM Projects\Mainspring Conservation Trust\24-092 Ela Dam Removal PDB\6.0 Plans and Specs\6.6_GIS\gis_requests\20241112_survey_parcels\Ela_XSections_Endpoints_joined_v3.csv"
+df=pd.read_csv(csv)
+
+keep_fld = ['OBJECTID_12', 'Shape', 'StreamOrd', 'TYPE', 'Reach', 'OBJECTID', 'Join_Count',
+              'TARGET_FID', 'OBJECTID_1', 'PIN', 'FCODE', 'DEED_ACRE', 'DATE_OF_ED', 'TYPE_OF_ED',
+              'COMMENTS', 'PARCEL_ID', 'PIN_Lease', 'SubName', 'LotNumb', 'PlatRefere', 'ParcelNumb',
+              'AccountNum', 'Name1', 'Name2', 'Address1', 'Address2', 'City', 'State', 'ZipCode',
+              'TownshipCo', 'Improvemen', 'ParcelBuil', 'ParcelObxf', 'ParcelLand', 'ParcelSpec',
+              'ParcelDefe', 'TotalAsses', 'TotalMarke', 'HouseNumbe', 'UnitNumber', 'StreetDire',
+              'StreetName', 'StreetType', 'StreetSuff', 'Parcel_Cit','ParcelAddr', 'PclNmbStr']
+
+d={'right':'R','left':'L'}
+df['XSection_ID']=[r'{}_{}'.format(v['StreamOrd'],d[v['bank']]) for i, v in df.iterrows()]
+df['XSection_ID']
+df_agg=pro_obj.aggregate_rows(df, 'PARCEL_ID','XSection_ID',carry_fields=keep_fld)
+df_agg.to_csv(r"C:\Box\MCM Projects\Mainspring Conservation Trust\24-092 Ela Dam Removal PDB\6.0 Plans and Specs\6.6_GIS\gis_requests\20241112_survey_parcels\Ela_XSections_endpoints_groubpy.csv")

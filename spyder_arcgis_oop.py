@@ -1531,7 +1531,7 @@ class commonUtils(object):
             df_tgt.loc[merge_idx, col_tgt] = df_src_subset.loc[merge_idx, col_src]
         if concat:
             # find rows that were not originally in tgt
-            concat_idx = list(set(df_src_subset.index) - set(df_tgt.loc[merge_idx]))
+            concat_idx = list(set(df_src_subset.index) - set(df_tgt.loc[merge_idx].index))
             # first remap select src columns to tgt columns from dict
             # subet to ommitted rows and src_cols
             cols_append=list(set(df_tgt.columns).intersection(set(df_src.columns)))
@@ -1852,8 +1852,8 @@ class proProject(commonUtils):
                     pass
         # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
         # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
-        # aprx = getattr(self, f"aprx_{subproject}")
-        # aprx.save()
+        aprx = getattr(self, f"aprx_{subproject}")
+        aprx.save()
 
     def init_logfile(self, subproject):
         logger = logging.getLogger(subproject)
@@ -1927,7 +1927,7 @@ class proProject(commonUtils):
                 t['APRX']=len(t)*[aprx_str]
                 df_concat=pd.concat([df_concat, t])
         df_concat.to_csv(csv_out)
-    def expand_rows(self, subproject, csv_out):
+    def expand_rows(self, subproject, csv_out, update=False):
         '''
         Outputs a True False matrix flagging which map utilizes which layer.
         For use in making re-sourceing more efficient.  Parses comma separated
@@ -1936,11 +1936,15 @@ class proProject(commonUtils):
         Args:
             subproject:       yeah
             csv_out:        for mapping grid dataframe
+            update:         set to True if map matrix already populated and CHANGED values have been updated with
+                            resourcing.  Will retain those values and only create new rows for added rows
+                            i.e. if layout imported like PSP_3 to PSP_2
 
         Returns:
 
         '''
         df_lyR_inv=pd.read_csv(self.pl_aprx.loc[subproject, 'fp_lyR_inv'], index_col='DATA_LOCATION_MCMILLEN')
+
         maps = df_lyR_inv.MAP_NAME
         maps_unique=[y.strip() for x in maps for y in x.split(',')]
         maps_unique=list(set(maps_unique))

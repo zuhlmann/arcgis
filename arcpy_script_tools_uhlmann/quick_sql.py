@@ -74,7 +74,7 @@ class selection_to_sql(object):
     def isLicensed(self):
         '''
         set whether tool is licensed to execute.
-        '''~
+        '''
         return True
     def updateParameters(self, parameters):
         '''

@@ -19,9 +19,9 @@ pro_obj.proProject_init(fp_pathlist_aprx)
 pro_obj.dbase_init(prj_file, subproject, fp_pathlist)
 
 fp_aprx=pro_obj.pl_aprx.loc[subproject,'fp_aprx']
+fp_df_maestro = pro_obj.pl_aprx.loc[subproject,'fp_df_maestro']
 fp_lyR_inv = pro_obj.pl_aprx.loc[subproject,'fp_lyR_inv']
 fp_lyR_inv_maestro = pro_obj.pl_aprx.loc[subproject,'fp_lyR_maestro']
-fp_tolt_maestro = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro.csv"
 fp_map_matrix = pro_obj.pl_aprx.loc[subproject,'fp_map_matrix']
 
 # -------CREATE INVENTORIES / FLAG-------
@@ -56,8 +56,7 @@ pro_obj.add_df(fp_lyR_inv, 'df_lyR_inv', 'DATA_LOCATION_MCMILLEN')
 pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
 
 # # B0) OUTER join - lyR to df_maestro
-# csv_maestro=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro.csv"
-# df_maestro=pd.read_csv(csv_maestro, index_col='DATA_LOCATION_MCMILLEN')
+# df_maestro=pd.read_csv(fp_df_maestro, index_col='DATA_LOCATION_MCMILLEN')
 # df_lyR_maestro=pd.read_csv(fp_lyR_inv_maestro, index_col='DATA_LOCATION_MCMILLEN')
 # df_lyR_maestro_subset=df_lyR_maestro[df_lyR_maestro.ACTION=='copy_PSP_2024']
 # df_merged = df_maestro.merge(df_lyR_maestro_subset[['ACTION','ITEM']], left_index=True, right_index=True, how='outer')
@@ -66,13 +65,14 @@ pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
 # # B1_0 Transfer action from lyR_maestro to maestro
 # # (separate maestro for PSP_2024)
 # import copy
+# csv_temp = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\temp.csv'
 # tc = 'DATA_LOCATION_MCMILLEN'
 # df1 = getattr(pro_obj, 'df_lyR_maestro')
 # df2 = getattr(pro_obj, 'df')
-# action = ['MOVE_PSP']
+# action = ['FIX_PSP_2024_2']
 # mc_dict={'ACTION':'ACTION','ABSTRACT':'ABSTRACT','MOVE_LOCATION':'MOVE_LOCATION',}
-# df2 = pro_obj.df_to_df_transfer_v2(df1, df2, 'ACTION',action, tc, tc, mc_dict, False)
-# df2.to_csv(csv_temp)
+# df2 = pro_obj.df_to_df_transfer_v2(df1, df2, 'ACTION',action, tc, tc, mc_dict, True)
+# df2.to_csv(fp_df_maestro)
 
 # # B1_0_copy/move APPX) TAKE_ACTION
 # # Probably best performed in Pro to confirm everything was moved
@@ -80,34 +80,34 @@ pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
 # pro_obj.take_action('df','copy_replace', dry_run = True, save_df = True)
 # pro_obj.df.loc[pro_obj.indices, 'CREDITS']= 'standard'
 
-# # # # B1) Transfer Action from df to df_LYr_maestro
+# # # # # B1) Transfer Action from df to df_LYr_maestro
 # csv_temp = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\temp.csv'
 # df1 = getattr(pro_obj, 'df')
 # df2 = getattr(pro_obj, 'df_lyR_maestro')
-# mc_dict={'ACTION':'ACTION','DATA_LOCATION_MCMILLEN':'DATA_LOCATION_MCM_RESOURCE'}
+# mc_dict={'ACTION':'ACTION','DATA_LOCATION_MCM_RESOURCE':'DATA_LOCATION_MCM_RESOURCE'}
 # tc1 = 'DATA_LOCATION_MCM_STAGING'
 # tc2 = 'DATA_LOCATION_MCMILLEN'
-# action=['MOVE_PSP']
+# action=['resource_psp2']
 # df2 = pro_obj.df_to_df_transfer_v2(df1, df2, 'ACTION', action, tc1, tc2, mc_dict, False)
 # df2.to_csv(fp_lyR_inv_maestro)
 
-# # # # B1) Transfer Action from df to df_LYr_maestro
+# # # # B1) Transfer Action from df_lyr_maestro to df_LYr
 # df1 = getattr(pro_obj, 'df_lyR_maestro')
 # df2 = getattr(pro_obj, 'df_lyR_inv')
 # mc_dict={'ACTION':'ACTION','DATA_LOCATION_MCM_RESOURCE':'DATA_LOCATION_MCM_RESOURCE'}
 # tc1 = 'DATA_LOCATION_MCMILLEN'
 # tc2 = 'DATA_LOCATION_MCMILLEN'
-# action=['MOVE_PSP']
+# action=['resource_psp2']
 # df2 = pro_obj.df_to_df_transfer_v2(df1, df2, 'ACTION', action, tc1, tc2, mc_dict, False)
 # df2.to_csv(fp_lyR_inv)
 
 #----------RESOURCING TRANSFERS------------
 df_lyR_str='df_{}_lyR'.format(subproject)
 pro_obj.add_df(fp_lyR_inv, df_lyR_str, 'DATA_LOCATION_MCMILLEN')
-ta = 'MOVE_PSP'
+ta = 'resource_psp2'
 
 # # # Add ReSource info
-# pro_obj.selection_idx(df_lyR_str, target_action='MOVE_PSP')
+# pro_obj.selection_idx(df_lyR_str, target_action=ta)
 # pro_obj.format_lyR_inv_datasource_standard(subproject)
 
 # # Z) Create map matrix - just do once
@@ -121,9 +121,7 @@ pro_obj.add_maps(subproject)
 pro_obj.re_source_lyR_maestro(subproject)
 # SAVE
 df_lyR_inv = getattr(pro_obj, f"df_{subproject}_lyR")
-df_map_matrix = getattr(pro_obj, f"df_map_matrix_{subproject}")
 df_lyR_inv.to_csv(fp_lyR_inv)
-df_map_matrix.to_csv(fp_map_matrix)
 
 # # D_a) Update CSS from maestro
 # # After Re-Sourcing, remove aprx name from csSring

@@ -34,10 +34,10 @@ importlib.reload(sys.modules['utilities_oop'])
 import pandas as pd
 import copy
 
-# tc = 'DATA_LOCATION_MCMILLEN'
-# parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
-# csv_lyt_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\map_documents_aprx_inv.csv"
-# subdir_inv_obj = utilities_oop.utilities(parent_dir, tc)
+tc = 'DATA_LOCATION_MCMILLEN'
+parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
+csv_lyt_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\map_documents_aprx_inv.csv"
+subdir_inv_obj = utilities_oop.utilities(parent_dir, tc)
 
 # # a) no filetype filter
 # subdir_inv_obj.subdir_inventory(new_inventory = csv_lyt_inv)

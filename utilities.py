@@ -15,7 +15,7 @@ import copy
 import compare_data
 import logging
 from imp import reload
-# from pathlib import Path
+from pathlib import Path
 reload(logging)
 
 def show_table(display_preference):
@@ -2617,3 +2617,23 @@ def subdir_inventory_scan(parent_dir, fp_logfile, ftype_filters, parent_dir_dept
             filetype.extend(t3)
             base_subdir_list.extend(t4)
     return(feat_name, feat_path, subdir_name, filetype, base_subdir_list)
+def parse_git_status_csv(csv):
+    '''
+    Use command git diff --name-status master from branch of interest to determine
+    changes on macro-file level.  Copy and paste to csv.  use this to parse output into
+    coherent csv. 20241204.  Used during merging tolt_agol_obj situation.
+    Args:
+        csv:
+
+    Returns:
+
+    '''
+    df=pd.read_csv(csv)
+    for idx in df.index:
+        r = df.loc[idx].values[0]
+        code, fname = r.split()
+        e = os.path.splitext(fname)[-1]
+        df.at[idx, 'CODE'] = code
+        df.at[idx, 'FNAME']=fname
+        df.at[idx, 'EXTENSION']=e
+    df.to_csv(csv)

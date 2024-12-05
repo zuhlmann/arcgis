@@ -5,20 +5,18 @@
 # coding: utf-8
 
 from __future__ import print_function, unicode_literals, absolute_import
+import os, sys
+sys.path = [p for p in sys.path if '86' not in p]
 from arcgis.gis import GIS
 from arcgis.gis import Group
-import os, sys
 import glob
 import copy
 import pandas as pd
 import numpy as np
 import utilities
-import ductape_utilities
-import os_utilities
 import datetime
 import math
 import xml.etree.ElementTree as ET
-sys.path = [p for p in sys.path if '86' not in p]
 import arcpy
 import logging
 # note this protocol from here because debug was not writing to file
@@ -27,27 +25,28 @@ from imp import reload
 reload(logging)
 
 
-class metaData(object):
+class commonUtils(object):
     '''
     ARGS
     df_index_col            ITEM is default for use with Klamath.
     '''
-    def __init__(self,  prj_file, subproject_str, use_item_desc = False,
+    def __init__(self):
+        pass
+    def dbase_init(self,  prj_file, subproject_str, fp_csv_lookup, use_item_desc = False,
                 df_str = 'df', df_index_col = 'ITEM'):
         '''
-        KEYWORD ARGS:
-        fill in now that reworked
-        '''
-        fp_csv_lookup = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
-        lookup_table = pd.read_csv(fp_csv_lookup, index_col = 'gdb_str',dtype='str',encoding="utf-8")
+               KEYWORD ARGS:
+               fill in now that reworked
+               '''
+        lookup_table = pd.read_csv(fp_csv_lookup, index_col='gdb_str', dtype='str', encoding="utf-8")
         setattr(self, 'lookup_table', lookup_table)
         # If item_desc kw, then use klamath maestro
         # eventually make submaestroe
         if use_item_desc:
             fp_csv = r'C:\Box\MCMGIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'
         else:
-            fp_csv = lookup_table[lookup_table.subproject==subproject_str].fp_maestro_csv.values[0]
-        df = pd.read_csv(fp_csv, index_col = df_index_col, na_values = 'NA', dtype='str',encoding = "utf-8")
+            fp_csv = lookup_table[lookup_table.subproject == subproject_str].fp_maestro_csv.values[0]
+        df = pd.read_csv(fp_csv, index_col=df_index_col, na_values='NA', dtype='str', encoding="utf-8")
         setattr(self, 'subproject_str', subproject_str)
         setattr(self, df_str, df)
         # fp_csv_archive creation.
@@ -200,9 +199,11 @@ class metaData(object):
         df = getattr(self, df_str)
 
         if df_str == 'df':
+            prop_str_indices = 'indices'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
+            prop_str_indices = '{}_indices'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
         try:
             target_tag = kwargs['target_tag']
@@ -272,11 +273,7 @@ class metaData(object):
             iloc_action.sort()
             # get index names from iloc vals
             setattr(self, prop_str_indices_iloc, iloc_action)
-            self.indices = df.iloc[iloc_action].index.tolist()
-            print('iloc')
-            print(' --- '.join([str(i) for i in iloc_action]))
-            print('indices')
-            print(' --- '.join(df.iloc[iloc_action].index.tolist()))
+            setattr(self, prop_str_indices, df.iloc[iloc_action].index.tolist())
             # if not tags selection then indices will be     passed
         except KeyError:
             pass
@@ -294,12 +291,12 @@ class metaData(object):
             try:
                 int(indices[0])
                 print('indices {}'.format(indices))
+                setattr(self, prop_str_indices, df.iloc[indices].index.tolist())
                 setattr(self, prop_str_indices_iloc, indices)
-                self.indices = df.iloc[indices].index.tolist()
             # If indices were index_column vals (stirng)
             except ValueError:
                 try:
-                    self.indices = df.loc[indices].index.tolist()
+                    setattr(self, prop_str_indices, df.iloc[indices].index.tolist())
                 #Check that the index_col vals passes EXIST
                 except KeyError:
                     print('index_col indices are not in index.  For examples\n'
@@ -361,24 +358,7 @@ class metaData(object):
         except KeyError:
             pass
 
-    def selection_index_translate(self, df_str_target):
-        '''
-        Designed to be used after initiating spyder_arcgis_oop from the AGOL class.
-        run this next --> i.e. selection_index_translate('df'). ZU 20220921
-        ARGS
-        df_str_target       self-explanatory
 
-        '''
-        if df_str_target == 'df':
-            prop_str_indices_iloc = 'indices_iloc'
-        else:
-            df_base_str = df_str.replace('df_','')
-            prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
-
-        indices = getattr(self, 'indices')
-        df_target = getattr(self, df_str_target)
-        indices_target = [df_target.index.get_loc(i) for i in indices]
-        setattr(self, prop_str_indices_iloc, indices_target)
     def parse_comma_sep_list(self, df_str, col_to_parse):
         '''
         takes string from tags column and parse into list of strings
@@ -414,16 +394,15 @@ class metaData(object):
 
         df = getattr(self, df_str)
 
-        # archive before deleting - this saves an archive csv
-        self.save_archive_csv(df_str)
-
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
+            prop_str_indices = 'indices'
             prop_str_indices_iloc = 'indices_iloc'
         else:
             df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
             prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices = '{}_indices'.format(df_base_str)
             prop_str_indices_iloc = '{}_indices_iloc'.format(df_base_str)
 
         lookup_table = copy.copy(self.lookup_table)
@@ -433,21 +412,22 @@ class metaData(object):
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
-        logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
+        # logging.basicConfig(filename = fp_logfile, level = logging.DEBUG)
 
         # Save call string to logfile
         banner = '    {}    '.format('-'*50)
         fct_call_str = 'Performing function write_xml'
         date_str = datetime.datetime.today().strftime('%D %H:%M')
         msg_str = '\n{}\n{}\n{}\n{}\n'.format(banner, date_str, banner, fct_call_str)
-        logging.info(msg_str)
+        # logging.info(msg_str)
 
         # key/val and key lists for add and subtract purpose list respectively
         add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
         subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
 
+        indices = getattr(self, prop_str_indices)
         indices_iloc = getattr(self, prop_str_indices_iloc)
-        for indice, indice_iloc in zip(self.indices, indices_iloc):
+        for indice, indice_iloc in zip(indices, indices_iloc):
             fp_fcs = os.path.normpath(df.loc[indice]['DATA_LOCATION_MCMILLEN'])
             if os.path.splitext(fp_fcs)[-1]=='.shp':
                 glob_string = '{}*.xml'.format(fp_fcs)
@@ -610,7 +590,7 @@ class metaData(object):
                 else:
                     pass
 
-                logging.info(msg_str)
+                # logging.info(msg_str)
 
                 for el, el_title, el_text in zip(element_list, element_title, element_text_list):
                     # print('{}\\n{}\\n{}\\n'.format(el,el_title,el_text))
@@ -818,7 +798,7 @@ class metaData(object):
     def take_action(self, df_str, action_type,
                     target_col = 'DATA_LOCATION_MCMILLEN',
                     dry_run = False, replace_action = '', save_df = False,
-                    offline_source = True, offline_target = True, **kwargs):
+                    **kwargs):
         '''
         Move has no checks for if the index_col == fcs name.  If it's an integer,
         that's what the new feature name will save out as.
@@ -838,20 +818,18 @@ class metaData(object):
 
 
         arcpy.env.addOutputsToMap = False
-        # for use in abstracted function
-        setattr(self, 'target_column', target_col)
         # load dataframe
         df = getattr(self, df_str)
 
         # archive before deleting - this saves an archive csv
-        self.save_archive_csv(df_str)
 
         if df_str == 'df':
             prop_str_fp_logfile = 'fp_log'
+            prop_str_indices = 'indices'
         else:
             df_base_str = df_str.replace('df_','')
             prop_str_fp_logfile = 'fp_log_{}'.format(df_base_str)
-            prop_str_fp_csv = 'fp_csv_{}'.format(df_base_str)
+            prop_str_indices = '{}_indices'.format(df_base_str)
 
         fp_logfile = getattr(self, prop_str_fp_logfile)
 
@@ -869,7 +847,7 @@ class metaData(object):
         dict_col_name_orig = {'original':'DATA_LOCATION_MCM_ORIGINAL',
                                 'staging':'DATA_LOCATION_MCM_STAGING',
                                 'previous':'DATA_LOCATION_MCM_PREVIOUS'}
-        setattr(self, 'dict_archival_col', dict_col_name_orig)
+
         lookup_table = copy.copy(self.lookup_table)
         # if gdb not in viable subproject, then add to poo poo platter
         project_str = lookup_table[lookup_table.subproject == self.subproject_str].project.values[0]
@@ -879,10 +857,10 @@ class metaData(object):
 
         csv = lookup_table_project[lookup_table_project.subproject == self.subproject_str].offline_lookup_table.values[0]
         olt = pd.read_csv(csv, index_col = 'gdb_str')
-
+        indices = getattr(self, prop_str_indices)
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
-            for index in self.indices:
+            for index in indices:
                 fp_fcs_current = os.path.normpath(df.loc[index][target_col])
                 fp_components = fp_fcs_current.split(os.sep)
                 if offline_source:
@@ -920,7 +898,9 @@ class metaData(object):
                                 # No gdb found == shapefile passed - use dir/folder
                                 standalone = True
                         if not standalone:
-                            fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
+                            fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                            inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                            fp_csv_source = os.path.join(inventory_dir, fname_csv)
                             df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                         else:
                             # clunky way of grabbing any inventory dir value
@@ -936,8 +916,6 @@ class metaData(object):
                             # note this also creates fp_csv_archive
                             self.add_df(fp_csv_source, df_str_source, 'ITEM')
                             df_source = getattr(self, df_str_source)
-                            # save a base archive if NEVER saved and a daily archive if never saved
-                            self.save_archive_csv(df_str_source)
                         df_source.drop(index, inplace = True)
                         setattr(self, df_str_source, df_source)
 
@@ -953,7 +931,7 @@ class metaData(object):
                     logging.info('feature with ACTION == delete does not exist\n:{}'.format(index))
 
         elif action_type in ['rename']:
-            for index in self.indices:
+            for index in indices:
                 print('did we make it here?')
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
@@ -971,26 +949,6 @@ class metaData(object):
                 # full path to new fcs
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
 
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    fp_fcs_new_online = copy.copy(fp_fcs_new)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_fcs_new = fp_fcs_new.replace(online_base, offline_base)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-
                 if not dry_run:
                     msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
                     print(fp_fcs_current)
@@ -998,11 +956,6 @@ class metaData(object):
                     arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
                     # Now fp is renamed, so change alias on NEW fcs
                     arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
-
-                # TRANSFORM
-                if offline_source:
-                    fp_fcs_current = copy.copy(fp_fcs_current_online)
-                    fp_fcs_new = copy.copy(fp_fcs_new_online)
 
                 # NEW COL VALUES
                 df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
@@ -1035,7 +988,9 @@ class metaData(object):
                         # No gdb found == shapefile passed - use dir/folder
                         standalone = True
                 if not standalone:
-                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1051,16 +1006,14 @@ class metaData(object):
                     # note this also creates fp_csv_archive
                     self.add_df(fp_csv_source, df_str_source, 'ITEM')
                     df_source = getattr(self, df_str_source)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_source)
 
                 df_source = df_source.rename(index = {index:fc_new_name})
                 # Replace indice with new feat name
-                idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                idt = [i for i, index_val in enumerate(indices) if index_val == index]
                 idt = idt[0]
                 print('index = {}'.format(idt))
-                self.indices[idt] = fc_new_name
-                print('we did it')
+                indices[idt] = fc_new_name
+                setattr(self, prop_str_indices, indices)
 
                 df_source.at[fc_new_name, target_col] = fp_fcs_new.replace(os.sep, '//')
 
@@ -1079,7 +1032,7 @@ class metaData(object):
 
         elif action_type in ['move']:
 
-            for index in self.indices:
+            for index in indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
@@ -1094,28 +1047,7 @@ class metaData(object):
                 rename_delete_protocol = False
                 fp_components = fp_fcs_current.split(os.sep)
 
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_components = fp_fcs_current.split(os.sep)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
+                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
 
                 for idx, comp in enumerate(fp_components):
@@ -1140,7 +1072,10 @@ class metaData(object):
                         # No gdb found == shapefile passed - use dir/folder
                         standalone = True
                 if not standalone:
-                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1166,7 +1101,9 @@ class metaData(object):
                     src_tgt_same = False
 
                 if not src_tgt_same:
-                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
+                    inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                    fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                    fp_csv_target = os.path.join(inventory_dir, fname_csv)
                     df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                     # Only grabs TargetGDB once per gdb
                     try:
@@ -1178,7 +1115,6 @@ class metaData(object):
                         self.add_df(fp_csv_target, df_str_target, 'ITEM')
                         df_target = getattr(self, df_str_target)
                         # save a base archive if NEVER saved and a daily archive if never saved
-                        self.save_archive_csv(df_str_target)
 
                 # Only grabs TargetGDB once per gdb
                 try:
@@ -1190,7 +1126,6 @@ class metaData(object):
                     self.add_df(fp_csv_source, df_str_source, 'ITEM')
                     df_source = getattr(self, df_str_source)
                     # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_source)
 
                 # for featureclasstofeatureclass
                 if pd.isnull(dset_move):
@@ -1208,6 +1143,7 @@ class metaData(object):
                     feat_name = copy.copy(index)
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
+                    feat_name = feat_name.replace('.shp','')
 
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
@@ -1304,11 +1240,11 @@ class metaData(object):
                     if rename:
                         # Replace indice with new feat name
                         print('1217')
-                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        idt = [i for i, index_val in enumerate(indices) if index_val == index]
                         idt = idt[0]
                         print('index = {}'.format(idt))
-                        self.indices[idt] = feat_name
-                        print('we did it')
+                        indices[idt]=feat_name
+                        setattr(self, prop_str_indices, indices)
                         index = copy.copy(feat_name)
                     debug_idx = 8
                     df.loc[index, 'DATA_LOCATION_MCMILLEN'] = fp_fcs_new
@@ -1339,7 +1275,7 @@ class metaData(object):
 
         elif action_type in ['copy_no_replace', 'copy_replace']:
 
-            for index in self.indices:
+            for index in indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
                 dset_move = df_item['MOVE_LOCATION_DSET']
@@ -1351,30 +1287,8 @@ class metaData(object):
                     rename = False
 
                 fp_components = fp_fcs_current.split(os.sep)
-
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
-                    # check if gdb in filepath
-                    try:
-                        offline_idx = gdb_str[0]
-                        offline_base = os.path.normpath(olt.loc[offline_idx, 'offline'])
-                        online_base = os.path.normpath(olt.loc[offline_idx, 'online'])
-                        print('fp_fcs_current {}'.format(fp_fcs_current))
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                        fp_components = fp_fcs_current.split(os.sep)
-                        print('ONLINE BASE {}'.format(online_base))
-                        print('OFFLINE BASE {}'.format(offline_base))
-                    except IndexError:
-                        # STANDALONE SHAPEFILE assume the DATA_LOC... from Target is desired
-                        # from gdb_str[0]  ---> standalone shapefile with no gdb
-                        pass
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
-
+                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
+                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
@@ -1393,8 +1307,10 @@ class metaData(object):
                         standalone = True
 
                 if not standalone:
-                    fp_csv_source = lookup_table.loc[src_gdb_or_dir_str, 'fp_gdb_inv_csv']
-                    print('FP CSV SOURSE:  {}'.format(fp_csv_source))
+                    fname_csv = lookup_table.loc[src_gdb_or_dir_str, 'fname_csv']
+                    inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
+                    fp_csv_source = os.path.join(inventory_dir, fname_csv)
+                    print('FP CSV SOURCE:  {}'.format(fp_csv_source))
                     df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
                 else:
                     # clunky way of grabbing any inventory dir value
@@ -1412,7 +1328,10 @@ class metaData(object):
                 # GDB as target
                 else:
                     tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
-                fp_csv_target = lookup_table.loc[tgt_gdb_or_dir_str, 'fp_gdb_inv_csv']
+
+                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                fp_csv_target = os.path.join(inventory_dir, fname_csv)
                 print('CSV TARGET:    --->',  fp_csv_target)
                 df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
@@ -1424,8 +1343,6 @@ class metaData(object):
                     # note this also creates fp_csv_archive
                     self.add_df(fp_csv_target, df_str_target, 'ITEM')
                     df_target = getattr(self, df_str_target)
-                    # save a base archive if NEVER saved and a daily archive if never saved
-                    self.save_archive_csv(df_str_target)
 
                 # for featureclasstofeatureclass
                 if pd.isnull(dset_move):
@@ -1443,6 +1360,7 @@ class metaData(object):
                     feat_name = copy.copy(index)
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
+                    feat_name = feat_name.replace('.shp','')
 
                 # full path with featureclass name
                 print('feat name to copy {}'.format(feat_name))
@@ -1459,19 +1377,28 @@ class metaData(object):
                             arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_dset, feat_name)
                         debug_idx = 4
 
-                    # TRANSFORM
-                    # if offline_source:
-                    #     fp_fcs_current = copy.copy(fp_fcs_current_online)
-                    if offline_target:
-                        fp_components = fp_fcs_new.split(os.sep)
-                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                        online_base = olt.loc[gdb_str, 'online']
-                        offline_base = olt.loc[gdb_str, 'offline']
-                        fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
-                    # TARGET DF UPDATES
-                    # Assemble Series to append to Master DF
-
-                    d = self.return_append_dict(df_str, index, fp_fcs_new, target_col)
+                    col_name_original = df_item['COL_NAME_ARCHIVAL']
+                    debug_idx = 41
+                    if not pd.isnull(col_name_original):
+                        col_name_original = dict_col_name_orig[col_name_original]
+                        df.at[index, col_name_original] = fp_fcs_current
+                        d = {col_name_original: fp_fcs_current,
+                             'FEATURE_DATASET': dset_move,
+                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+                    # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
+                    # to master, and now decide to move back to archival.
+                    else:
+                        d = {'FEATURE_DATASET': dset_move,
+                             'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+                    # columns to transfer from source to target
+                    merge_cols = df_item['MERGE_COLUMNS']
+                    debug_idx = 42
+                    if not pd.isnull(merge_cols):
+                        print('MERGE COLUMNS: ', merge_cols)
+                        keys = [c.strip() for c in merge_cols.split(',')]
+                        vals = df.loc[index, keys]
+                        d.update(dict(zip(keys, vals)))
+                    debug_idx =43
                     ser_append = pd.Series(data=d,
                                            index=list(d.keys()),
                                            name=feat_name)
@@ -1509,11 +1436,12 @@ class metaData(object):
 
                     if rename:
                         # Replace indice with new feat name
-                        print('1217')
-                        idt = [i for i, index_val in enumerate(self.indices) if index_val == index]
+                        print('1217 - renaming')
+                        idt = [i for i, index_val in enumerate(indices) if index_val == index]
                         idt = idt[0]
                         print('index = {}'.format(idt))
-                        self.indices[idt] = feat_name
+                        indices[idt] = feat_name
+                        setattr(self, prop_str_indices, indices)
                         if action_type == 'copy_replace':
                             df.rename(index={index:feat_name}, inplace=True)
                         else:
@@ -1541,188 +1469,91 @@ class metaData(object):
                         logging.info(e)
 
 
-        elif action_type == 'gp':
-            pass
+        elif action_type in ['fc_to_fc_conv']:
+            var_dict = kwargs['var_dict']
+            fp_fcs_current = var_dict['feat_in']
+            index = indices[0]
+            df_item = df.loc[index]
 
-        else:
-            if action_type in  ['create_poly', 'create_line', 'create_point']:
-                # For adding new item to maestro and take_action(action_type = create_<type>...)
-                for index in self.indices:
-                    print('HERE')
-                    df_item = df.loc[index]
-                    dset_move = df_item['MOVE_LOCATION_DSET']
+            fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
-                    if offline_target:
-                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
+            dset = df_item['MOVE_LOCATION_DSET']
+            # NO DSET passed
+            if pd.isnull(dset):
+                pass
+            else:
+                fp_move = os.path.join(fp_move, dset)
+
+            msg_str = 'FC to FC conversion: \n'
+            msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_fcs_current)
+            feat_name = copy.copy(index)
+            fp_fcs_new = os.path.join(fp_move, feat_name)
+            msg_str = '{}  FEAT_OUT: ---  {}\n'.format(msg_str, fp_fcs_new)
+            if not dry_run:
+                arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_move, feat_name)
+
+            # documentation to add to table
+            logging.info(msg_str)
+
+                # Dict will be UPDATED below if kwarg specified
+            d = {'ITEM':feat_name, 'DATE_CREATED':[self.todays_date],
+                'DATA_LOCATION_MCMILLEN':[fp_fcs_new.replace(os.sep, '//')]}
+
+            df_append = pd.DataFrame(d)
+            df_append = df_append.set_index('ITEM')
+
+            # Get TARGET DF/CSV/STR
+            fp_components = fp_fcs_new.split(os.sep)
+            for idx, comp in enumerate(fp_components):
+                if '.gdb' in comp:
+                    # Get Source STR
+                    tgt_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+
+                    if tgt_gdb_or_dir_str in viable_gdbs:
+                        standalone = False
                     else:
-                        fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
+                        standalone = True
+                    # Once gdb is found in path, then break
+                    break
+                # translation - there was no gdb in fp_fcs_orig
+                elif idx == (len(fp_components) - 1):
+                    # No gdb found == shapefile passed - use dir/folder
+                    standalone = True
+            if not standalone:
+                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+            else:
+                fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
+                df_str_target = 'df_{}_standalone'.format(self.subproject_str)
 
-                    # NO DSET passed
-                    if pd.isnull(dset_move):
-                        dset_move=''
+            # Only grabs TargetGDB once per gdb
+            try:
+                df_target = getattr(self, df_str_target)
+            # if dataframe NOT already added via self.add_df
+            except AttributeError:
+                print('populating target')
+                # note this also creates fp_csv_archive
+                self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                df_target = getattr(self, df_str_target)
 
-                    fp_dset = os.path.join(fp_move, dset_move)
-                    # check to make sure output dset exists before proceeding
-                    if not arcpy.Exists(fp_dset):
-                        arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
+            # Since adding new row, it's append
+            df_target = df_target.append(df_append)
+            # since updating existing NOT append
+            print(df)
+            print('\n')
+            print(df_append)
+            df.update(df_append)
+            print('AFTERWARDS/n')
+            print(df)
+            setattr(self, df_str_target, df_target)
+            setattr(self, df_str, df)
 
-                    feat_type_dict = {'create_poly': 'POLYGON', 'create_line':'POLYLINE',
-                                      'create_point':'POINT'}
-                    feat_type = feat_type_dict[action_type]
-                    fp_fcs_new = os.path.join(fp_move, dset_move, index)
+            if save_df:
+                pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                pd.DataFrame.to_csv(df_target, fp_csv_target)
 
-                    feat_name = copy.copy(index)
-                    msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs_new)
-                    # flag_index
-                    if not dry_run:
-                        arcpy.CreateFeatureclass_management(fp_dset, feat_name, feat_type,
-                                                            spatial_reference = self.prj_file,
-                                                            has_m = 'No', has_z = 'No')
-                    # documentation to add to table
-                    logging.info(msg_str)
-
-                    df_target, df_str_target, fp_csv_target = self.return_df(fp_move)
-                    # append new row from Series
-                    debug_idx = 7
-                    # first drop index in case multiple times running due to error
-                    try:
-                        df_target.drop(feat_name, inplace=True)
-                        print('1205; item already exists in target gdb')
-                    except KeyError:
-                        pass
-
-                    # append to target gdb
-                    d = self.return_append_dict(df_str, index,fp_fcs_new, target_col)
-                    ser_append = pd.Series(data=d,
-                                           index=list(d.keys()),
-                                           name=feat_name)
-                    df_target = df_target.append(ser_append)
-
-                    # similar in function to updating dictionary, but instead, updating row in df if new vals
-                    df_join = pd.DataFrame(d, index=[index])
-                    # saves name to csv column above index
-                    df_join.index.name = copy.copy(df.index.name)
-                    col_order_orig = df.columns.to_list()
-                    idx_order_orig = df.index.to_list()
-                    df = df_join.combine_first(df)
-                    debug_idx = 81
-                    # If ValueError: cannot reindex from duplicate axis  CHECK FOR DUPLICATE INDICES
-                    # this means there are duplicate row indices, i.e. ITEM duplicated
-                    # NOTE! does not have to be the indices from agol_obj.indices.  ANYWHERE on csv with duplicate rows will trigger error
-                    df = df.reindex(idx_order_orig)
-                    debug_idx = 82
-                    # or else gets reordered alphabetically
-                    df = df.reindex(columns=col_order_orig)
-
-                    # SAVE TO TARGET_DF every Iter in case Exception
-                    setattr(self, df_str_target, df_target)
-                    setattr(self, df_str, df)
-
-                    if save_df:
-                        pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
-                        pd.DataFrame.to_csv(df_target, fp_csv_target)
-
-
-            elif action_type in ['fc_to_fc_conv']:
-                var_dict = kwargs['var_dict']
-                fp_fcs_current = var_dict['feat_in']
-                index = self.indices[0]
-                df_item = df.loc[index]
-
-                if offline_target:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'offline']
-                    print('in offline: ', fp_move)
-                else:
-                    fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
-                    print('in online: ', fp_move)
-
-
-                dset = df_item['MOVE_LOCATION_DSET']
-                # NO DSET passed
-                if pd.isnull(dset):
-                    pass
-                else:
-                    fp_move = os.path.join(fp_move, dset)
-
-                msg_str = 'FC to FC conversion: \n'
-                msg_str = '{}  FEAT_IN:   ---  {}\n'.format(msg_str, fp_fcs_current)
-                feat_name = copy.copy(index)
-                fp_fcs_new = os.path.join(fp_move, feat_name)
-                msg_str = '{}  FEAT_OUT: ---  {}\n'.format(msg_str, fp_fcs_new)
-                if not dry_run:
-                    arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_current, fp_move, feat_name)
-
-                # documentation to add to table
-                logging.info(msg_str)
-
-
-
-    def return_df(self, fp_move):
-        '''
-        Attempted to abstract some things, did not work.  ended up with narrow utility
-        Args:
-            fp_move:
-
-        Returns:
-            all the variables related to df_target
-        '''
-
-        # Get TARGET DF/CSV/STR
-        fp_components_target = fp_move.split(os.sep)
-        tgt_gdb_or_dir = fp_components_target[-1]
-        # dir as target
-        if '.gdb' not in tgt_gdb_or_dir:
-            tgt_gdb_or_dir = fp_components_target[-1]
-            tgt_gdb_or_dir_str = '{}_dir'.format(tgt_gdb_or_dir)
-        # GDB as target
-        else:
-            tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
-
-        inventory_dir = self.lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-        fname_csv = self.lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-        fp_csv_target = os.path.join(inventory_dir, fname_csv)
-        df_str_target = self.lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
-        # Only grabs TargetGDB once per gdb
-        try:
-            df_target = getattr(self, df_str_target)
-        # if dataframe NOT already added via self.add_df
-        except AttributeError:
-            print('populating target')
-            self.add_df(fp_csv_target, df_str_target, 'ITEM')
-            df_target = getattr(self, df_str_target)
-        return(df_target, df_str_target, fp_csv_target)
-
-    def return_append_dict(self, df_str, idx_current,fp_fcs_new, target_col):
-        df = getattr(self,df_str)
-        df_item = df.loc[idx_current]
-        dset_move = df_item['MOVE_LOCATION_DSET']
-
-        col_name_original = df_item['COL_NAME_ARCHIVAL']
-
-        if not pd.isnull(col_name_original):
-            col_name_original = self.dict_archival_col[col_name_original]
-            fp_fcs_current = os.path.normpath(df_item[target_col])
-            df.at[idx_current, col_name_original] = fp_fcs_current
-            d = {col_name_original: fp_fcs_current,
-                 'FEATURE_DATASET': dset_move,
-                 'DATA_LOCATION_MCMILLEN': fp_fcs_new}
-        # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
-        # to master, and now decide to move back to archival.
-        else:
-            d = {'FEATURE_DATASET': dset_move,
-                 'DATA_LOCATION_MCMILLEN': fp_fcs_new}
-        # columns to transfer from source to target
-        merge_cols = df_item['MERGE_COLUMNS']
-        debug_idx = 42
-        if not pd.isnull(merge_cols):
-            print('MERGE COLUMNS: ', merge_cols)
-            keys = [c.strip() for c in merge_cols.split(',') if c == self.target_column]
-            # Remove TC - DATA_LOCATION_MCMILLEN if present
-            vals = df.loc[idx_current, keys]
-            d.update(dict(zip(keys, vals)))
-        debug_idx = 43
-        setattr(self, df_str, df)
-        return(d)
     def df_sets(self, df_list, col_list):
         '''
         utility to find overlapping and symmetric differences between different
@@ -1868,31 +1699,6 @@ class metaData(object):
         fp_log = '{}_logfile.log'.format(basepath)
         setattr(self, fp_log_prop_str, fp_log)
 
-    def save_archive_csv(self, df_str):
-
-        if df_str == 'df':
-            # if df
-            str_csv_archive_obj = 'fp_csv_archive'
-            str_csv_archive_temp_obj = 'fp_csv_archive_temp'
-        else:
-            # strip away the df_
-            df_base_str = df_str.replace('df_', '')
-            str_csv_archive_obj = 'fp_csv_archive_{}'.format(df_base_str)
-            str_csv_archive_temp_obj = 'fp_csv_archive_temp_{}'.format(df_base_str)
-
-        # 2) path to csv archive
-        fp_csv_archive = getattr(self, str_csv_archive_obj)
-
-        # create archive if first time managing database
-        if not os.path.exists(fp_csv_archive):
-            # initiate archive file for day
-            print('save an archive:\n{}'.format(fp_csv_archive))
-            pd.DataFrame.to_csv(getattr(self, df_str), fp_csv_archive)
-
-        # # perhaps useful later for cleanup?
-        # date_str = os.path.split(fp_csv_archive_temp)[-1][-12:-4]
-        # date_obj = datetime.date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:]))
-
     def cast_columns(self, df_str):
         '''
         basic funciton to convert columns to specific datatypes
@@ -1975,17 +1781,68 @@ class metaData(object):
         replace_col_source = replace_col_list[0]
         replace_col_target = replace_col_list[1]
         # indices that match target_val in source
-        source_indices = df_source.index[df_source[replace_col_source]==target_val]
-        # file paths most likely
-        vals_match = df_source.loc[source_indices][match_col_source].to_list()
-        # indices in df_target matching source indices
+        if not df_source.index.name==replace_col_source:
+            idx_target = df_source[df_source[match_col_source]==target_val][replace_col_source]
+        else:
+            idx_target = df_source[[df_source[match_col_source]==target_val]].index
+        if not df_target.index.name == replace_col_target:
+            idx_name = df_target.index.name
+            df_target.set_index(replace_col_target, inplace=True)
+            df_target.at[idx_target, match_col_target]=target_val
+            df_target.set_index(idx_name, inplace=True)
+        else:
+            df_target.at[idx_target, match_col_target]=target_val
 
-
-        target_indices = [df_target.index[df_target[match_col_target]==val] for val in vals_match]
-
-        for indice in target_indices:
-            df_target.at[indice, replace_col_target] = target_val
         setattr(self, '{}_matched'.format(df_str_target), df_target)
+
+    def df_to_df_transfer_v2(self, df_src, df_tgt, flag_col_src, flag_val, key_src,
+                             key_tgt, merge_cols_dict, concat=False):
+        '''
+        More for manual transfers.
+        flag_col_src            name of column to transfer to ID rows and flag_col_tgt i.e. action
+        flag_val                val for loc in src df to loc and transfer to tgt
+        key_src                name of column to receive vals from flag_col_src
+        key_tgt                name of column to receive vals from flag_col_src
+        merge_cols_dict         dict of col names to replace or add vals from src to tgt.
+                                Replicate k:v if the column names match between df_src and df_tgt
+        concat                  If want to add non intersecting rows from src to tgt in addition to
+                                the whole other protocol
+        '''
+        if df_src.index.name!=key_src:
+            df_src = df_src.set_index(key_src)
+
+        reset_idx=False
+        if df_tgt.index.name != key_tgt:
+            idx_name = copy.copy(df_tgt.index.name)
+            df_tgt.reset_index(inplace=True)
+            df_tgt.set_index(key_tgt, inplace=True)
+            reset_idx=True
+        if isinstance(flag_val, list):
+            df_src_subset = df_src[df_src[flag_col_src].isin(flag_val)]
+        else:
+            df_src_subset = df_src[df_src[flag_col_src] == flag_val]
+
+        merge_idx = list(set(df_tgt.index).intersection(df_src_subset.index))
+        for col_src, col_tgt in merge_cols_dict.items():
+            df_tgt.loc[merge_idx, col_tgt] = df_src_subset.loc[merge_idx, col_src]
+        if concat:
+            # find rows that were not originally in tgt
+            concat_idx = list(set(df_src_subset.index) - set(df_tgt.loc[merge_idx].index))
+            # first remap select src columns to tgt columns from dict
+            # subet to ommitted rows and src_cols
+            cols_append=list(set(df_tgt.columns).intersection(set(df_src.columns)))
+            # if src col names to key - append and find key
+            cols_append.extend(list(merge_cols_dict.keys()))
+            cols_append = list(set(cols_append))
+            # key the few col names contained in dict
+            df_src_subset = df_src_subset.loc[concat_idx, cols_append]
+            df_src_subset.rename(columns=merge_cols_dict, inplace=True)
+            df_tgt = pd.concat([df_tgt, df_src_subset])
+        if reset_idx:
+            df_tgt.reset_index(inplace=True)
+            df_tgt.set_index(idx_name, inplace=True)
+
+        return(df_tgt)
 
     def data_sent_tracking(self, fp_csv_tracking, base_dir, action, tracking_dict):
         '''
@@ -2046,7 +1903,10 @@ class metaData(object):
                 arcpy.FeatureClassToFeatureClass_conversion(fp, shp_dir, fname)
                 items.append(fname)
             zip_dir = os.path.join(base_dir,'zip')
-            self.zip_shp_dir(shp_dir, zip_dir)
+            if not pd.isnull(fc_new_name):
+                self.zip_shp_dir(shp_dir, zip_dir, renamed_files=items)
+            else:
+                self.zip_shp_dir(shp_dir, zip_dir)
         if write_df:
             df_tracking = pd.read_csv(fp_csv_tracking)
             c1 = [notes] * len(self.indices)
@@ -2070,8 +1930,493 @@ class metaData(object):
                                                   'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
+    def parse_csString_utils(self, csString, **kwargs):
+        '''
+        Parse Comma-Sep Strings utilities.  Add to kwargs for  more scenarios.
+        Args:
+            csString:           Comma Separated String
+            **kwargs:           kwargs[remove] = pass value to remove from csString
+        Returns:
+            csString_updated    updated csString i.e. with tgt_val removed
 
-class AgolAccess(metaData):
+        '''
+        try:
+            tgt_val = kwargs['remove_item']
+            csString_updated = [v.strip() for v in csString.split(',') if v.strip() != tgt_val]
+            csString_updated = ','.join(csString_updated)
+            return(csString_updated)
+        except KeyError:
+            pass
+class proProject(commonUtils):
+    '''
+    INSERT / FLESH OUT
+    '''
+    def __init__(self):
+        print('something')
+    def proProject_init(self, fp_pathlist_aprx):
+        setattr(self, 'fp_pl_aprx', fp_pathlist_aprx)
+        pl_aprx =pd.read_excel(fp_pathlist_aprx, index_col='subproject')
+        setattr(self, 'pl_aprx', pl_aprx)
+    def add_aprx(self,subproject, target_col = r'DATA_LOCATION_MCMILLEN', add_lyR_inv = True,**kwargs):
+        fp_aprx=self.pl_aprx.loc[subproject,'fp_aprx']
+        setattr(self, 'fp_{}'.format(subproject), fp_aprx)
+        aprx = arcpy.mp.ArcGISProject(fp_aprx)
+        aprx_str = 'aprx_{}'.format(subproject)
+        setattr(self, aprx_str, aprx)
+        if add_lyR_inv:
+            try:
+                kwargs['lyR_maestro']
+                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+                df_lyR_str = f"df_{subproject}_lyR_maestro"
+                fp_lyR_str = f"fp_{subproject}_lyR_maestro"
+            except KeyError:
+                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+                df_lyR_str = f"df_{subproject}_lyR"
+                fp_lyR_str = f"fp_{subproject}_lyR"
+
+            df_lyR_inv = pd.read_csv(fp_lyR_inv, index_col=target_col)
+            setattr(self, df_lyR_str, df_lyR_inv)
+            setattr(self, fp_lyR_str, fp_lyR_inv)
+    def add_maps(self, subproject):
+        '''
+        fetches aprx maps and layouts from init attributes
+        Args:
+            aprx_str:       <aprx name>_aprx
+
+        Returns:
+        '''
+        aprx = getattr(self, f"aprx_{subproject}")
+        m =  aprx.listMaps()
+        map_str = f"{subproject}_maps"
+        setattr(self, map_str, m)
+    def add_layouts(self, aprx_str):
+        '''
+        fetches aprx maps and layouts from init attributes
+        NEVER USED
+        Args:
+            aprx_str:       <aprx name>_aprx
+
+        Returns:
+        '''
+        aprx = getattr(self, aprx_str)
+        l =  aprx.listLayouts()
+        map_str = aprx_str.replace('aprx','layouts')
+        setattr(self, layout_str, l)
+
+    def format_lyR_inv_datasource_standard(self, subproject, source_new='DATA_LOCATION_MCM_RESOURCE', **kwargs):
+
+        # A) Gather Connetion Info
+        try:
+            kwargs['lyR_maestro']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+        except KeyError:
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
+        prop_str_indices = '{}_lyR_indices'.format(subproject)
+        indices = getattr(self, prop_str_indices)
+
+        # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
+        for idx in indices:
+            # idx_lyR = os.path.normpath(df_gdb_inv.loc[idx, source_orig])
+            # fp_new = os.path.normpath(df_gdb_inv.loc[idx, source_new])
+            fp_new = os.path.normpath(df.loc[idx, source_new])
+            if not df.loc[idx, 'IS_RASTER']:
+                if fp_new[-4:] == '.shp':
+                    dbase_connection, fname = os.path.split(fp_new)
+                    df.at[idx, 'workspace_factory'] = 'Shape File'
+                else:
+                    dbase_connection = '{}.gdb'.format(fp_new.split('.gdb')[0])
+                    df.at[idx, 'workspace_factory'] = 'FileGDB'
+                    fp_comps = fp_new.split(os.sep)
+                    fname, dset = fp_comps[-1], fp_comps[-2]
+                    if 'gdb' not in dset:
+                        df.at[idx, 'feature_dataset']=dset
+                df.at[idx, 'dataset'] = fname
+                df.at[idx, 'dbase_connection'] = dbase_connection
+            else:
+                fp_comps = fp_new.split('.gdb')
+                if len(fp_comps)==2:
+                    dbase_connection = '{}.gdb'.format(fp_comps[0])
+                    df.at[idx, 'workspace_factory'] = 'Raster'
+                    fp_comps = fp_new.split(os.sep)
+                    fname, dset = fp_comps[-1], fp_comps[-2]
+                    if 'gdb' not in dset:
+                        df.at[idx, 'feature_dataset'] = dset
+                else:
+                    df.at[idx, 'workspace_factory'] = 'Raster'
+                    fp_comps = os.path.split(fp_new)
+                    dbase_connection = fp_comps[0]
+                    fname=fp_comps[-1]
+                df.at[idx, 'dataset'] = fname
+                df.at[idx, 'dbase_connection'] = dbase_connection
+        setattr(self, fp_csv_lyR, df)
+        df.to_csv(fp_csv_lyR)
+
+    def re_source_lyR_maestro(self, subproject, **kwargs):
+        # B) Connect
+        # A) Gather Connetion Info
+        try:
+            kwargs['lyR_maestro']
+            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+            prop_str_indices = '{}_lyR_maestro_indices'.format(subproject)
+        except KeyError:
+            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+            prop_str_indices = '{}_lyR_indices'.format(subproject)
+        df_lyR_inv = pd.read_csv(fp_lyR_inv, index_col='DATA_LOCATION_MCMILLEN')
+        fp_lyR_inv_update = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df_lyR_inv_update = pd.read_csv(fp_lyR_inv_update, index_col='DATA_LOCATION_MCMILLEN')
+
+        # Initiate map removal accounting if needed
+        if r'MAP_NAME_UPDATED' not in df_lyR_inv_update.columns:
+            df_lyR_inv_update['MAP_NAME_UPDATED']=df_lyR_inv_update['MAP_NAME']
+
+        indices = getattr(self, prop_str_indices)
+
+        # INIT LOGFILE
+        self.init_logfile(subproject)
+
+        map_temp, layer_temp=[],[]
+        df_lyR_inv_subset = df_lyR_inv.loc[indices]
+        fp_map_matrix = self.pl_aprx.loc[subproject, 'fp_map_matrix']
+        df_map_matrix = pd.read_csv(fp_map_matrix, index_col='DATA_LOCATION_MCMILLEN')
+        # Returns rows in index and columns with any True valeus
+        # mask = df_map_matrix=='CHANGE'
+        df_map_matrix_subset = df_map_matrix.loc[indices]
+        map_objects = getattr(self, f"{subproject}_maps")
+        # Remove maps not in Use i.e. not in matrix or inventoried
+        # map_objects = [mo for mo in map_objects if mo.name in df_map_matrix_subset.columns]
+        idx_cols=[c for c in df_map_matrix_subset.columns if 'CHANGE' in df_map_matrix_subset[c].values]
+        map_objects_subset = [mo for mo in map_objects if mo.name in idx_cols]
+        for m in map_objects_subset:
+            # Pulls layers with TRUE in each map column from matrix
+            tgt_layers = df_map_matrix_subset[df_map_matrix_subset[m.name]=='CHANGE'].index
+            layers = m.listLayers()
+            for lyr in layers:
+                try:
+                    if lyr.dataSource in tgt_layers:
+                        # dataSource and in tgt_layer
+                        resource = True
+                    else:
+                        resource = False
+                except AttributeError:
+                    # does not have dataSource attribute (i.e. map server or...something)
+                    resource = False
+                if resource:
+                    try:
+                        idx = copy.copy(os.path.normpath(lyr.dataSource))
+                        wsf = df_lyR_inv_subset.loc[idx, 'workspace_factory']
+                        dbase_connection = df_lyR_inv_subset.loc[idx, 'dbase_connection']
+                        dataset = df_lyR_inv_subset.loc[idx, 'dataset']
+                        feature_dataset = df_lyR_inv_subset.loc[idx, 'feature_dataset']
+
+                        lyr_cim = lyr.getDefinition('V3')
+                        # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
+                        dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
+                        dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
+                        dc.workspaceFactory = wsf
+                        dc.dataset = dataset
+                        # check for feature dataset
+                        if not pd.isnull(feature_dataset):
+                            dc.featureDataset = feature_dataset
+                        # Different object structure with Raster
+                        if wsf=='Raster':
+                            lyr_cim.dataConnection = dc
+                        elif wsf in ('Shapefile', 'FileGDB'):
+                            lyr_cim.featureTable.dataConnection = dc
+                        lyr.setDefinition(lyr_cim)
+
+                        new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
+                        df_lyR_inv.at[idx,'RESOURCED']=True
+                        # Once successful, remove map name of resource layer from list
+                        csString = df_lyR_inv_update.loc[idx, 'MAP_NAME_UPDATED']
+                        csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
+                        df_lyR_inv_update.at[idx, 'MAP_NAME_UPDATED'] = csString_updated
+                        df_lyR_str = f"df_{subproject}_lyR"
+                        setattr(self, df_lyR_str, df_lyR_inv_update)
+
+                        df_map_matrix.loc[idx,m.name]='FIXED'
+                        df_map_matrix.to_csv(fp_map_matrix)
+                        setattr(self, f"df_map_matrix_{subproject}", df_map_matrix)
+
+                        self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
+                        self.logger.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
+                    except KeyError as e:
+                        self.logger.info('EXCEPTION {}'.format(e))
+                        map_temp.append(m.name)
+                        layer_temp.append(idx)
+                else:
+                    pass
+        # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
+        # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
+        aprx = getattr(self, f"aprx_{subproject}")
+        aprx.save()
+
+    def init_logfile(self, subproject):
+        logger = logging.getLogger(subproject)
+        fp_logfile = self.pl_aprx.loc[subproject, 'fp_logfile']
+        logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
+        banner = '    {}    '.format('-' * 50)
+        call_str = 're_source_lyR_maestro {}:\n'.format(subproject)
+        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
+        logging.info(msg_str)
+        setattr(self, 'logger', logger)
+    def aprx_map_inv(self, aprx_path):
+        '''
+        Inventory of single aprx from aprx path
+        20241021
+        Args:
+            aprx_path:      path/to/aprs
+            csv_out:        path to lyR inventory
+        Returns:
+
+        '''
+        aprx = arcpy.mp.ArcGISProject(aprx_path)
+        map_objects = aprx.listMaps()
+        src_list, map_list,broken, raster = [],[],[],[]
+        for m in map_objects:
+            layers = m.listLayers()
+            for lyr in layers:
+                if lyr.visible and lyr.supports('DATASOURCE'):
+                    broken.append(lyr.isBroken)
+                    if lyr.isFeatureLayer:
+                        raster.append(False)
+                    elif lyr.isRasterLayer:
+                        raster.append(True)
+                    else:
+                        raster.append(False)
+                    src = lyr.dataSource
+                    src_list.append(src)
+                    map_list.append(m.name)
+        del map_objects
+        del aprx
+
+        item = [os.path.split(fp)[-1] for fp in src_list]
+        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME','IS_RASTER','IS_BROKEN']
+        vals = np.column_stack([item, src_list, map_list, raster, broken])
+        df = pd.DataFrame(vals, columns=cols)
+        return(df)
+
+    def aprx_map_inv2(self, csv_in, csv_out):
+        '''
+        20241021
+        Compiling single inv from multiple aprx paths via aprx inv
+        Need a True/False FLAG field to subset rows to inventory
+        Args:
+            csv_in:         path/to/aprx inventory (if exists for bulk; i.e. Tolt)
+            csv_out:        path to lyR inventory
+        Returns:
+
+        '''
+        df = pd.read_csv(csv_in)
+        df = df[df.FLAG]
+        src_list, map_list, broken, raster = [], [], [], []
+        for idx in df.index:
+            aprx_path = df.loc[idx, 'DATA_LOCATION_MCMILLEN_APRX']
+            aprx_str = df.loc[idx, 'APRX']
+            if 'df_concat' not in locals():
+                df_concat = self.aprx_map_inv(aprx_path)
+                df_concat['APRX']=len(df_concat)*[aprx_str]
+            else:
+                t = self.aprx_map_inv(aprx_path)
+                t['APRX']=len(t)*[aprx_str]
+                df_concat=pd.concat([df_concat, t])
+        df_concat.to_csv(csv_out)
+    def expand_rows(self, subproject, csv_out, update=False):
+        '''
+        Outputs a True False matrix flagging which map utilizes which layer.
+        For use in making re-sourceing more efficient.  Parses comma separated
+        string column map_name ["map1", "map2", "mapn"] from lyR_inv as primary input.
+        20241015
+        Args:
+            subproject:       yeah
+            csv_out:        for mapping grid dataframe
+            update:         set to True if map matrix already populated and CHANGED values have been updated with
+                            resourcing.  Will retain those values and only create new rows for added rows
+                            i.e. if layout imported like PSP_3 to PSP_2
+
+        Returns:
+
+        '''
+        df_lyR_inv=pd.read_csv(self.pl_aprx.loc[subproject, 'fp_lyR_inv'], index_col='DATA_LOCATION_MCMILLEN')
+
+        maps = df_lyR_inv.MAP_NAME
+        maps_unique=[y.strip() for x in maps for y in x.split(',')]
+        maps_unique=list(set(maps_unique))
+        layers = df_lyR_inv.index
+        vals = np.full([len(layers), len(maps_unique)], r'-----')
+        df_maps_join = pd.DataFrame(vals, columns = maps_unique)
+        index = pd.Index(layers)
+        df_maps_join = df_maps_join.set_index(index)
+        for idx in df_lyR_inv.index:
+            map_list = df_lyR_inv.loc[idx, 'MAP_NAME']
+            map_list = [mn.strip() for mn in map_list.split(',')]
+            for mn in map_list:
+                df_maps_join.at[idx, mn]='CHANGE'
+        df_maps_join.to_csv(csv_out, index=True, index_label='DATA_LOCATION_MCMILLEN')
+
+    def join_list(self, v):
+        vn = v.to_list()
+        vn = list(set(vn))
+        vn = ', '.join(vn)
+        return (vn)
+    def aggregate_rows(self, df, group_by_field, agg_field,**kwargs):
+        '''
+        Groupby a field (group_by_field), aggregate all unique values in another field (agg_field)
+        as a new field with values being unique values as string with commas separating values.
+        20240904
+        Args:
+            csv_in:             path/to/csv source
+            csv_out:            path/to/csv_out; can be same as csv_in
+            group_by_field:     field to groupby
+            agg_field:          field to create unique value comma-separated string
+            kwargs:             count = include field with number of values for agg_field in csv_out
+                                carry_field = list of field(s) to keep - can include agg field
+
+        Returns:
+
+        '''
+        # The method .agg({agg_field: <function>}) will perform <function> over the agg_field
+        # i.e. join_list aggregated over map_name column
+        groupby_source = df.groupby(group_by_field).agg({agg_field: self.join_list})
+        # pulls groupby_field out of index and replaces with numbers (iloc)
+        groupby_source = groupby_source.reset_index()
+
+        try:
+            # use if group_by_field is a file path and you want filename
+            kwargs['extract_filename']
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source[group_by_field]]
+            groupby_source[group_by_field] = fnames
+        except KeyError:
+            pass
+        try:
+            kwargs['count']
+            for idx in groupby_source.index:
+                t = groupby_source.loc[idx, agg_field]
+                t = t.split(',')
+                groupby_source.loc[idx, 'NUMBER_OCCURRENCES']= len(t)
+        except KeyError:
+            pass
+        groupby_source = groupby_source.set_index(group_by_field)
+        try:
+            keep_fld = kwargs['carry_fields']
+            keep_fld.append(group_by_field)
+            df_join = df.drop_duplicates([group_by_field]).reset_index()
+            # Don't bring in Agg Field i.e. map_name
+            df_join = df_join[[c for c in df_join.columns if c in keep_fld]]
+            # cols_rename = {f"{c}_y":c for c in df.columns if c!=group_by_field}
+            groupby_source = groupby_source.merge(df_join, on=group_by_field, how='left')
+            # groupby_source = groupby_source.rename(columns=cols_rename)
+        except KeyError:
+            pass
+        return(groupby_source)
+    def concatenate_aggregate(self, csv_in, csv_out, split_field, group_by_field, agg_field, **kwargs):
+        '''
+        Used for multiple aprx ReSourcing wherein need to groupby map_names in each aprx.
+        Layer X may be used in 4 different APRXs.  In this case, there will be 4 Layer X
+        or DATA_SOURCE rows, one for each aprx and a map_name 'map1,map2,mapn' string for each
+        20241016
+        Args:
+            csv_in:         lyR_in_csv to aggregate
+            csv_out:        path/to/final/csv
+            split_field:    for instance groupby map_name but per aprx.  so split by aprx and
+                            comma sep string map_names for each aprx.
+            group_by_field  field to groupby i.e. DATA_SOURCE
+            agg_field       field to generate comma separated string of values i.e. map_name
+            kwargs:         carry_field = list of field(s) to keep - can include agg field
+        Returns:
+
+        '''
+        df = pd.read_csv(csv_in)
+        split_vals = list(set(df[split_field].to_list()))
+        for v in split_vals:
+            df_temp = df[df[split_field]==v]
+            try:
+                keep_fld = kwargs['carry_fields']
+                df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field, carry_fields = keep_fld)
+            except KeyError:
+                df_temp_agg = self.aggregate_rows(df_temp, group_by_field, agg_field)
+            df_temp_agg[split_field]=v
+            # is_raster = df_temp.drop_duplicates(subset=[group_by_field])
+            # is_raster=is_raster['IS_RASTER']
+            # df_temp_agg['IS_RASTER']=is_raster.to_list()
+            if 'df_concat' not in locals():
+                df_concat = copy.copy(df_temp_agg)
+            else:
+                df_concat = pd.concat([df_concat, df_temp_agg])
+        df_concat.to_csv(csv_out)
+
+    def aprx_broken_source_inv2(self, subproject, **kwargs):
+        '''
+        Step 2 in fixing dumb ESRI path when moved.
+        After running step 2, manually create columns and val for .replace
+        Then run this to save csv with correct source column
+        Args:
+            csv_out:        path/to/broken_source_inv
+
+        Returns:
+
+        '''
+        try:
+            kwargs['lyR_maestro']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+        except KeyError:
+            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
+        prop_str_indices = '{}_lyR_indices'.format(subproject)
+        indices = getattr(self, prop_str_indices)
+        for idx in indices:
+            orig=copy.copy(idx)
+            t=df.loc[idx,'target']
+            r=df.loc[idx,'replace']
+            corrected=orig.replace(t,r)
+            df.loc[idx,'DATA_LOCATION_MCM_RESOURCE']=corrected
+        df.to_csv(fp_csv_lyR)
+
+    def dict_key_utility(self, vals_to_key, the_dict):
+        '''
+        20241105
+        Args:
+            vals_to_key:            List of values to key from dictionary
+            the_dict:                   dictionary to key original list
+
+        Returns:
+            keyed_list              If key, then rekeyed, if none, then original val
+        '''
+        keyed_list=[]
+        for orig in vals_to_key:
+            try:
+                keyed = the_dict[orig]
+            except KeyError:
+                keyed = copy.copy(orig)
+            keyed_list.append(keyed)
+        return(keyed_list)
+    def flag_csString_val(self, df_str, col_to_parse, tgt_val, col_to_flag):
+        '''
+
+        Args:
+            df_str:
+            col_to_parse:       column to parse in df
+            tgt_val:            i.e. PSP_2024
+            col_to_flag:        which col to insert flag
+
+        Returns:
+
+        '''
+        df = getattr(self, df_str)
+        # creates a list of lists
+        csString_orig_list=self.parse_comma_sep_list(df_str, col_to_parse)
+        if col_to_flag not in df.columns:
+            df[col_to_flag]=False
+        for idx_int, idx in enumerate(df.index):
+            if tgt_val in csString_orig_list[idx_int]:
+                df.at[idx, col_to_flag]=True
+            else:
+                pass
+        return(df)
+
+class AgolAccess(commonUtils):
     '''
     Basic init for AGOL access
     '''
@@ -2579,207 +2924,3 @@ class AgolAccess(metaData):
                 df_agol_raw = copy.copy(df_temp)
         df_agol_raw = df_agol_raw.set_index('ITEM')
         setattr(self, 'df_agol_raw', df_agol_raw)
-
-    def email_group(self):
-        signature = 'Zach Uhlmann     GIS Specialist     (206) 920-2478     uhlmann@mcmillencorp.com'
-        #
-        # Group User Info: dict with keys - owner, admins, users
-        try:
-            members_dict = krrp_geospatial.get_members()
-        except NameError:
-            self.get_group('krrp_geospatial')
-            members_dict = self.krrp_geospatial.get_members()
-        # create list of lists
-        list_list = [members_dict[key] for key in members_dict.keys()]
-        # flatten list
-        all_members = [member for members in list_list for member in members if isinstance(members, list)]
-
-        zach = members_dict['owner']
-        subject = 'Klamath River Renewal ArcGIS Online Reorganizing'
-        email_body = '''Hi everybody,\n\nApologies on the formatting of this
-                        message but I have limited communication functionality
-                        in Groups for ArcGIS Online, particularly formatting text.
-                        I wanted to let everyone know that we have rearranged
-                        some content on our ArcGIS Online Group "KRRP_Geospatial".
-                        I updated and added metadata to the existing datasets -
-                        feature layers and shapefiles - to ensure that Item
-                        Descriptions in ArcGIS products are informative and
-                        archival.  This includes metadata describing
-                        data origins, status (current or
-                        archival), file location, type, etc.\n\n
-                        I also parsed the existing geodatabases (gdb)
-                        into individual shapefiles and will REMOVE the
-                        gdbs.  The only data this pertains to is the Wetlands.gdb
-                        and requested_layers_working.gdb (FERC bdrs
-                        and LoW_60Design).  The exact contents of those gdbs are
-                        now available as individual shapefiles.  I have yet to
-                        remove them, so if anybody objects please let me know.
-                        I wanted to give everyone a heads up in case those files
-                        slated for replacement are used in personal maps online.
-                        \n\nFeel free to contact me if you have questions.  Also,
-                        please RESPOND WITH YOUR EMAIL ADDRESS FOR FUTURE COMMUNICATION.
-                        That way I can format e-mails properly.   {}.
-                        \n\n'''.format(signature)
-        self.krrp_geospatial.notify(all_members, subject, email_body, 'email')
-
-class DbaseManagement(metaData):
-    '''
-    cleaning up gdbs
-    '''
-
-    def __init__(self, fp_csv = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\data_inventory_and_tracking\database_contents\item_descriptions.csv'):
-        super().__init__(fp_csv)
-
-    def flag_gdb_dset(self, df_str, target_col, flag_val, new_col_name = 'protect'):
-        '''
-        identify base paths or datasets within gdbs (via full fp) to protect from
-        ANY deletion. ZRU 3/31/2021
-
-        ARGS
-        df_str                  for csv added during add_df
-x`        target_col              name of column with fp or gdb path
-        flag_val               gdb or subdirectory or dset to flag
-        new_col_name            default == 'protect'.  This will serve as flag for
-                                categorically disqualifying row for deletion.
-        '''
-
-        df = getattr(self, df_str)
-        target_list = df[target_col].tolist()
-        target_list = [os.path.realpath(item) for item in target_list]
-        # populate new col if it doesn't exist
-        # it will exist if run multiple times with different flag_vals
-        if new_col_name not in df.columns:
-            df[new_col_name] = False
-        # get col idx for assigning values
-        col_idx = df.columns.get_loc(new_col_name)
-        for idx, fp in enumerate(target_list):
-            for component in fp.split(os.sep):
-                if flag_val == component:
-                    # figure out how to set with iloc
-                    df.iloc[idx, col_idx] = True
-                    # break will only apply to inner loops
-                    break
-
-        setattr(self, df_str, df)
-
-    def symmetric_diff_basic(self, df_str_source, source_col, df_str_target, target_col, mark_remove = True):
-        # get dataframes
-        df_source = getattr(self, df_str_source)
-        df_target = getattr(self, df_str_target)
-
-        # find overlapping values for action
-        set_source = set(df_source[source_col].to_list())
-        set_target = set(df_target[target_col].to_list())
-        target_vals = list(set_target - set_source)
-
-        if mark_remove:
-            new_col_name = 'remove'
-        else:
-            new_col_name = 'protect'
-
-        #probably unnecessary, but in case funciton run multiple times
-        if new_col_name not in df_target.columns:
-            df_target[new_col_name] = False
-
-        for idx in list(range(len(df_target))):
-            if df_target.loc[idx, target_col] in target_vals:
-                df_target.loc[idx, new_col_name] = True
-        setattr(self, df_str_target, df_target)
-
-
-    # # used to remove subelements made messing arounc
-    # el_list = ['idTestZRU', 'idPurp']
-    # for el_str in el_list:
-    #     el_remove = root.find(el_str)
-    #     try:
-    #         root.remove(el_remove)
-    #     except TypeError:
-    #         pass
-    # tree.write(fp_xml)
-
-# XML NOTES
-# 1) ATTRIBUTTES are useful for metadata (data about data)
-# 8/6/2020
-# Use attributes for Metadata (https://www.w3schools.com/xml/xml_attributes.asp):
-# SEE the id="501".  GOOD IDEA
-# <messages>
-#     <note id="501">
-#         <to>bnasty</to>
-#         <from>zach</from>
-#     </note>
-#     note id="502">
-#         <to>mom</to>
-#         <from>zach</from>
-#     </note>
-# </messages>
-
-# 2) TREES and ELEMENTS
-# 8/6/2020
-# from here: https://docs.python.org/2/library/xml.etree.elementtree.html
-# XML is an inherently hierarchical data format, and the most natural way to represent it is
-# with a tree. ET has two classes for this purpose - ElementTree represents the whole XML document
-# as a tree, and Element represents a single node in this tree. Interactions with the whole
-# document (reading and writing to/from files) are usually done on the ElementTree level.
-# Interactions with a single XML element and its sub-elements are done on the Element level.
-
-# 3)  RANDOM
-# dir from ET object
-# root iterates with [child for child in root] to datatype xml.etree.ElementTree.Element with dir of each element or child
-# ['__class__', '__copy__', '__deepcopy__', '__delattr__', '__delitem__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__',
-# '__getattribute__', '__getitem__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__len__',
-#'__lt__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setitem__', '__setstate__',
-# '__sizeof__', '__str__', '__subclasshook__', 'append', 'attrib', 'clear', 'extend', 'find', 'findall', 'findtext', 'get',
-# 'getchildren', 'getiterator', 'insert', 'items', 'iter', 'iterfind', 'itertext', 'keys', 'makeelement', 'remove', 'set', 'tag', 'tail', 'text']
-
-# # 4) share items
-# feat_layer_list = mcm_gis.content.search(query = 'owner: uhlmann@mcmillencorp.com', item_type = 'Feature Layer Collection', max_items = 50)
-# target_tag = 'wetlands'
-# # find features which are wetlands
-# feats = [feat for feat in feat_layer_list if target_tag in feat.tags]
-#
-# # publishing is EASY:
-# for feat in feats:
-#     feat.publish()
-# # sharing is EASY
-# for feat in feats:
-#     feat.share(groups = [krrp_geospatial])
-# # for feat in feats:
-# #     print(feat)
-
-
-# # 4) One off eagle data
-# eagle_gdb = 'eagle_features\\KlamathEagleImpactAnalysis_20200714_gdb\\KlamathEagleImpactAnalysis_20200714.gdb'
-# fp_gdb = os.path.join(fp_new_data, eagle_gdb)
-# fcs = ['BaldEagleTerritoryZones_20200424', 'EagleTerritoryPoints_20200415_Proj',
-#     'EagleViewingLocations_20200312', 'GoldenEagleTerritoryZones_20200424',
-#     'GoldenEagleViewsheds_20200114']
-# fp_fcs = [os.path.join(fp_gdb, fc) for fc in fcs]
-# [arcpy.FeatureClassToGeodatabase_conversion(fc, fp_out) for fc in fp_fcs]
-
-# # 4) GIS Random tidbits
-# # print content
-# krrp_content = krrp_geospatial.content()
-# # string search from parse_dir
-# target_content = krrp_content[5]
-# print(target_content)
-# target_id = target_content.id
-# feature_collection = mcm_gis.content.get(target_id)
-# fp_download = 'C:\\Users\\uhlmann\\box_offline\\test_download'
-# gdb_name = 'eagle.gdb'
-# result = feature_collection.export(gdb_name, 'File Geodatabase')
-# result.download(fp_download)
-
-
-# # dir(feat) from features mcm_gis.content.search()
-# '_ux_item_type', '_workdir', 'access', 'accessInformation', 'add_comment', 'add_relationship',
-#  'appCategories', 'app_info', 'avgRating', 'banner', 'categories', 'clear', 'comments', 'content_status',
-#  'copy', 'copy_feature_layer_collection', 'create_thumbnail', 'create_tile_service', 'created', 'culture',
-#   'delete', 'delete_rating', 'delete_relationship', 'dependencies', 'dependent_to', 'dependent_upon',
-#   'description', 'documentation', 'download', 'download_metadata', 'download_thumbnail', 'export', 'extent',
-#    'fromkeys', 'get', 'get_data', 'get_thumbnail', 'get_thumbnail_link', 'groupDesignations', 'guid',
-#    'homepage', 'id', 'industries', 'isOrgItem', 'itemid', 'items', 'keys', 'languages', 'largeThumbnail',
-#    'layers', 'licenseInfo', 'listed', 'metadata', 'modified', 'move', 'name', 'numComments', 'numRatings',
-#    'numViews', 'owner', 'ownerFolder', 'pop', 'popitem', 'properties', 'protect', 'protected', 'proxies',
-#    'proxyFilter', 'publish', 'rating', 'reassign_to', 'register', 'related_items', 'resources', 'scoreCompleteness',
-#    'screenshots', 'setdefault', 'share', 'shared_with', 'snippet', 'spatialReference', 'status', 'tables', 'tags',
-#     'thumbnail', 'title', 'type', 'typeKeywords', 'unregister', 'unshare', 'update', 'url', 'usage', 'values']

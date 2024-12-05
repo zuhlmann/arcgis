@@ -29,7 +29,7 @@ class format_NHD_flowline(object):
         param0 = arcpy.Parameter(
             displayName="Feature",
             name="feat",
-            datatype="GPLayer",
+            datatype=["GPLayer","DEFeatureClass"],
             parameterType="Required",
             direction="Input")
 

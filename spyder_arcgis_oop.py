@@ -71,7 +71,115 @@ class commonUtils(object):
 
         # PRJ FILE
         self.prj_file = prj_file
+    def fcs_to_shp_agol_prep(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN'):
+        '''
+        Created long time ago.  Edited for different workflow - i.e. pass indices
+        for one here to fcs to fcs then zip in separate funcion which calls zipping utilities
+        NEEDS TO incorporate offline_base ZU!! aug 2022
 
+        ARGS:
+        df_str              df for example
+        target_col          col name for  col with file path to fcs for conversion
+        '''
+        arcpy.env.addOutputsToMap = False
+        df = getattr(self, df_str)
+        ct = 0
+        for indice in self.indices:
+            inDir = df.loc[indice, 'AGOL_DIR']
+            # shp subdir does not exist
+            if not os.path.exists(inDir):
+                os.mkdir(inDir)
+            fp_fcs_in = df.loc[indice][target_col]
+            symb = '-'*20
+            fp_shp = os.path.join(inDir, indice + '.shp')
+            if not arcpy.Exists(fp_shp):
+                print('{}  CONVERTING  {}\nInput FCS: {}\nOutput SHP: {}'.format
+                                (symb, symb, fp_fcs_in, '{}.shp'.format(indice)))
+                arcpy.FeatureClassToFeatureClass_conversion(fp_fcs_in, inDir, indice)
+                print('{}  CONVERSION COMPLETE  {}'.format(symb, symb))
+            else:
+                print('SHAPEFILE EXISTS\n {}\nDID NOT CONVERT'.format(fp_shp))
+
+    def zip_shp_agol_prep(self, df_str, **kwargs):
+        '''
+        Created long time ago.  Edited for different workflow - i.e. pass indices
+        for one fell swoop within function as opposed to calling within for loop.
+        Also, convert fcs to shp AND zip in one fell swoop.  ZU 5/21/21
+
+        ARGS:
+        base_dir_shp:           path/to/dir/with/agol_Uploads/2020_10_05
+        exclude_files:          take from self.indices --> string of shapefile name
+                                to exclude from zipping (already zipped)
+        '''
+
+        df = getattr(self, df_str)
+        yyyymmdd = datetime.datetime.today().strftime('%B %d %Y')
+
+        inDir = list(set(self.df.loc[self.indices,'AGOL_DIR'].to_list()))
+        for id in inDir:
+            outDir = '{}_zip'.format(id)
+            # ensure shp_dir does not already exist
+            if not os.path.exists(outDir):
+                os.mkdir(outDir)
+
+            # 3) ZIP all Files at once
+            try:
+                # exclude files if already zipped
+                exclude_files = kwargs['exclude_files']
+                utilities.zipShapefilesInDir(id, outDir, exclude_files = exclude_files)
+            except KeyError:
+                utilities.zipShapefilesInDir(id, outDir)
+
+    def zip_shp_agol_prep2(self, tc = 'DATA_LOCATION_MCMILLEN'):
+        '''
+        To zip all the indices.  If zipped exist already, they will be ignored.
+        20220610
+        '''
+        for index in self.indices:
+            fp_in = self.df.loc[index, tc]
+            dir_out = self.df.loc[index, 'AGOL_DIR']
+            shp_dir = os.path.join(dir_out, 'shp')
+            zip_dir = os.path.join(dir_out, 'zip')
+            for d in [shp_dir, zip_dir]:
+                if not os.path.exists(d):
+                    os.mkdir(d)
+                else:
+                    pass
+            print('FC to FC: {}'.format(fp_in))
+            arcpy.FeatureClassToFeatureClass_conversion(fp_in, shp_dir, index)
+        # zip
+        incl_files = copy.copy(self.indices)
+        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
+        excl_files = list(set(exist_file) - set(incl_files))
+        if len(excl_files)>0:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
+        else:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir)
+    def zip_shp_dir(self, shp_dir, zip_dir):
+        '''
+        Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
+        ZU 20230224
+        Args:
+            shp_dir:        path/to/shp/dir
+            zip_dir:        path/to/zip/dir
+            **kwargs        renamed_files - use case for data_share_inv if renaming from indices.
+                            not awesome protocol
+
+        Returns:
+
+        '''
+        try:
+            exist_files = [f[:-4] for f in os.listdir(zip_dir) if '.shp' in f]
+            exclude_kw = True
+        except FileNotFoundError:
+            os.mkdir(zip_dir)
+            exclude_kw = False
+        if exclude_kw:
+            print('here ', exist_files)
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = exist_files)
+        else:
+            utilities.zipShapefilesInDir(shp_dir, zip_dir)
+            print('there')
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -565,6 +673,109 @@ class commonUtils(object):
                 # apply to fcs (tgt)
                 tgt_item_md.copy(src_template_md)
                 tgt_item_md.save()
+
+
+
+    def quickie_inventory(self, df_str, target_col = 'DATA_LOCATION_MCMILLEN',
+                        shp = False, standard_credits = True, **kwargs):
+        '''
+        quick grab item description to add to new csv for the gang.  ZRU 20201207
+        updated (slightly 5/11/2021) for functionality with feature classes.
+        ARGUMENTS
+        df_str              string of datatrame to getattr
+        target_col          data location column
+        shp                 True or False.  Nowadays (May 2021) most likely fcs
+                            not shapefiles
+        standard_credits    use same credits throughout.  Saves cut and pasting
+                            credits in spreadsheet
+        '''
+
+        # FIND file paths to xmls of shapefiles FIGURE OUT FOR GDB
+        df = getattr(self, df_str)
+        fp_base = df.loc[self.indices][target_col].tolist()
+        index_names = df.loc[self.indices].index.to_list()
+        print(index_names)
+
+        # initiate lists
+        purp_list = []
+        abstract_list = []
+        credits_list = []
+
+        # If standard credits stamp
+        credits_stamp = 'Zachary Uhlmann\nMcMillen Corp\nuhlmann@mcmillencorp.com'
+        # If feature classes
+        if not shp:
+            for indice in self.indices:
+                fp_fcs = df.loc[indice][target_col]
+                tgt_item_md = arcpy.metadata.Metadata(fp_fcs)
+                purp_list.append(tgt_item_md.summary)
+                abstract_list.append(tgt_item_md.description)
+                if standard_credits:
+                    credits = credits_stamp
+                else:
+                    credits = tgt_item_md.credits
+                credits_list.append(credits)
+
+        #If SHAPEFILE ---> relic
+        else:
+            # glob strings will create the string to pass to  glob.glob which
+            # uses th *xml wildcard to pull JUST the xml files from shapefile folder
+            glob_strings = ['{}\\{}*.xml'.format(fp_base, index_name) for fp_base, index_name in zip(fp_base, index_names)]
+            fp_xml_orig = []
+            for idx, glob_string in enumerate(glob_strings):
+                try:
+                    # ...[0] because it is a list of list - [[path/to/file]]
+                    temp = glob.glob(glob_string)[0]
+                    print(temp)
+                    fp_xml_orig.append(temp)
+                # if file not_uploaded, credit_crush, etc.  ZU 20210122
+                except IndexError:
+                    fp_xml_orig.append(fp_base[idx])
+            ct = 0
+            # NOTE: In fury of AECOM dump AgOL upload THIS was added as a method simply
+            # to append DATA_LOCATION_MCMILLEN key/pair to Item Description
+            # need to fix all columns in this regard when writing xml
+            # FIX THIS it is not prepared to handle other cases.
+            for idx, fp_xml in enumerate(fp_xml_orig):
+                print('indice {}. path {}'.format(self.indices_iloc[idx], fp_xml))# refer to notes below for diff betw trees and elements
+                try:
+                    tree = ET.parse(fp_xml)
+                    # root is the root ELEMENT of a tree
+                    root = tree.getroot()
+                    # remove the mess in root
+                    # Parent for idPurp
+                    dataIdInfo = root.find('dataIdInfo')
+                    # search for element <idPurp> - consult python doc for more methods. find
+                    # stops at first DIRECT child.  use root.iter for recursive search
+                    # if doesn't exist.  Add else statements for if does exist and update with dict
+                    purp = dataIdInfo.find('idPurp')
+                    abstract = dataIdInfo.find('idAbs')
+                    credits = dataIdInfo.find('idCredit')
+                    try:
+                        purp_list.append(purp.text)
+                    except AttributeError:
+                        purp_list.append(None)
+                    try:
+                        abstract_list.append(abstract.text)
+                    except AttributeError:
+                        abstract_list.append(None)
+                    try:
+                        credits_list.append(credits.text)
+                    except AttributeError:
+                        credits_list.append(None)
+                except FileNotFoundError:
+                    str = 'AGOL upload status: {}'.format(fp_base[idx])
+                    purp_list.append(str)
+                    abstract_list.append(None)
+                    credits_list.append(None)
+            # print('index {}\npurp {}\nabstract {}\ncredits {}\n'.format(index_names, purp_list, abstract_list, credits_list))
+
+        # EXPORT INVENTORY
+        df_quick_inventory = pd.DataFrame(np.column_stack(
+                                [index_names, purp_list, abstract_list, credits_list]),
+                                columns = ['feature_name', 'purpose', 'abstract', 'credits'])
+        fp_out = r'C:\Users\uhlmann\Box\GIS\Project_Based\Klamath_River_Renewal_MJA\GIS_Data\compare_vers\database_contents\master_gdb\\agol_master_gdb_assessmen_2021c.csv'
+        pd.DataFrame.to_csv(df_quick_inventory, fp_out)
 
     def add_df(self, fp_csv, df_str, index_field):
         '''
@@ -1374,6 +1585,91 @@ class commonUtils(object):
         setattr(self, df_name, df_symm_diff)
         print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
 
+    def merge_feats(self, df_str, target_fc, action = 'merge', **kwargs):
+        '''
+        belongs in python 2 mxd_utilities with arcpy.Mapping module, but that shit's
+        broken.  ZU 3/3/2021.  updated 3/10/21
+        ARGUMENTS
+        kwargs[field_mappings]      list of fields to RETAIN.  Additionally, orig_fname
+                                    and orig_fpath will be added
+        df_str                      select dataframe from self
+        target_fc                   output fc
+        action                      just merge at this point
+        '''
+
+        arcpy.env.overwriteOutput = True
+        merge_lyrs = []
+        # if field mappings requested
+        try:
+            fields_to_map = kwargs['field_mappings']
+            if not isinstance(fields_to_map, list):
+                fields_to_map = [fields_to_map]
+            field_mappings = arcpy.FieldMappings()
+            field_mappings_true = True
+        except KeyError:
+            field_mappings_true = False
+
+        for i, index in enumerate(self.indices):
+            df = getattr(self, df_str)
+            # replace or else unicode error
+            fp_fcs = df.loc[index]['layer_source'].replace('\\','/')
+            fcs_name = os.path.basename(fp_fcs)
+            if arcpy.Exists(fp_fcs):
+                lyr_name = 'merge_lyr_{}'.format(i + 1)
+                fcs_obj = arcpy.FeatureClassToFeatureClass_conversion(fp_fcs, 'in_memory', lyr_name)
+                # get feature path
+                lyr_path = fcs_obj[0]
+                # add new field
+                print('adding fname {}'.format(fcs_name))
+                arcpy.AddField_management(lyr_path, 'orig_fname', 'text', field_length = 50)
+                arcpy.CalculateField_management(lyr_path, 'orig_fname', '"{}"'.format(fcs_name), "PYTHON")
+                arcpy.AddField_management(lyr_path, 'orig_fpath', 'text',field_length = 254)
+                arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"'+fp_fcs+'"', "PYTHON")
+                # arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"{}"'.format(fp_fcs), "PYTHON")
+                print('adding fcs to merge list:\n{}'.format(fcs_name))
+                merge_lyrs.append(lyr_path)  #list of feat names
+                if field_mappings_true:
+                    field_mappings.addTable(lyr_path)
+            else:
+                print('feature with ACTION == delete does not exist:\n{}'.format(fcs_name))
+        # direct from field mappings arc documentation
+        fields_to_map.extend(['orig_fname', 'orig_fpath'])
+        if field_mappings_true:
+            for field in field_mappings.fields:
+                if field.name not in fields_to_map:
+                    field_mappings.removeFieldMap(field_mappings.findFieldMapIndex(field.name))
+            arcpy.Merge_management(merge_lyrs, target_fc, field_mappings)
+        else:
+            arcpy.Merge_management(merge_lyrs, target_fc)
+    def replace_indices(self, df_str, **kwargs):
+        '''
+        For dataframes from csv with no value (math.nan) from pd.DataFrame.read_csv
+        due to...no values in csv.  This version requires user to set indices
+        using self.selection_idx.  Additionally, this version is simply for standalone
+        shapefiles or feature classes (i.e. not within gdb) and takes name automatically
+        from base filename.  ZRU 04/05/2021
+        ARGS
+        df_str          i.e. df_working
+        '''
+        df = getattr(self, df_str)
+        try:
+            kwargs['shapefile']
+            orig_index = df.index.to_list()
+            indices_iloc = self.indices_iloc
+            fp_fcs = df.iloc[indices_iloc].DATA_LOCATION_MCMILLEN.to_list()
+            print(fp_fcs)
+            # flag_index
+            # example of zip syntax for indices_iloc
+            for idx, item in zip(indices_iloc, fp_fcs):
+                path, ext = os.path.splitext(item)
+                new_indice = os.path.split(path)[-1]
+                print('replaceing with {}'.format(new_indice))
+                orig_index[idx] = new_indice
+            df.index = orig_index
+            setattr(self, df_str, df)
+        except KeyError:
+            print('did it pass')
+            pass
     def create_base_properties(self, df_str):
         '''
         adds base properties for dataframes such as fp_csv and fp_log

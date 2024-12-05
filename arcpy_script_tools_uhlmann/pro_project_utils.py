@@ -1,13 +1,11 @@
-import copy
 import arcpy
-import os
-
 # AMAZING RESOURE
 #https://gis.stackexchange.com/questions/339744/python-toolbox-only-update-parameter-when-specific-parameter-changes
 import pandas as pd
 import numpy as np
 import os
 import copy
+import ntpath
 
 class ToolBox(object):
     def __init__(self):
@@ -60,7 +58,13 @@ class project_lyT_inv(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-        parameters = [param0,param1,param2,param3]
+        param4 = arcpy.Parameter(
+            displayName="Export Map Inventory",
+            name="map_inventory",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Output")
+        parameters = [param0,param1,param2,param3,param4]
         return parameters
     def isLicensed(self):
         '''
@@ -79,16 +83,19 @@ class project_lyT_inv(object):
             prodoc_selected = True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         elif parameters[0].altered and not parameters[0].hasBeenValidated:
             parameters[1].value=None
             prodoc_selected=True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         else:
             prodoc_selected  = False
         if prodoc_selected:
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         return parameters
 
 
@@ -109,14 +116,10 @@ class project_lyT_inv(object):
         el_map_formatted = []
         for lyt in lyt_list:
             el = lyt.listElements()
-            try:
-                el_map = [e.map.name for e in el if e.type == 'MAPFRAME_ELEMENT']
-                el_map_formatted = el_map_formatted + el_map
-                lyt_name = lyt_name + ([lyt.name] * len(el_map))
-            except RuntimeError:
-                # This means that there is a map element with a map linked that no longer exists
-                el_map_formatted = el_map_formatted + ['RUNTIME ERROR - most likely map element linked does not exist']
-                lyt_name = lyt_name + [lyt.name]
+            el_map = [e.map.name for e in el if e.type == 'MAPFRAME_ELEMENT']
+            el_map_formatted = el_map_formatted + el_map
+            lyt_name = lyt_name + ([lyt.name] * len(el_map))
+
         df = pd.DataFrame(np.column_stack([lyt_name, el_map_formatted]), columns=['LAYOUT', 'SOURCE_MAP'])
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)
@@ -125,7 +128,21 @@ class project_lyT_inv(object):
         csv = os.path.join(parameters[2].valueAsText,fname)
         df.to_csv(csv)
 
+        # If map inventory
+        if parameters[4].value:
+            project_maps = [m.name for m in aprx.listMaps()]
+            unused_maps = list(set(project_maps) - set(el_map_formatted))
+            df_maps = pd.DataFrame(project_maps, columns = ['map_name'])
+            df_maps = df_maps.set_index('map_name')
+            df_maps.loc[unused_maps,'used_in_layout']=false
+            df_maps.loc[list(set(el_map_formatted)), 'used_in_layout']=True
+            proj_name = os.path.split(aprx.filePath)[-1][:-5]
+            csv_maps = os.path.join(parameters[2].valueAsText, '{}_map_inv.csv'.format(proj_name))
+            df_maps.to_csv(csv_maps)
+        else:
+            pass
         return
+
 class project_lyR_inv(object):
     '''
     To identify layers from map elements in all layouts.  Outputs layer name, layout name, data source.
@@ -169,7 +186,13 @@ class project_lyR_inv(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-        parameters = [param0,param1,param2,param3]
+        param4 = arcpy.Parameter(
+            displayName="Unique Layer Inventory",
+            name = "unuque_lyr_inventory",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+        parameters = [param0,param1,param2,param3,param4]
         return parameters
     def isLicensed(self):
         '''
@@ -188,16 +211,19 @@ class project_lyR_inv(object):
             prodoc_selected = True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         elif parameters[0].altered and not parameters[0].hasBeenValidated:
             parameters[1].value=None
             prodoc_selected=True
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         else:
             prodoc_selected  = False
         if prodoc_selected:
             parameters[2].values = None
             parameters[3].values = None
+            parameters[4].values = None
         return parameters
 
 
@@ -221,7 +247,7 @@ class project_lyR_inv(object):
             el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
             for em in el:
                 for lyr in em.map.listLayers():
-                    if lyr.visible and lyr.supports('DATASOURCE'):
+                    if lyr.visible:
                         lyr_name.append(lyr.name)
                         lyt_name.append(lyt.name)
                         map_element.append(em.name)
@@ -243,6 +269,21 @@ class project_lyR_inv(object):
         csv = os.path.join(parameters[2].valueAsText,fname)
         df.to_csv(csv)
 
-        return
+        if parameters[4].value is not None:
+            fname = fname.replace('.csv','_unique.csv')
+            csv = os.path.join(parameters[2].valueAsText, fname)
+            def join_list(v):
+                vn = v.to_list()
+                vn = list(set(vn))
+                vn = ', '.join(vn)
+                return (vn)
 
+            groupby_source = df.groupby('source').agg({'map_name': join_list})
+            groupby_source = groupby_source.reset_index()
+
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source.source]
+            groupby_source['ITEM'] = fnames
+            groupby_source.to_csv(csv)
+
+        return
 

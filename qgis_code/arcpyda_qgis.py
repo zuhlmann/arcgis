@@ -19,13 +19,13 @@ import pandas as pd
 # layer.commitChanges()
 
 #WALLOWA sheet num
-layer_name = 'wallowa_indices_v1'
+layer_name = 'wallowa_indices_v2'
 layer = QgsProject.instance().mapLayersByName(layer_name)[0]
 layer.startEditing()
 features = layer.getFeatures()
-csv = r"C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\wallowa_inundation_indices.csv"
-df = pd.read_csv(csv,index_col='sheet_num')
+csv = r"C:\Box\MCMGIS\Project_Based\Wallowa_Dam\gis_data\wallowa_inundation_indices2.csv"
+df = pd.read_csv(csv,index_col='row_num')
 for ct, feature in enumerate(features):
-    feature['rotation']=int(df.loc[feature['sheet_num'],'rotation_new'])
+    feature['rotation']=int(df.loc[feature['row_num'],'rotation'])
     layer.updateFeature(feature)
 layer.commitChanges()

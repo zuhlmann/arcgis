@@ -4,10 +4,10 @@ import subprocess
 import copy
 # import pandas as pd
 
-20240531
-Multiple files: ~ 10 same everything; 4 diff proj; 2 diff projection and spatial res
-tiffs Initially converted from arcgrid wihch were downloaded from usgs:
-C:\Box\MCMGIS\Project_Based\Wallowa_Dam\Map\wallowa_dam
+# 20240531
+# Multiple files: ~ 10 same everything; 4 diff proj; 2 diff projection and spatial res
+# tiffs Initially converted from arcgrid wihch were downloaded from usgs:
+# C:\Box\MCMGIS\Project_Based\Wallowa_Dam\Map\wallowa_dam
 
 base_dir = r'C:\Users\UhlmannZachary\Documents\staging\CONVERTED_zu'
 out_dir = r'C:\Users\UhlmannZachary\Documents\staging\CONVERTED_zu\projected'

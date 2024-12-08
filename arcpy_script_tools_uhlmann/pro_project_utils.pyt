@@ -116,10 +116,14 @@ class project_lyT_inv(object):
         el_map_formatted = []
         for lyt in lyt_list:
             el = lyt.listElements()
-            el_map = [e.map.name for e in el if e.type == 'MAPFRAME_ELEMENT']
-            el_map_formatted = el_map_formatted + el_map
-            lyt_name = lyt_name + ([lyt.name] * len(el_map))
-
+            try:
+                el_map = [e.map.name for e in el if e.type == 'MAPFRAME_ELEMENT']
+                el_map_formatted = el_map_formatted + el_map
+                lyt_name = lyt_name + ([lyt.name] * len(el_map))
+            except RuntimeError:
+                # This means that there is a map element with a map linked that no longer exists
+                el_map_formatted = el_map_formatted + ['RUNTIME ERROR - most likely map element linked does not exist']
+                lyt_name = lyt_name + [lyt.name]
         df = pd.DataFrame(np.column_stack([lyt_name, el_map_formatted]), columns=['LAYOUT', 'SOURCE_MAP'])
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)
@@ -247,7 +251,11 @@ class project_lyR_inv(object):
             el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
             for em in el:
                 for lyr in em.map.listLayers():
+<<<<<<< HEAD
                     if lyr.visible:
+=======
+                    if lyr.visible and lyr.supports('DATASOURCE'):
+>>>>>>> tolt_agol_obj
                         lyr_name.append(lyr.name)
                         lyt_name.append(lyt.name)
                         map_element.append(em.name)

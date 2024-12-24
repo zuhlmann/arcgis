@@ -5,6 +5,12 @@ import glob
 import sys
 sys.path.append('c:/Users/uhlmann/code')
 import utilities
+import importlib
+import utilities_oop
+importlib.reload(sys.modules['utilities'])
+importlib.reload(sys.modules['utilities_oop'])
+import pandas as pd
+import copy
 
 # ESRI  ---> set python exe (ctl Alt S; settings, find in list)
 # # 1_esri) GET ARC VERSION for mxd
@@ -26,13 +32,7 @@ import utilities
 # INVENTORY DIRECTORY
 # 20240722
 # from cowlitz_dbase notebook
-sys.path.append('c:/users/uhlmann/code')
-import importlib
-import utilities_oop
-importlib.reload(sys.modules['utilities'])
-importlib.reload(sys.modules['utilities_oop'])
-import pandas as pd
-import copy
+
 
 # tc = 'DATA_LOCATION_MCMILLEN'
 # parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
@@ -101,15 +101,23 @@ import copy
 # df_agg.to_csv(r"C:\Box\MCM Projects\Mainspring Conservation Trust\24-092 Ela Dam Removal PDB\6.0 Plans and Specs\6.6_GIS\gis_requests\20241112_survey_parcels\Ela_XSections_endpoints_groubpy.csv")
 
 
-# PDF selection
-import utilities2
-csv=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\figure_list_PSP.csv"
-df=pd.read_csv(csv)
-pdf_in=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\PUBLIC_P-2959_SFT_PSP.pdf"
-pdf_out=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\PUBLIC_P-2959_SFT_PSP_figures.pdf"
-flag='MAP'
-utilities2.subset_PDF(df,flag,pdf_in,pdf_out)
+# # PDF selection
+# import utilities2
+# csv=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\figure_list_PSP.csv"
+# df=pd.read_csv(csv)
+# pdf_in=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\PUBLIC_P-2959_SFT_PSP.pdf"
+# pdf_out=r"C:\Box\MCM Projects\Seattle City Light\23-024_South Fork Tolt Relicensing\11.0 Supplemental Files\Figures\PSP\PUBLIC_P-2959_SFT_PSP_figures.pdf"
+# flag='MAP'
+# utilities2.subset_PDF(df,flag,pdf_in,pdf_out)
 
+# Expand_csRow
+parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
+tc = r"whatever"
+utils_obj = utilities_oop.utilities(parent_dir, tc)
+csv_in=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\Mokelumne_HPMP_Site_Table_2024.csv"
+df=pd.read_csv(csv_in)
+csv_out=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\Mokelumne_HPMP_Site_Table_2024_FS_NUMBER.csv"
+utils_obj.expand_csRow(df, csv_out, r'FERC_14794_ref','FS_num')
 
 
 

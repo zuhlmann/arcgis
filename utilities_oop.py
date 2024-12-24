@@ -7,6 +7,11 @@ from time import gmtime, strftime
 import time
 import math
 import ntpath
+import sys
+sys.path.append('c:/users/uhlmann/code')
+import utilities
+import importlib
+importlib.reload(sys.modules['utilities'])
 
 class utilities(object):
     def __init__(self,  parent_dir, target_col):
@@ -185,6 +190,11 @@ class utilities(object):
                 pass
         return(feat_name, feat_path, subdir_name, filetype, base_subdir_list,time_modified,file_size,flag)
 
+    def join_list(self, v):
+        vn = v.to_list()
+        vn = list(set(vn))
+        vn = ', '.join(vn)
+        return (vn)
     def aggregate_rows(self, df, csv_out, group_by_field, agg_field, **kwargs):
         '''
         Groupby a field (group_by_field), aggregate all unique values in another field (agg_field)
@@ -201,13 +211,7 @@ class utilities(object):
 
         '''
 
-        def join_list(v):
-            vn = v.to_list()
-            vn = list(set(vn))
-            vn = ', '.join(vn)
-            return (vn)
-
-        groupby_source = df.groupby(group_by_field).agg({agg_field: join_list})
+        groupby_source = df.groupby(group_by_field).agg({agg_field: self.join_list})
         # pulls groupby_field out of index and replaces with numbers (iloc)
         groupby_source = groupby_source.reset_index()
 
@@ -228,3 +232,25 @@ class utilities(object):
             pass
         groupby_source = groupby_source.set_index(group_by_field)
         groupby_source.to_csv(csv_out)
+
+    def expand_csRow(self, df, csv_out, ref_col, parse_col):
+        csList_all=[]
+        ref_list_all=[]
+        for idx in df.index:
+            csString = df.loc[idx, parse_col]
+            try:
+                csList=[item.strip(' ') for item in csString.split(',')]
+            except AttributeError:
+                # nans from pd.read_csv(...) are saved as floats which have
+                csList = [csString]
+            ref_list=[df.loc[idx,ref_col]]*len(csList)
+            csList_all.extend(csList)
+            ref_list_all.extend(ref_list)
+        df_join=pd.DataFrame(np.column_stack([ref_list_all, csList_all]), columns=[ref_col, parse_col])
+        df_target=df.drop(columns=[parse_col])
+        # IF NOT USING integer, need to add if/else and flesh out
+        df_join[ref_col] = df_join[ref_col].astype(int)
+        df_join=df_join.merge(df_target, how='left', on=ref_col)
+        # df_join.drop(f"{ref_col}_y",inplace=True)
+        # df_join.rename(columns={r"{ref_col}_x":ref_col},inplace=True)
+        df_join.to_csv(csv_out)

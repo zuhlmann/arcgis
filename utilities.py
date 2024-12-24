@@ -14,7 +14,7 @@ import glob
 import copy
 import compare_data
 import logging
-from imp import reload
+from importlib import reload
 from pathlib import Path
 reload(logging)
 
@@ -2637,3 +2637,17 @@ def parse_git_status_csv(csv):
         df.at[idx, 'FNAME']=fname
         df.at[idx, 'EXTENSION']=e
     df.to_csv(csv)
+
+def parse_comma_sep_list(df, col_to_parse):
+    '''
+    takes string from tags column and parse into list of strings
+    '''
+    csl = df[col_to_parse].values.tolist()
+    parsed_csl_temp = []
+    for items in csl:
+        try:
+            parsed_csl_temp.append([item.strip(' ') for item in items.split(',')])
+        except AttributeError:
+            # nans from pd.read_csv(...) are saved as floats which have
+            parsed_csl_temp.append([items])
+    return(parsed_csl_temp)

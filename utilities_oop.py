@@ -193,7 +193,11 @@ class utilities(object):
     def join_list(self, v):
         vn = v.to_list()
         vn = list(set(vn))
-        vn = ', '.join(vn)
+        try:
+            vn = ', '.join(vn)
+        except TypeError:
+            vn=[str(v) for v in vn]
+            vn = ', '.join(vn)
         return (vn)
     def aggregate_rows(self, df, csv_out, group_by_field, agg_field, **kwargs):
         '''

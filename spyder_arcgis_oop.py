@@ -155,7 +155,7 @@ class commonUtils(object):
             utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = excl_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
-    def zip_shp_dir(self, shp_dir, zip_dir):
+    def zip_shp_dir(self, shp_dir, zip_dir, **kwargs):
         '''
         Manually pass shape and zip dir for decomposed version of above.  Need to tackle this shit.
         ZU 20230224
@@ -168,18 +168,20 @@ class commonUtils(object):
         Returns:
 
         '''
+
         try:
-            exist_files = [f[:-4] for f in os.listdir(zip_dir) if '.shp' in f]
-            exclude_kw = True
-        except FileNotFoundError:
-            os.mkdir(zip_dir)
-            exclude_kw = False
-        if exclude_kw:
-            print('here ', exist_files)
-            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files = exist_files)
+            incl_files = kwargs['renamed_files']
+        except KeyError:
+            incl_files = copy.copy(self.indices)
+        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
+        excl_files = list(set(exist_file) - set(incl_files))
+        if len(excl_files) > 0:
+            print('here ', excl_files)
+            utilities.zipShapefilesInDir(shp_dir, zip_dir, exclude_files=excl_files)
         else:
             utilities.zipShapefilesInDir(shp_dir, zip_dir)
             print('there')
+
     def selection_idx(self, df_str, **kwargs):
         '''
         use item_descriptions.csv tags to find indices OR pass integer
@@ -863,18 +865,6 @@ class commonUtils(object):
             for index in indices:
                 fp_fcs_current = os.path.normpath(df.loc[index][target_col])
                 fp_components = fp_fcs_current.split(os.sep)
-                if offline_source:
-                    # save for later
-                    fp_fcs_current_online = copy.copy(fp_fcs_current)
-                    try:
-                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                        offline_base = olt.loc[gdb_str, 'offline']
-                        online_base = olt.loc[gdb_str, 'online']
-                        fp_fcs_current = fp_fcs_current.replace(online_base, offline_base)
-                    except IndexError:
-                        pass
-                else:
-                    pass
                 if arcpy.Exists(fp_fcs_current):
                     logging.info(fp_fcs_current)
                     try:
@@ -1177,16 +1167,6 @@ class commonUtils(object):
                                 debug_idx = 6
                                 setattr(self, df_str_source, df_source)
 
-                    # TRANSFORM
-                    if offline_source:
-                        fp_fcs_current = copy.copy(fp_fcs_current_online)
-                    if offline_target:
-                        fp_components = fp_fcs_new.split(os.sep)
-                        gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v][0]
-                        online_base = olt.loc[gdb_str, 'online']
-                        offline_base = olt.loc[gdb_str, 'offline']
-                        fp_fcs_new = fp_fcs_new.replace(offline_base, online_base)
-
                     # TARGET DF UPDATES
                     # Assemble Series to append to Master DF
 
@@ -1274,7 +1254,12 @@ class commonUtils(object):
                         logging.info(e)
 
         elif action_type in ['copy_no_replace', 'copy_replace']:
-
+            # Get indices where duplicates occur
+            dup_idx = list(set(df[df.index.duplicated(keep=False)].index))
+            if len(dup_idx):
+                logging.info(f"DUPLICATES ON THESE INDICES {dup_idx}")
+                # Stop running if duplicate indices
+                return
             for index in indices:
                 df_item = df.loc[index]
                 fp_fcs_current = os.path.normpath(df_item[target_col])
@@ -1425,12 +1410,11 @@ class commonUtils(object):
                         idx_order_orig = df.index.to_list()
                         df = df_join.combine_first(df)
                         debug_idx = 81
-                        # If ValueError: cannot reindex from duplicate axis, this means there are duplicate row indices, i.e. ITEM duplicated
-                        # NOTE! does not have to be the indices from agol_obj.indices.  Anywhere on csv with duplicate rows will trigger error
                         df = df.reindex(idx_order_orig)
                         debug_idx = 82
                         # or else gets reordered alphabetically
                         df = df.reindex(columns=col_order_orig)
+                        print('debugging Z')
                     else:
                         df = df.append(ser_append)
 
@@ -1863,7 +1847,6 @@ class commonUtils(object):
         rec_comp = tracking_dict['recipient_company']
         rec_name = tracking_dict['recipient_name']
         project = tracking_dict['project']
-
 
         # prep shape dir
         arcpy.env.addOutputsToMap = False

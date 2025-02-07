@@ -303,6 +303,7 @@ def update_field(fp_fcs, field_dict, field_match, incr = 1, sequential = True, f
     sequential          Set to False to use the csv updating protocol
     fp_csv              pass this if adding text field to fp_fcs
     field_match         to  match for df.loc
+    kwarg               flag = subset csv to flag field = True
     '''
 
     existing_fields = [f.name for f in arcpy.ListFields(fp_fcs)]
@@ -321,6 +322,11 @@ def update_field(fp_fcs, field_dict, field_match, incr = 1, sequential = True, f
         del cursor
     else:
         df = pd.read_csv(fp_csv)
+        try:
+            flag=kwargs['flag']
+            df=df[df[flag]]
+        except KeyError:
+            pass
         df = df.set_index(field_match)
         # CHECK IF FIELD EXISTS BEFORE CREATING
         # Arc will replace spaces with _

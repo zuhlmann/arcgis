@@ -11,6 +11,7 @@ importlib.reload(sys.modules['utilities'])
 importlib.reload(sys.modules['utilities_oop'])
 import pandas as pd
 import copy
+import numpy as np
 
 # ESRI  ---> set python exe (ctl Alt S; settings, find in list)
 # # 1_esri) GET ARC VERSION for mxd
@@ -110,14 +111,62 @@ import copy
 # flag='MAP'
 # utilities2.subset_PDF(df,flag,pdf_in,pdf_out)
 
+
 # Expand_csRow
 parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
 tc = r"whatever"
 utils_obj = utilities_oop.utilities(parent_dir, tc)
-csv_in=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\Mokelumne_HPMP_Site_Table_2024.csv"
-df=pd.read_csv(csv_in)
-csv_out=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\Mokelumne_HPMP_Site_Table_2024_FS_NUMBER.csv"
-utils_obj.expand_csRow(df, csv_out, r'FERC_14794_ref','FS_num')
+
+fnames=['PRIMARY','TRINOMIAL','USFS']
+split_keys=['primary_num','trinomial','FS_num']
+fnames=[f"Mokelumne_HPMP_Site_Table_2024_20240116_{v}.csv" for v in fnames]
+table_dir=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables'
+fps=[os.path.join(table_dir, fn) for fn in fnames]
+
+# Create initial table and generate counts
+for csv_out, sk in zip(fps,split_keys):
+    csv_orig=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables\Mokelumne_HPMP_Site_Table_20240116.csv"
+    df=pd.read_csv(csv_orig)
+    utils_obj.expand_csRow(df, csv_out, r'FERC_14794_ref',sk)
+    df=pd.read_csv(csv_out)
+    df=df[~pd.isna(df[sk])]
+    t = df.FERC_14794_ref.to_list()
+    if 'count_list' not in locals():
+        count_list=copy.copy(t)
+    else:
+        count_list.extend(t)
+v, c = np.unique(count_list, return_counts=True)
+v=list(v)
+c=list(c)
+
+# Add counts to each
+# When done, delete the two columns not split
+df.sort_values(by=['FERC_14794_ref'], inplace=True)
+for csv_out, sk in zip(fps,split_keys):
+    df=pd.read_csv(csv_out)
+    df = df[~pd.isna(df[sk])]
+    # Issue with try/except not working; use this instead
+    bandaid=df['FERC_14794_ref'].to_list()
+    df=df.set_index('FERC_14794_ref')
+    for idx, ct in zip(v,c):
+        if idx in bandaid:
+            df.at[idx, 'Count']=ct
+        else:
+            pass
+    df.sort_values(by=['FERC_14794_ref'], inplace=True)
+    df.reset_index()
+    df.to_csv(csv_out)
+
+# # Find Duplicates missed during QGIS join
+# # 20250124
+# base_dir=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables"
+# utils_obj = utilities_oop.utilities(base_dir, 'whatever')
+# fp_list=[f'{base_dir}\Mokelumne_HPMP_Site_Table_2024_20240116_{ap}.csv'.format(ap) for ap in ['PRIMARY','TRINOMIAL','USFS']]
+# tc_list=['primary_num','trinomial','FS_num']
+# for fp, tc in zip(fp_list, tc_list):
+#     dft=pd.read_csv(fp)
+#     csv=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables\intermediary\duplicated_nums_{}.csv'.format(tc)
+#     utils_obj.aggregate_rows(dft, csv, tc, r'FERC_14794_ref')
 
 
 

@@ -15,8 +15,8 @@ import copy
 import compare_data
 import logging
 from importlib import reload
-from pathlib import Path
-reload(logging)
+# from pathlib import Path
+# reload(logging)
 
 def show_table(display_preference):
     '''

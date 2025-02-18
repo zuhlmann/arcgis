@@ -1452,6 +1452,94 @@ class commonUtils(object):
                         logging.info(msg_str)
                         logging.info(e)
 
+        if action_type in ['create_poly', 'create_line', 'create_point']:
+            # For adding new item to maestro and take_action(action_type = create_<type>...)
+            for index in self.indices:
+                print('HERE')
+                df_item = df.loc[index]
+                dset_move = df_item['MOVE_LOCATION_DSET']
+
+                # NO DSET passed
+                if pd.isnull(dset_move):
+                    dset_move = ''
+
+                fp_dset = os.path.join(fp_move, dset_move)
+                # check to make sure output dset exists before proceeding
+                if not arcpy.Exists(fp_dset):
+                    arcpy.CreateFeatureDataset_management(fp_move, dset_move, self.prj_file)
+
+                feat_type_dict = {'create_poly': 'POLYGON', 'create_line': 'POLYLINE',
+                                  'create_point': 'POINT'}
+                feat_type = feat_type_dict[action_type]
+                fp_fcs_new = os.path.join(fp_move, index)
+
+                feat_name = copy.copy(index)
+                msg_str = '\nCreating {} FC: {} in location:\n{}'.format(feat_type, feat_name, fp_fcs_new)
+                # flag_index
+                if not dry_run:
+                    arcpy.CreateFeatureclass_management(fp_dset, feat_name, feat_type,
+                                                        spatial_reference=self.prj_file,
+                                                        has_m='No', has_z='No')
+
+                d = {'ITEM': feat_name, 'DATE_CREATED': [self.todays_date],
+                     'DATA_LOCATION_MCMILLEN': [fp_fcs_new.replace(os.sep, '//')]}
+
+                df_append = pd.DataFrame(d)
+                df_append = df_append.set_index('ITEM')
+
+                # Get TARGET DF/CSV/STR
+                fp_components = fp_fcs_new.split(os.sep)
+                for idx, comp in enumerate(fp_components):
+                    if '.gdb' in comp:
+                        # Get Source STR
+                        tgt_gdb_or_dir_str = '{}_gdb'.format(comp[:-4])
+
+                        if tgt_gdb_or_dir_str in viable_gdbs:
+                            standalone = False
+                        else:
+                            standalone = True
+                        # Once gdb is found in path, then break
+                        break
+                    # translation - there was no gdb in fp_fcs_orig
+                    elif idx == (len(fp_components) - 1):
+                        # No gdb found == shapefile passed - use dir/folder
+                        standalone = True
+                if not standalone:
+                    fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+                    inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+                    fp_csv_target = os.path.join(inventory_dir, fname_csv)
+                    df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+                else:
+                    fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[
+                        0]
+                    df_str_target = 'df_{}_standalone'.format(self.subproject_str)
+
+                # Only grabs TargetGDB once per gdb
+                try:
+                    df_target = getattr(self, df_str_target)
+                # if dataframe NOT already added via self.add_df
+                except AttributeError:
+                    print('populating target')
+                    # note this also creates fp_csv_archive
+                    self.add_df(fp_csv_target, df_str_target, 'ITEM')
+                    df_target = getattr(self, df_str_target)
+
+                # Since adding new row, it's append
+                df_target = df_target.append(df_append)
+                # since updating existing NOT append
+                print(df)
+                print('\n')
+                print(df_append)
+                df.update(df_append)
+                print('AFTERWARDS/n')
+                print(df)
+                setattr(self, df_str_target, df_target)
+                setattr(self, df_str, df)
+
+                if save_df:
+                    pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
+                    pd.DataFrame.to_csv(df_target, fp_csv_target)
+
 
         elif action_type in ['fc_to_fc_conv']:
             var_dict = kwargs['var_dict']
@@ -2157,7 +2245,7 @@ class proProject(commonUtils):
         '''
         aprx = arcpy.mp.ArcGISProject(aprx_path)
         map_objects = aprx.listMaps()
-        src_list, map_list,broken, raster = [],[],[],[]
+        src_list, map_list,broken, raster,layer_name_list = [],[],[],[],[]
         for m in map_objects:
             layers = m.listLayers()
             for lyr in layers:
@@ -2171,13 +2259,14 @@ class proProject(commonUtils):
                         raster.append(False)
                     src = lyr.dataSource
                     src_list.append(src)
+                    layer_name_list.append(lyr.name)
                     map_list.append(m.name)
         del map_objects
         del aprx
 
         item = [os.path.split(fp)[-1] for fp in src_list]
-        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME','IS_RASTER','IS_BROKEN']
-        vals = np.column_stack([item, src_list, map_list, raster, broken])
+        cols=['ITEM', 'DATA_LOCATION_MCMILLEN', 'LAYER_NAME','MAP_NAME','IS_RASTER','IS_BROKEN']
+        vals = np.column_stack([item, src_list, layer_name_list, map_list, raster, broken])
         df = pd.DataFrame(vals, columns=cols)
         return(df)
 

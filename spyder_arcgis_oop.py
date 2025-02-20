@@ -213,7 +213,7 @@ class commonUtils(object):
             if not isinstance(target_tag, list):
                 target_tag = [target_tag]
             # pull tags column from df (list)
-            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = 'TAGS')
+            parsed_list = self.parse_comma_sep_list('TAGS',oop=df_str)
             self.tags_from_df = parsed_list
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_tag if (isinstance(tags, list)) and (val_targ in tags)]
@@ -251,7 +251,7 @@ class commonUtils(object):
                 fld = 'ACTION'
             # pull tags column from df (list)
 
-            parsed_list = self.parse_comma_sep_list(df_str, col_to_parse = fld)
+            parsed_list = self.parse_comma_sep_list(fld,oop=df_str)
 
             # find index if tags are present in col (list) and if tag matches target
             # iloc_tag = [idx for idx, tags in enumerate(tags_from_df) for val_targ in target_action if (isinstance(tags, list)) and (val_targ in tags)]
@@ -361,11 +361,20 @@ class commonUtils(object):
             pass
 
 
-    def parse_comma_sep_list(self, df_str, col_to_parse):
+    def parse_comma_sep_list(self, col_to_parse, **kwargs):
         '''
         takes string from tags column and parse into list of strings
+        kwargs:         must be: oop or df.  oop=df_str, dframe= pandas dataframe
         '''
-        df = getattr(self, df_str)
+        try:
+            df_str=kwargs['oop']
+            df = getattr(self, df_str)
+        except KeyError:
+            pass
+        try:
+            df = kwargs['dframe']
+        except KeyError:
+            pass
         csl = df[col_to_parse].values.tolist()
         parsed_csl_temp = []
         for items in csl:
@@ -424,8 +433,8 @@ class commonUtils(object):
         # logging.info(msg_str)
 
         # key/val and key lists for add and subtract purpose list respectively
-        add_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'ADD_LINES_PURP')
-        subtract_new_purp_list = self.parse_comma_sep_list(df_str, col_to_parse = 'REMOVE_LINES_PURP')
+        add_new_purp_list = self.parse_comma_sep_list('ADD_LINES_PURP', oop=df_str)
+        subtract_new_purp_list = self.parse_comma_sep_list('REMOVE_LINES_PURP',oop=df_str)
 
         indices = getattr(self, prop_str_indices)
         indices_iloc = getattr(self, prop_str_indices_iloc)
@@ -1657,62 +1666,6 @@ class commonUtils(object):
         setattr(self, df_name, df_symm_diff)
         print('Property with symmetric difference dataframe saved as: \n{}'.format(df_name))
 
-    def merge_feats(self, df_str, target_fc, action = 'merge', **kwargs):
-        '''
-        belongs in python 2 mxd_utilities with arcpy.Mapping module, but that shit's
-        broken.  ZU 3/3/2021.  updated 3/10/21
-        ARGUMENTS
-        kwargs[field_mappings]      list of fields to RETAIN.  Additionally, orig_fname
-                                    and orig_fpath will be added
-        df_str                      select dataframe from self
-        target_fc                   output fc
-        action                      just merge at this point
-        '''
-
-        arcpy.env.overwriteOutput = True
-        merge_lyrs = []
-        # if field mappings requested
-        try:
-            fields_to_map = kwargs['field_mappings']
-            if not isinstance(fields_to_map, list):
-                fields_to_map = [fields_to_map]
-            field_mappings = arcpy.FieldMappings()
-            field_mappings_true = True
-        except KeyError:
-            field_mappings_true = False
-
-        for i, index in enumerate(self.indices):
-            df = getattr(self, df_str)
-            # replace or else unicode error
-            fp_fcs = df.loc[index]['layer_source'].replace('\\','/')
-            fcs_name = os.path.basename(fp_fcs)
-            if arcpy.Exists(fp_fcs):
-                lyr_name = 'merge_lyr_{}'.format(i + 1)
-                fcs_obj = arcpy.FeatureClassToFeatureClass_conversion(fp_fcs, 'in_memory', lyr_name)
-                # get feature path
-                lyr_path = fcs_obj[0]
-                # add new field
-                print('adding fname {}'.format(fcs_name))
-                arcpy.AddField_management(lyr_path, 'orig_fname', 'text', field_length = 50)
-                arcpy.CalculateField_management(lyr_path, 'orig_fname', '"{}"'.format(fcs_name), "PYTHON")
-                arcpy.AddField_management(lyr_path, 'orig_fpath', 'text',field_length = 254)
-                arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"'+fp_fcs+'"', "PYTHON")
-                # arcpy.CalculateField_management(lyr_path, 'orig_fpath', '"{}"'.format(fp_fcs), "PYTHON")
-                print('adding fcs to merge list:\n{}'.format(fcs_name))
-                merge_lyrs.append(lyr_path)  #list of feat names
-                if field_mappings_true:
-                    field_mappings.addTable(lyr_path)
-            else:
-                print('feature with ACTION == delete does not exist:\n{}'.format(fcs_name))
-        # direct from field mappings arc documentation
-        fields_to_map.extend(['orig_fname', 'orig_fpath'])
-        if field_mappings_true:
-            for field in field_mappings.fields:
-                if field.name not in fields_to_map:
-                    field_mappings.removeFieldMap(field_mappings.findFieldMapIndex(field.name))
-            arcpy.Merge_management(merge_lyrs, target_fc, field_mappings)
-        else:
-            arcpy.Merge_management(merge_lyrs, target_fc)
     def replace_indices(self, df_str, **kwargs):
         '''
         For dataframes from csv with no value (math.nan) from pd.DataFrame.read_csv
@@ -1770,7 +1723,6 @@ class commonUtils(object):
         setattr(self, fp_csv_archive_prop_str, '{}_archive.csv'.format(basepath))
         fp_log = '{}_logfile.log'.format(basepath)
         setattr(self, fp_log_prop_str, fp_log)
-
     def cast_columns(self, df_str):
         '''
         basic funciton to convert columns to specific datatypes
@@ -2001,6 +1953,7 @@ class commonUtils(object):
                                                   'DATE'])
             df_tracking = df_tracking.append(df_new_rows)
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
+
     def parse_csString_utils(self, csString, **kwargs):
         '''
         Parse Comma-Sep Strings utilities.  Add to kwargs for  more scenarios.
@@ -2018,6 +1971,7 @@ class commonUtils(object):
             return(csString_updated)
         except KeyError:
             pass
+
 class proProject(commonUtils):
     '''
     INSERT / FLESH OUT
@@ -2037,7 +1991,7 @@ class proProject(commonUtils):
         if add_lyR_inv:
             try:
                 kwargs['lyR_maestro']
-                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+                fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_aprx']
                 df_lyR_str = f"df_{subproject}_lyR_maestro"
                 fp_lyR_str = f"fp_{subproject}_lyR_maestro"
             except KeyError:
@@ -2079,7 +2033,7 @@ class proProject(commonUtils):
         # A) Gather Connetion Info
         try:
             kwargs['lyR_maestro']
-            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, f'fp_{subproject}_lyR_maestro']
         except KeyError:
             fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
         df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
@@ -2123,41 +2077,62 @@ class proProject(commonUtils):
         setattr(self, fp_csv_lyR, df)
         df.to_csv(fp_csv_lyR)
 
-    def re_source_lyR_maestro(self, subproject, **kwargs):
-        # B) Connect
-        # A) Gather Connetion Info
+    def re_source_lyR_maestro(self, subproject, prop_str_indices, tc='DATA_LOCATION_MCMILLEN',**kwargs):
+
+
+        df_lyR_map_str=f"df_{subproject}_map_lyR"
+        df_lyR_aprx_str=f"df_{subproject}_aprx_lyR"
+        df_lyR_all_str=f"df_{subproject}_all_lyR"
+        df_map_matrix=f"df_{subproject}_map_matrix"
+        fp_lyR_inv_map = self.pl_aprx.loc[subproject, 'fp_lyR_map']
+        fp_lyR_inv_aprx = self.pl_aprx.loc[subproject, 'fp_lyR_aprx']
+        fp_lyR_inv_all = self.pl_aprx.loc[subproject, 'fp_lyR_all']
+        fp_map_matrix = self.pl_aprx.loc[subproject, 'fp_map_matrix']
         try:
-            kwargs['lyR_maestro']
-            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_maestro']
-            prop_str_indices = '{}_lyR_maestro_indices'.format(subproject)
-        except KeyError:
-            fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
-            prop_str_indices = '{}_lyR_indices'.format(subproject)
-        df_lyR_inv = pd.read_csv(fp_lyR_inv, index_col='DATA_LOCATION_MCMILLEN')
-        fp_lyR_inv_update = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
-        df_lyR_inv_update = pd.read_csv(fp_lyR_inv_update, index_col='DATA_LOCATION_MCMILLEN')
+            getattr(self, df_lyR_map_str)
+        except AttributeError:
+            self.add_df(fp_lyR_inv_map, df_lyR_map_str, [tc, 'APRX'])
+        try:
+            getattr(self, df_lyR_aprx_str)
+        except AttributeError:
+            self.add_df(fp_lyR_inv_aprx, df_lyR_aprx_str,tc)
+        try:
+            getattr(self, df_lyR_all_str)
+        except AttributeError:
+            self.add_df(fp_lyR_inv_all, df_lyR_all_str,[tc,'APRX','MAP_NAME'])
+        try:
+            getattr(self, df_map_matrix)
+        except AttributeError:
+            self.add_df(fp_map_matrix, df_map_matrix, tc)
+
+        df_lyR_inv_aprx=getattr(self, df_lyR_aprx_str)
+        df_lyR_inv_map=getattr(self, df_lyR_map_str)
+        # df_lyR_inv_map.set_index([tc, 'APRX'], inplace=True)
+        df_lyR_inv_all=getattr(self, df_lyR_all_str)
+        # df_lyR_inv_all.set_index([tc,'APRX','MAP_NAME'],inplace=True)
 
         # Initiate map removal accounting if needed
-        if r'MAP_NAME_UPDATED' not in df_lyR_inv_update.columns:
-            df_lyR_inv_update['MAP_NAME_UPDATED']=df_lyR_inv_update['MAP_NAME']
+        if r'MAP_NAME_UPDATED' not in df_lyR_inv_map.columns:
+            df_lyR_inv_map['MAP_NAME_UPDATED']=df_lyR_inv_map['MAP_NAME']
+        if r'APRX_UPDATED' not in df_lyR_inv_aprx.columns:
+            df_lyR_inv_aprx['APRX_UPDATED']=df_lyR_inv_aprx['APRX']
 
         indices = getattr(self, prop_str_indices)
 
         # INIT LOGFILE
         self.init_logfile(subproject)
 
+        # df_temp=df_lyR_inv_map[df_lyR_inv_mapAPRX==aprx_name]
+        # map_list = self.parse_comma_sep_list(col_to_parse, dframe=df_temp)
         map_temp, layer_temp=[],[]
-        df_lyR_inv_subset = df_lyR_inv.loc[indices]
-        fp_map_matrix = self.pl_aprx.loc[subproject, 'fp_map_matrix']
-        df_map_matrix = pd.read_csv(fp_map_matrix, index_col='DATA_LOCATION_MCMILLEN')
+
         # Returns rows in index and columns with any True valeus
-        # mask = df_map_matrix=='CHANGE'
         df_map_matrix_subset = df_map_matrix.loc[indices]
         map_objects = getattr(self, f"{subproject}_maps")
-        # Remove maps not in Use i.e. not in matrix or inventoried
-        # map_objects = [mo for mo in map_objects if mo.name in df_map_matrix_subset.columns]
+        # Remove maps not in Use i.e. not in present in indices
         idx_cols=[c for c in df_map_matrix_subset.columns if 'CHANGE' in df_map_matrix_subset[c].values]
         map_objects_subset = [mo for mo in map_objects if mo.name in idx_cols]
+        aprx_indices=[]
         for m in map_objects_subset:
             # Pulls layers with TRUE in each map column from matrix
             tgt_layers = df_map_matrix_subset[df_map_matrix_subset[m.name]=='CHANGE'].index
@@ -2175,10 +2150,10 @@ class proProject(commonUtils):
                 if resource:
                     try:
                         idx = copy.copy(os.path.normpath(lyr.dataSource))
-                        wsf = df_lyR_inv_subset.loc[idx, 'workspace_factory']
-                        dbase_connection = df_lyR_inv_subset.loc[idx, 'dbase_connection']
-                        dataset = df_lyR_inv_subset.loc[idx, 'dataset']
-                        feature_dataset = df_lyR_inv_subset.loc[idx, 'feature_dataset']
+                        wsf = df_lyR_inv_aprx.loc[idx, 'workspace_factory']
+                        dbase_connection = df_lyR_inv_aprx.loc[idx, 'dbase_connection']
+                        dataset = df_lyR_inv_aprx.loc[idx, 'dataset']
+                        feature_dataset = df_lyR_inv_aprx.loc[idx, 'feature_dataset']
 
                         lyr_cim = lyr.getDefinition('V3')
                         # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
@@ -2196,18 +2171,20 @@ class proProject(commonUtils):
                             lyr_cim.featureTable.dataConnection = dc
                         lyr.setDefinition(lyr_cim)
 
-                        new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
-                        df_lyR_inv.at[idx,'RESOURCED']=True
+                        # new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
+                        idx_all=(idx, subproject, m.name)
+                        df_lyR_inv_all.loc[idx_all,'RESOURCED_COMPLETE']=True
                         # Once successful, remove map name of resource layer from list
-                        csString = df_lyR_inv_update.loc[idx, 'MAP_NAME_UPDATED']
+                        idx_map = (idx, subproject)
+                        csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
                         csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
-                        df_lyR_inv_update.at[idx, 'MAP_NAME_UPDATED'] = csString_updated
-                        df_lyR_str = f"df_{subproject}_lyR"
-                        setattr(self, df_lyR_str, df_lyR_inv_update)
+                        df_lyR_inv_map.loc[idx_map, 'MAP_NAME_UPDATED'] = csString_updated
+                        setattr(self, df_lyR_map_str, df_lyR_inv_map)
 
                         df_map_matrix.loc[idx,m.name]='FIXED'
-                        df_map_matrix.to_csv(fp_map_matrix)
-                        setattr(self, f"df_map_matrix_{subproject}", df_map_matrix)
+                        setattr(self, f"df_{subproject}_map_matrix", df_map_matrix)
+
+                        aprx_indices.append(idx)
 
                         self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
                         self.logger.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
@@ -2219,6 +2196,11 @@ class proProject(commonUtils):
                     pass
         # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
         # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
+        for idx in aprx_indices:
+            csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
+            csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
+            df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
+            setattr(self, df_lyR_aprx_str, df_lyr_inv_aprx)
         aprx = getattr(self, f"aprx_{subproject}")
         aprx.save()
 
@@ -2478,7 +2460,7 @@ class proProject(commonUtils):
         '''
         df = getattr(self, df_str)
         # creates a list of lists
-        csString_orig_list=self.parse_comma_sep_list(df_str, col_to_parse)
+        csString_orig_list=self.parse_comma_sep_list(col_to_parse,oop=df_str)
         if col_to_flag not in df.columns:
             df[col_to_flag]=False
         for idx_int, idx in enumerate(df.index):
@@ -2690,7 +2672,7 @@ class AgolAccess(commonUtils):
                 shp = os.path.join(zip_dir, '{}.zip'.format(indice))
 
                 # TAGS
-                tags_df = self.parse_comma_sep_list('df_agol', 'TAGS')
+                tags_df = self.parse_comma_sep_list('TAGS',oop='df_agol')
                 # subset tags in index
                 tags = tags_df[indice_iloc]
                 snippet = self.df_agol.loc[indice,'SNIPPET']
@@ -2902,7 +2884,7 @@ class AgolAccess(commonUtils):
         try:
             tags = self.tags_from_df
         except AttributeError:
-            tags = self.parse_comma_sep_list(df_str, 'TAGS')
+            tags = self.parse_comma_sep_list('TAGS',oop=df_str)
         # subset tags in index
         tags_temp = []
         for iloc in indices_loc:

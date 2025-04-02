@@ -20,25 +20,20 @@ fp_pathlist_aprx=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_
 csv_aprx_lyR_2=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_inventories\aprx\FLA_aprx_all_lyr_v1_2.csv"
 # pro_obj.aprx_map_inv2(fp_pathlist_aprx, csv_aprx_lyR_2)
 #
-# E2) Concatenate Aggregate
-csv_aprx_lyR_1=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_inventories\aprx\FLA_aprx_all_lyr_v1_1.csv"
-cf = ['ITEM','IS_RASTER','IS_BROKEN']
+# # E2) Concatenate Aggregate
+# csv_aprx_lyR_1=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_inventories\aprx\FLA_aprx_all_lyr_v1_1.csv"
+# cf = ['ITEM','IS_RASTER','IS_BROKEN']
 # pro_obj.concatenate_aggregate(csv_aprx_lyR_2, csv_aprx_lyR_1, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-#
-# B. Aggregate Map_Name from Data_Location;  could have potentially skipped step 2.
-df1=pd.read_csv(csv_aprx_lyR_1)
-df2 =pro_obj.aggregate_rows(df1, 'DATA_LOCATION_MCMILLEN','APRX',carry_fields=cf)
-csv_aprx_lyR_0=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_inventories\aprx\FLA_aprx_all_lyr_v1_0.csv"
-df2.to_csv(csv_aprx_lyR_0)
-#
+# #
+# # B. Aggregate Map_Name from Data_Location;  could have potentially skipped step 2.
+# df1=pd.read_csv(csv_aprx_lyR_1)
+# df2 =pro_obj.aggregate_rows(df1, 'DATA_LOCATION_MCMILLEN','APRX',carry_fields=cf)
+# csv_aprx_lyR_0=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_inventories\aprx\FLA_aprx_all_lyr_v1_0.csv"
+# df2.to_csv(csv_aprx_lyR_0)
 
 # ---------------------BULK CREATE LYR AND MAP_MATRIX INDICES------
 
 # # ONE OFF: Create joined lyR_inv and flag BROKEN paths
-# # 20241031
-# # A) Base Everyghint
-# pro_obj = agolZ.proProject()
-# pro_obj.proProject_init(fp_pathlist_aprx)
 
 # df = pd.read_csv(fp_all_SFT_aprx, index_col='APRX')
 # sp_list = df[df.FLAG].index
@@ -82,5 +77,5 @@ df2.to_csv(csv_aprx_lyR_0)
 # # MISC Flag cols containing csString vals i.e. PSP_2024
 # # df_lyR_str='df_lyR_maestro'
 # pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-# df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX_TO_FIX', 'PSP_2024_2', 'PSP_2024_2')
+# df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'PSP_2024_2', 'PSP_2024_2')
 # df.to_csv(fp_lyR_inv_maestro)

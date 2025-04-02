@@ -173,7 +173,7 @@ class commonUtils(object):
             incl_files = kwargs['renamed_files']
         except KeyError:
             incl_files = copy.copy(self.indices)
-        exist_file = [f[:-4] for f in os.listdir(shp_dir) if '.shp' in f]
+        exist_file = [f[:-4] for f in os.listdir(zip_dir)]
         excl_files = list(set(exist_file) - set(incl_files))
         if len(excl_files) > 0:
             print('here ', excl_files)
@@ -1467,6 +1467,7 @@ class commonUtils(object):
                 print('HERE')
                 df_item = df.loc[index]
                 dset_move = df_item['MOVE_LOCATION_DSET']
+                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                 # NO DSET passed
                 if pd.isnull(dset_move):
@@ -2028,16 +2029,15 @@ class proProject(commonUtils):
         map_str = aprx_str.replace('aprx','layouts')
         setattr(self, layout_str, l)
 
-    def format_lyR_inv_datasource_standard(self, subproject, source_new='DATA_LOCATION_MCM_RESOURCE', **kwargs):
+    def format_lyR_inv_datasource_standard(self, subproject, prop_str_indices, source_new='DATA_LOCATION_MCM_RESOURCE', **kwargs):
 
         # A) Gather Connetion Info
         try:
-            kwargs['lyR_maestro']
-            fp_csv_lyR = self.pl_aprx.loc[subproject, f'fp_{subproject}_lyR_maestro']
+            kwargs['lyR_aprx']
+            fp_csv_lyR = self.pl_aprx.loc[subproject, f'fp_lyR_aprx']
         except KeyError:
             fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
         df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
-        prop_str_indices = '{}_lyR_indices'.format(subproject)
         indices = getattr(self, prop_str_indices)
 
         # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
@@ -2083,7 +2083,7 @@ class proProject(commonUtils):
         df_lyR_map_str=f"df_{subproject}_map_lyR"
         df_lyR_aprx_str=f"df_{subproject}_aprx_lyR"
         df_lyR_all_str=f"df_{subproject}_all_lyR"
-        df_map_matrix=f"df_{subproject}_map_matrix"
+        df_map_matrix_str=f"df_{subproject}_map_matrix"
         fp_lyR_inv_map = self.pl_aprx.loc[subproject, 'fp_lyR_map']
         fp_lyR_inv_aprx = self.pl_aprx.loc[subproject, 'fp_lyR_aprx']
         fp_lyR_inv_all = self.pl_aprx.loc[subproject, 'fp_lyR_all']
@@ -2101,15 +2101,16 @@ class proProject(commonUtils):
         except AttributeError:
             self.add_df(fp_lyR_inv_all, df_lyR_all_str,[tc,'APRX','MAP_NAME'])
         try:
-            getattr(self, df_map_matrix)
+            getattr(self, df_map_matrix_str)
         except AttributeError:
-            self.add_df(fp_map_matrix, df_map_matrix, tc)
+            self.add_df(fp_map_matrix, df_map_matrix_str, tc)
 
         df_lyR_inv_aprx=getattr(self, df_lyR_aprx_str)
         df_lyR_inv_map=getattr(self, df_lyR_map_str)
         # df_lyR_inv_map.set_index([tc, 'APRX'], inplace=True)
         df_lyR_inv_all=getattr(self, df_lyR_all_str)
         # df_lyR_inv_all.set_index([tc,'APRX','MAP_NAME'],inplace=True)
+        df_map_matrix=getattr(self, df_map_matrix_str)
 
         # Initiate map removal accounting if needed
         if r'MAP_NAME_UPDATED' not in df_lyR_inv_map.columns:
@@ -2174,6 +2175,7 @@ class proProject(commonUtils):
                         # new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
                         idx_all=(idx, subproject, m.name)
                         df_lyR_inv_all.loc[idx_all,'RESOURCED_COMPLETE']=True
+                        setattr(self, df_lyR_all_str, df_lyR_inv_all)
                         # Once successful, remove map name of resource layer from list
                         idx_map = (idx, subproject)
                         csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
@@ -2200,7 +2202,7 @@ class proProject(commonUtils):
             csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
             csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
             df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
-            setattr(self, df_lyR_aprx_str, df_lyr_inv_aprx)
+            setattr(self, df_lyR_aprx_str, df_lyR_inv_aprx)
         aprx = getattr(self, f"aprx_{subproject}")
         aprx.save()
 
@@ -2263,18 +2265,17 @@ class proProject(commonUtils):
         Returns:
 
         '''
-        df = pd.read_csv(csv_in)
+        df = getattr(self, 'pl_aprx')
         df = df[df.FLAG]
         src_list, map_list, broken, raster = [], [], [], []
         for idx in df.index:
-            aprx_path = df.loc[idx, 'DATA_LOCATION_MCMILLEN_APRX']
-            aprx_str = df.loc[idx, 'APRX']
+            aprx_path = df.loc[idx, 'fp_aprx']
             if 'df_concat' not in locals():
                 df_concat = self.aprx_map_inv(aprx_path)
-                df_concat['APRX']=len(df_concat)*[aprx_str]
+                df_concat['APRX']=len(df_concat)*[idx]
             else:
                 t = self.aprx_map_inv(aprx_path)
-                t['APRX']=len(t)*[aprx_str]
+                t['APRX']=len(t)*[idx]
                 df_concat=pd.concat([df_concat, t])
         df_concat.to_csv(csv_out)
     def expand_rows(self, subproject, csv_out, update=False):
@@ -2448,7 +2449,7 @@ class proProject(commonUtils):
         return(keyed_list)
     def flag_csString_val(self, df_str, col_to_parse, tgt_val, col_to_flag):
         '''
-
+        Adds  True False vals to column where comma sep list val is present
         Args:
             df_str:
             col_to_parse:       column to parse in df

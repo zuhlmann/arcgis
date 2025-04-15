@@ -64,7 +64,7 @@ class create_series_from_centroid(object):
         has been changed.
         '''
 
-        return parameters
+        return
 
     def updateMessages(self, parameters):
         """Modify the messages created by internal validation for each tool
@@ -176,7 +176,7 @@ class update_map_series(object):
         has been changed.
         '''
 
-        return parameters
+        return
 
     def updateMessages(self, parameters):
         """Modify the messages created by internal validation for each tool

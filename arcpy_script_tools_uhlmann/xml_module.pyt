@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 import xml.etree.ElementTree as ET
 
-
 class Toolbox(object):
     def __init__(self):
         """Define the toolbox (the name of the toolbox is the name of the

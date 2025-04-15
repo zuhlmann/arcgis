@@ -937,37 +937,11 @@ class commonUtils(object):
                 # create new filename components
                 fc_new_name = df_item['RENAME']
 
-                try:
-                    col_name_original = df_item['COL_NAME_ARCHIVAL']
-                    col_name_original = dict_col_name_orig[col_name_original]
-                except KeyError:
-                    pass
                 fp_components = fp_fcs_current.split(os.sep)
                 # all but original file name
                 fp_base = os.sep.join(fp_components[:-1])
                 # full path to new fcs
                 fp_fcs_new = os.path.join(fp_base, fc_new_name)
-
-                if not dry_run:
-                    msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
-                    print(fp_fcs_current)
-                    print(fp_fcs_new)
-                    arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
-                    # Now fp is renamed, so change alias on NEW fcs
-                    arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
-
-                # NEW COL VALUES
-                df.at[index, target_col] = fp_fcs_new.replace(os.sep, '//')
-                df.at[index, 'ACTION'] = np.nan
-                df.at[index, 'RENAME'] = np.nan
-                try:
-                    df.at[index, col_name_original] = fp_fcs_current.replace(os.sep, '//')
-                except KeyError:
-                    pass
-
-                # RENAME label
-                df = df.rename(index = {index:fc_new_name})
-                setattr(self, df_str, df)
 
                 # UPDATE SOURCE inventory
                 # ABSTRACT into FUNCTION someday 20210819 ZU
@@ -1006,21 +980,36 @@ class commonUtils(object):
                     self.add_df(fp_csv_source, df_str_source, 'ITEM')
                     df_source = getattr(self, df_str_source)
 
+                if not dry_run:
+                    msg_str = '\nRENAMING: {}\nTO:        {}'.format(fp_fcs_current, fp_fcs_new)
+                    arcpy.Rename_management(fp_fcs_current, fp_fcs_new)
+                    # Now fp is renamed, so change alias on NEW fcs
+                    arcpy.AlterAliasName(fp_fcs_new, fc_new_name)
+
+                # To document whether fp_fcs_current = Staging, Previous, Original
+                col_name_original = df_item['COL_NAME_ARCHIVAL']
+                merge_cols = df_item['MERGE_COLUMNS']
+                if not pd.isnull(col_name_original):
+                    col_name_original = dict_col_name_orig[col_name_original]
+                    d = {col_name_original: fp_fcs_current,
+                         'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+                else:
+                    d = {'DATA_LOCATION_MCMILLEN': fp_fcs_new}
+
+                # UPDATE DF
+                df.loc[index, list(d.keys())] = list(d.values())
+                # RENAME label
+                df = df.rename(index = {index:fc_new_name})
+                setattr(self, df_str, df)
+
+                # columns to transfer from maestro to source
+                if not pd.isnull(merge_cols):
+                    keys = [c.strip() for c in merge_cols.split(',')]
+                    vals = df_source.loc[index, keys]
+                    d.update(dict(zip(keys, vals)))
+
+                df_source.loc[index, list(d.keys())] = list(d.values())
                 df_source = df_source.rename(index = {index:fc_new_name})
-                # Replace indice with new feat name
-                idt = [i for i, index_val in enumerate(indices) if index_val == index]
-                idt = idt[0]
-                print('index = {}'.format(idt))
-                indices[idt] = fc_new_name
-                setattr(self, prop_str_indices, indices)
-
-                df_source.at[fc_new_name, target_col] = fp_fcs_new.replace(os.sep, '//')
-
-                try:
-                    df_source.at[fc_new_name, col_name_original] = fp_fcs_current.replace(os.sep, '//')
-                except KeyError:
-                    pass
-                setattr(self, df_str_source, df_source)
 
                 # Save to DF
                 if save_df:
@@ -1143,11 +1132,8 @@ class commonUtils(object):
                     feat_name = feat_name.replace(' ','_')
                     feat_name = feat_name.replace('&','_')
                     feat_name = feat_name.replace('.shp','')
+                fp_fcs_new=os.path.join(fp_dset, feat_name)
 
-                # full path with featureclass name
-                print('feat name to copy {}'.format(feat_name))
-                fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
-                debug_idx = 0
                 try:
                     if not dry_run:
                         # Should only trigger if move not copy (i.e. move into same gdb)
@@ -1189,21 +1175,18 @@ class commonUtils(object):
                         d = {col_name_original: fp_fcs_current,
                              'FEATURE_DATASET':dset_move,
                              'DATA_LOCATION_MCMILLEN':fp_fcs_new}
-                    # If we don't want to document COL_NAME_ARCHIVAL.  i.e. mistakenly added
-                    # to master, and now decide to move back to archival.
                     else:
                         d = {'FEATURE_DATASET':dset_move,
                              'DATA_LOCATION_MCMILLEN':fp_fcs_new}
+
+                    df.loc[index, list(d.keys())] = list(d.values())
+                    df = df.rename(index = {index:feat_name})
 
                     # columns to transfer from source to target
                     if not pd.isnull(merge_cols):
                         keys = [c.strip() for c in merge_cols.split(',')]
                         vals = df_source.loc[index, keys]
                         d.update(dict(zip(keys,vals)))
-
-                    ser_append = pd.Series(data = d,
-                                           index = list(d.keys()),
-                                           name = feat_name)
 
                     # append new row from Series
                     debug_idx = 7
@@ -1223,8 +1206,7 @@ class commonUtils(object):
                     except KeyError:
                         pass
 
-                    df_target = df_target.append(ser_append)
-                    df = df.rename(index = {index:feat_name})
+                    df_target.loc[index, list(d.keys())] = list(d.values())
 
                     if rename:
                         # Replace indice with new feat name
@@ -1234,10 +1216,7 @@ class commonUtils(object):
                         print('index = {}'.format(idt))
                         indices[idt]=feat_name
                         setattr(self, prop_str_indices, indices)
-                        index = copy.copy(feat_name)
                     debug_idx = 8
-                    df.loc[index, 'DATA_LOCATION_MCMILLEN'] = fp_fcs_new
-
 
                     if not dry_run:
                         msg_str = '\nMOVING:  {}\nTO:      {}'.format(msg_substr, msg_substr2)
@@ -1261,6 +1240,10 @@ class commonUtils(object):
                         msg_str = '\nUNABLE TO MOVE:  {}\nARCPY DEBUG: {}'.format(msg_substr, debug_idx)
                         logging.info(msg_str)
                         logging.info(e)
+                    debug_idx = 0
+                    fp_fcs_new = os.path.join(fp_move, dset_move, feat_name)
+                    print('feat name to copy {}'.format(feat_name))
+                    # full path with featureclass name
 
         elif action_type in ['copy_no_replace', 'copy_replace']:
             # Get indices where duplicates occur
@@ -1281,7 +1264,6 @@ class commonUtils(object):
                     rename = False
 
                 fp_components = fp_fcs_current.split(os.sep)
-                gdb_str = [v.replace('.','_') for v in fp_components if '.gdb' in v]
                 fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                 for idx, comp in enumerate(fp_components):
@@ -1305,12 +1287,6 @@ class commonUtils(object):
                     inventory_dir = lookup_table.loc[src_gdb_or_dir_str, 'inventory_dir']
                     fp_csv_source = os.path.join(inventory_dir, fname_csv)
                     print('FP CSV SOURCE:  {}'.format(fp_csv_source))
-                    df_str_source = lookup_table.loc[src_gdb_or_dir_str, 'df_str']
-                else:
-                    # clunky way of grabbing any inventory dir value
-                    fp_csv_source = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
-                    df_str_source = 'df_{}_standalone'.format(project_str)
-                    print('why am I here')
 
                 # Get TARGET DF/CSV/STR
                 fp_components_target = fp_move.split(os.sep)
@@ -2077,8 +2053,15 @@ class proProject(commonUtils):
         setattr(self, fp_csv_lyR, df)
         df.to_csv(fp_csv_lyR)
 
-    def re_source_lyR_maestro(self, subproject, prop_str_indices, tc='DATA_LOCATION_MCMILLEN',**kwargs):
+    def re_source_lyR_maestro(self, subproject, prop_str_indices, fp_log_prop_str, tc='DATA_LOCATION_MCMILLEN',**kwargs):
 
+        fp_logfile = getattr(self, fp_log_prop_str)
+        logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
+        # Save call string to logfile
+        banner = '    {}    '.format('-' * 50)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}\n{}\nRESOURCING'.format(banner, date_str, banner)
+        logging.info(msg_str)
 
         df_lyR_map_str=f"df_{subproject}_map_lyR"
         df_lyR_aprx_str=f"df_{subproject}_aprx_lyR"
@@ -2128,83 +2111,95 @@ class proProject(commonUtils):
         map_temp, layer_temp=[],[]
 
         # Returns rows in index and columns with any True valeus
-        df_map_matrix_subset = df_map_matrix.loc[indices]
-        map_objects = getattr(self, f"{subproject}_maps")
-        # Remove maps not in Use i.e. not in present in indices
-        idx_cols=[c for c in df_map_matrix_subset.columns if 'CHANGE' in df_map_matrix_subset[c].values]
-        map_objects_subset = [mo for mo in map_objects if mo.name in idx_cols]
-        aprx_indices=[]
-        for m in map_objects_subset:
-            # Pulls layers with TRUE in each map column from matrix
-            tgt_layers = df_map_matrix_subset[df_map_matrix_subset[m.name]=='CHANGE'].index
-            layers = m.listLayers()
-            for lyr in layers:
-                try:
-                    if lyr.dataSource in tgt_layers:
-                        # dataSource and in tgt_layer
-                        resource = True
-                    else:
-                        resource = False
-                except AttributeError:
-                    # does not have dataSource attribute (i.e. map server or...something)
-                    resource = False
-                if resource:
+        included_indices = list(set(indices).intersection(set(df_map_matrix.index)))
+        excluded_indices = list(set(indices)-set(df_map_matrix.index))
+        try:
+            df_map_matrix_subset = df_map_matrix.loc[indices]
+            t1 = ', '.join(included_indices)
+            t2 = ', '.join(excluded_indices)
+            msg_str='\nINCLUDING: {}\nNOT PRESENT IN {}: {}'.format(t1,subproject, t2)
+            logging.info(msg_str)
+            no_layers_aprx=False
+        except KeyError:
+            msg_str = '\nNONE of the indices were present in {}'.format(subproject)
+            logging.info(msg_str)
+            no_layers_aprx=True
+        if not no_layers_aprx:
+            map_objects = getattr(self, f"{subproject}_maps")
+
+            # Remove maps not in Use i.e. not in present in indices
+            idx_cols=[c for c in df_map_matrix_subset.columns if 'CHANGE' in df_map_matrix_subset[c].values]
+            map_objects_subset = [mo for mo in map_objects if mo.name in idx_cols]
+            aprx_indices=[]
+            for m in map_objects_subset:
+                # Pulls layers with TRUE in each map column from matrix
+                tgt_layers = df_map_matrix_subset[df_map_matrix_subset[m.name]=='CHANGE'].index
+                layers = m.listLayers()
+                for lyr in layers:
                     try:
-                        idx = copy.copy(os.path.normpath(lyr.dataSource))
-                        wsf = df_lyR_inv_aprx.loc[idx, 'workspace_factory']
-                        dbase_connection = df_lyR_inv_aprx.loc[idx, 'dbase_connection']
-                        dataset = df_lyR_inv_aprx.loc[idx, 'dataset']
-                        feature_dataset = df_lyR_inv_aprx.loc[idx, 'feature_dataset']
+                        if lyr.dataSource in tgt_layers:
+                            # dataSource and in tgt_layer
+                            resource = True
+                        else:
+                            resource = False
+                    except AttributeError:
+                        # does not have dataSource attribute (i.e. map server or...something)
+                        resource = False
+                    if resource:
+                        try:
+                            idx = copy.copy(os.path.normpath(lyr.dataSource))
+                            wsf = df_lyR_inv_aprx.loc[idx, 'workspace_factory']
+                            dbase_connection = df_lyR_inv_aprx.loc[idx, 'dbase_connection']
+                            dataset = df_lyR_inv_aprx.loc[idx, 'dataset']
+                            feature_dataset = df_lyR_inv_aprx.loc[idx, 'feature_dataset']
 
-                        lyr_cim = lyr.getDefinition('V3')
-                        # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
-                        dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
-                        dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
-                        dc.workspaceFactory = wsf
-                        dc.dataset = dataset
-                        # check for feature dataset
-                        if not pd.isnull(feature_dataset):
-                            dc.featureDataset = feature_dataset
-                        # Different object structure with Raster
-                        if wsf=='Raster':
-                            lyr_cim.dataConnection = dc
-                        elif wsf in ('Shapefile', 'FileGDB'):
-                            lyr_cim.featureTable.dataConnection = dc
-                        lyr.setDefinition(lyr_cim)
+                            lyr_cim = lyr.getDefinition('V3')
+                            # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
+                            dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
+                            dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
+                            dc.workspaceFactory = wsf
+                            dc.dataset = dataset
+                            # check for feature dataset
+                            if not pd.isnull(feature_dataset):
+                                dc.featureDataset = feature_dataset
+                            # Different object structure with Raster
+                            if wsf=='Raster':
+                                lyr_cim.dataConnection = dc
+                            elif wsf in ('Shapefile', 'FileGDB'):
+                                lyr_cim.featureTable.dataConnection = dc
+                            lyr.setDefinition(lyr_cim)
 
-                        # new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
-                        idx_all=(idx, subproject, m.name)
-                        df_lyR_inv_all.loc[idx_all,'RESOURCED_COMPLETE']=True
-                        setattr(self, df_lyR_all_str, df_lyR_inv_all)
-                        # Once successful, remove map name of resource layer from list
-                        idx_map = (idx, subproject)
-                        csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
-                        csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
-                        df_lyR_inv_map.loc[idx_map, 'MAP_NAME_UPDATED'] = csString_updated
-                        setattr(self, df_lyR_map_str, df_lyR_inv_map)
+                            # new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
+                            idx_all=(idx, subproject, m.name)
+                            df_lyR_inv_all.loc[idx_all,'RESOURCED_COMPLETE']=True
+                            setattr(self, df_lyR_all_str, df_lyR_inv_all)
+                            # Once successful, remove map name of resource layer from list
+                            idx_map = (idx, subproject)
+                            csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
+                            csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
+                            df_lyR_inv_map.loc[idx_map, 'MAP_NAME_UPDATED'] = csString_updated
+                            setattr(self, df_lyR_map_str, df_lyR_inv_map)
 
-                        df_map_matrix.loc[idx,m.name]='FIXED'
-                        setattr(self, f"df_{subproject}_map_matrix", df_map_matrix)
+                            df_map_matrix.loc[idx,m.name]='FIXED'
+                            setattr(self, f"df_{subproject}_map_matrix", df_map_matrix)
 
-                        aprx_indices.append(idx)
+                            aprx_indices.append(idx)
 
-                        self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
-                        self.logger.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
-                    except KeyError as e:
-                        self.logger.info('EXCEPTION {}'.format(e))
-                        map_temp.append(m.name)
-                        layer_temp.append(idx)
-                else:
-                    pass
-        # df_log = pd.DataFrame(np.column_stack([map_temp,layer_temp]), columns = ['MAP', 'SOURCE'])
-        # df_log.to_csv(r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Maps\DLA\devel\layers_failed.csv')
-        for idx in aprx_indices:
-            csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
-            csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
-            df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
-            setattr(self, df_lyR_aprx_str, df_lyR_inv_aprx)
-        aprx = getattr(self, f"aprx_{subproject}")
-        aprx.save()
+                            self.logger.info('SUCCESS\nMAP: {} \nLAYER {}'.format(m.name, idx))
+                            self.logger.info('CONNECTION PROPERTIES: {}'.format(lyr.connectionProperties['connection_info']['database']))
+                        except KeyError as e:
+                            self.logger.info('EXCEPTION {}'.format(e))
+                            map_temp.append(m.name)
+                            layer_temp.append(idx)
+                    else:
+                        pass
+            # for idx in aprx_indices:
+            #     csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
+            #     csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
+            #     df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
+            #     setattr(self, df_lyR_aprx_str, df_lyR_inv_aprx)
+            aprx = getattr(self, f"aprx_{subproject}")
+            aprx.save()
 
     def init_logfile(self, subproject):
         logger = logging.getLogger(subproject)

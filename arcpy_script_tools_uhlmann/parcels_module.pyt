@@ -3,7 +3,7 @@
 import arcpy
 from arcpy import metadata as md
 import os
-import logging
+import loggingcy
 import pandas as pd
 import numpy as np
 import xml.etree.ElementTree as ET

@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import sys
+import arcpy
+import copy
 sys.path.append('c:/users/uhlmann/code')
 sys.path.append('c:/users/uhlmann/code/arcpy_script_tools_uhlmann')
 import importlib
@@ -12,47 +14,66 @@ fp_offline = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utili
 olt = pd.read_csv(fp_offline, index_col = 'gdb_str')
 prj_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files'
 
-def ol_translate(fp_current, gdb_str, offline):
-    offline_base, online_base = olt.loc[gdb_str, 'offline'], olt.loc[gdb_str, 'online']
-    fp_current = os.path.normpath(fp_current)
-    if offline:
-        print('there')
-        fp_out = fp_current.replace(online_base, offline_base)
-    else:
-        print('here')
-        fp_out = fp_current.replace(offline_base, online_base)
-    return(fp_out)
-
-idx = -1
-offline = False
-
-subproject = 'PSP_2024'
-
-# non_klamath
-gdb_str_dict = {r'easements': 'easements_RH_gdb',
-                'kauai': 'kauai_offline_gdb'}
-try:
-    gdb_str = gdb_str_dict[subproject]
-except KeyError:
-    gdb_str = '{}_gdb'.format(subproject)
-gdb_pro = ol_translate(pl.loc[gdb_str, 'fp_gdb'], gdb_str, offline)
-prj_file = os.path.join(prj_dir, pl[pl.subproject == subproject].prj_file.values[0])
-
-# TOLT
-import spyder_arcgis_oop as agolZ
-importlib.reload(sys.modules['utilities'])
-importlib.reload(sys.modules['spyder_arcgis_oop'])
-agol_obj = agolZ.commonUtils()
-agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
-
-# # INDICES
+# subproject = 'SFT_master'
+#
+# gdb_str = '{}_gdb'.format(subproject)
+# gdb_pro = pl.loc[gdb_str, 'fp_gdb']
+# prj_file = os.path.join(prj_dir, pl[pl.subproject == subproject].prj_file.values[0])
+#
+# # TOLT
+# import spyder_arcgis_oop as agolZ
+# importlib.reload(sys.modules['utilities'])
+# importlib.reload(sys.modules['spyder_arcgis_oop'])
+# agol_obj = agolZ.commonUtils()
+# agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
+#
+# # # INDICES
 # agol_obj.selection_idx('df', indices = [18])
-agol_obj.selection_idx('df', target_action= 'rename')
-for i, n in zip(agol_obj.indices_iloc, agol_obj.indices):
-    print('{}:  {}'.format(i,n))
+# agol_obj.selection_idx('df', target_action= 'rename_rd3')
+#
+# print('nothing')
+#
+# agol_obj.take_action('df', 'rename', target_col = 'DATA_LOCATION_MCMILLEN',
+#                      dry_run = False, save_df = True,
+#                      offline_source=False, offline_target=False)
 
-print('nothing')
+fp_aprx=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\PSP_2024\PSP_2024.aprx"
+csv=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0.csv"
+df_lyR_inv_aprx=pd.read_csv(csv, index_col='DATA_LOCATION_MCMILLEN')
+aprx = arcpy.mp.ArcGISProject(fp_aprx)
+maps=aprx.listMaps('SA_geomorphic_process_flows')[0]
+# Remove maps not in Use i.e. not in present in indices
+layers = maps.listLayers()
+idx=r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\PSP_2024\PSP_2024.gdb\aquatics\SA_aquatic_sediment'
+for lyr in layers:
+    try:
+        if lyr.dataSource==idx:
+            resource = True
+        else:
+            resource=False
+    except AttributeError:
+        # does not have dataSource attribute (i.e. map server or...something)
+        resource = False
+    if resource:
+        idx = copy.copy(os.path.normpath(lyr.dataSource))
+        wsf = df_lyR_inv_aprx.loc[idx, 'workspace_factory']
+        dbase_connection = df_lyR_inv_aprx.loc[idx, 'dbase_connection']
+        dataset = df_lyR_inv_aprx.loc[idx, 'dataset']
+        feature_dataset = df_lyR_inv_aprx.loc[idx, 'feature_dataset']
 
-agol_obj.take_action('df', 'move', target_col = 'DATA_LOCATION_MCMILLEN',
-                     dry_run = False, save_df = True,
-                     offline_source=False, offline_target=False)
+        lyr_cim = lyr.getDefinition('V3')
+        # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
+        dc = arcpy.cim.CreateCIMObjectFromClassName('CIMStandardDataConnection', 'V3')
+        dc.workspaceConnectionString = f"DATABASE={dbase_connection}"
+        dc.workspaceFactory = wsf
+        dc.dataset = dataset
+        # check for feature dataset
+        if not pd.isnull(feature_dataset):
+            dc.featureDataset = feature_dataset
+        # Different object structure with Raster
+        if wsf=='Raster':
+            lyr_cim.dataConnection = dc
+        elif wsf in ('Shapefile', 'FileGDB'):
+            lyr_cim.featureTable.dataConnection = dc
+        lyr.setDefinition(lyr_cim)
+        aprx.save()

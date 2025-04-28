@@ -6,6 +6,9 @@
 
 from __future__ import print_function, unicode_literals, absolute_import
 import os, sys
+
+from xarray.util.generate_ops import inplace
+
 sys.path = [p for p in sys.path if '86' not in p]
 from arcgis.gis import GIS
 from arcgis.gis import Group
@@ -796,7 +799,7 @@ class commonUtils(object):
         index_field         for assigning index_col in DataFrame constructor
         '''
         # save df
-        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA', dtype = 'str')
+        df = pd.read_csv(fp_csv, index_col = index_field, na_values = 'NA')
         setattr(self, df_str, df)
 
         # save path to csv
@@ -1382,7 +1385,7 @@ class commonUtils(object):
                     except KeyError:
                         pass
 
-                    df_target = df_target.append(ser_append)
+                    df_target = pd.concat([df_target, ser_append])
                     debug_idx = 8
                     if action_type == 'copy_replace':
                         # similar in function to updating dictionary, but instead, updating row in df if new vals
@@ -1401,7 +1404,7 @@ class commonUtils(object):
                         df = df.reindex(columns=col_order_orig)
                         print('debugging Z')
                     else:
-                        df = df.append(ser_append)
+                        df = pd.concat([df ser_append])
 
                     if rename:
                         # Replace indice with new feat name
@@ -1943,11 +1946,15 @@ class commonUtils(object):
         '''
         try:
             tgt_val = kwargs['remove_item']
-            csString_updated = [v.strip() for v in csString.split(',') if v.strip() != tgt_val]
-            csString_updated = ','.join(csString_updated)
-            return(csString_updated)
+            # if no comma sep string i.
+            if ~pd.isnull(tgt_val):
+                csString_updated = [v.strip() for v in csString.split(',') if v.strip() != tgt_val]
+                csString_updated = ','.join(csString_updated)
+                return(csString_updated)
+            else:
+                return(csString)
         except KeyError:
-            pass
+            return(csString)
 
 class proProject(commonUtils):
     '''
@@ -2005,16 +2012,16 @@ class proProject(commonUtils):
         map_str = aprx_str.replace('aprx','layouts')
         setattr(self, layout_str, l)
 
-    def format_lyR_inv_datasource_standard(self, subproject, prop_str_indices, source_new='DATA_LOCATION_MCM_RESOURCE', **kwargs):
+    def format_lyR_inv_datasource_standard(self, subproject, df_str, prop_str_indices, source_new='DATA_LOCATION_MCM_RESOURCE'):
 
         # A) Gather Connetion Info
-        try:
-            kwargs['lyR_aprx']
-            fp_csv_lyR = self.pl_aprx.loc[subproject, f'fp_lyR_aprx']
-        except KeyError:
-            fp_csv_lyR = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
-        df = pd.read_csv(fp_csv_lyR, index_col='DATA_LOCATION_MCMILLEN')
+        fp_csv = self.pl_aprx.loc[subproject, 'fp_df_reSource']
         indices = getattr(self, prop_str_indices)
+        try:
+            df = getattr(self, df_str)
+        except AttributeError:
+            self.add_df(fp_csv, df_str, 'DATA_LOCATION_MCMILLEN')
+            df = getattr(self, df_str)
 
         # Use orig (path/to/fc i.e. DATA_LOCATION_MCMILLEN
         for idx in indices:
@@ -2050,8 +2057,7 @@ class proProject(commonUtils):
                     fname=fp_comps[-1]
                 df.at[idx, 'dataset'] = fname
                 df.at[idx, 'dbase_connection'] = dbase_connection
-        setattr(self, fp_csv_lyR, df)
-        df.to_csv(fp_csv_lyR)
+        setattr(self, df_str, df)
 
     def re_source_lyR_maestro(self, subproject, prop_str_indices, fp_log_prop_str, tc='DATA_LOCATION_MCMILLEN',**kwargs):
 
@@ -2067,10 +2073,13 @@ class proProject(commonUtils):
         df_lyR_aprx_str=f"df_{subproject}_aprx_lyR"
         df_lyR_all_str=f"df_{subproject}_all_lyR"
         df_map_matrix_str=f"df_{subproject}_map_matrix"
+        df_reSource_str=f"df_{subproject}_reSource"
         fp_lyR_inv_map = self.pl_aprx.loc[subproject, 'fp_lyR_map']
         fp_lyR_inv_aprx = self.pl_aprx.loc[subproject, 'fp_lyR_aprx']
         fp_lyR_inv_all = self.pl_aprx.loc[subproject, 'fp_lyR_all']
         fp_map_matrix = self.pl_aprx.loc[subproject, 'fp_map_matrix']
+        fp_reSource = self.pl_aprx.loc[subproject, 'fp_df_reSource']
+
         try:
             getattr(self, df_lyR_map_str)
         except AttributeError:
@@ -2087,13 +2096,18 @@ class proProject(commonUtils):
             getattr(self, df_map_matrix_str)
         except AttributeError:
             self.add_df(fp_map_matrix, df_map_matrix_str, tc)
+        try:
+            getattr(self, df_reSource_str)
+        except AttributeError:
+            self.add_df(fp_reSource, df_reSource_str, tc)
 
         df_lyR_inv_aprx=getattr(self, df_lyR_aprx_str)
         df_lyR_inv_map=getattr(self, df_lyR_map_str)
-        # df_lyR_inv_map.set_index([tc, 'APRX'], inplace=True)
+        df_lyR_inv_map.reset_index().set_index([tc, 'APRX'], inplace=True)
         df_lyR_inv_all=getattr(self, df_lyR_all_str)
-        # df_lyR_inv_all.set_index([tc,'APRX','MAP_NAME'],inplace=True)
+        df_lyR_inv_all.reset_index().set_index([tc,'APRX','MAP_NAME'],inplace=True)
         df_map_matrix=getattr(self, df_map_matrix_str)
+        df_reSource = getattr(self, df_reSource_str)
 
         # Initiate map removal accounting if needed
         if r'MAP_NAME_UPDATED' not in df_lyR_inv_map.columns:
@@ -2105,9 +2119,6 @@ class proProject(commonUtils):
 
         # INIT LOGFILE
         self.init_logfile(subproject)
-
-        # df_temp=df_lyR_inv_map[df_lyR_inv_mapAPRX==aprx_name]
-        # map_list = self.parse_comma_sep_list(col_to_parse, dframe=df_temp)
         map_temp, layer_temp=[],[]
 
         # Returns rows in index and columns with any True valeus
@@ -2148,10 +2159,10 @@ class proProject(commonUtils):
                     if resource:
                         try:
                             idx = copy.copy(os.path.normpath(lyr.dataSource))
-                            wsf = df_lyR_inv_aprx.loc[idx, 'workspace_factory']
-                            dbase_connection = df_lyR_inv_aprx.loc[idx, 'dbase_connection']
-                            dataset = df_lyR_inv_aprx.loc[idx, 'dataset']
-                            feature_dataset = df_lyR_inv_aprx.loc[idx, 'feature_dataset']
+                            wsf = df_reSource.loc[idx, 'workspace_factory']
+                            dbase_connection = df_reSource.loc[idx, 'dbase_connection']
+                            dataset = df_reSource.loc[idx, 'dataset']
+                            feature_dataset = df_reSource.loc[idx, 'feature_dataset']
 
                             lyr_cim = lyr.getDefinition('V3')
                             # https://community.esri.com/t5/python-questions/updating-the-data-source-of-a-feature-class-in-a/m-p/1116155#M62964
@@ -2193,11 +2204,11 @@ class proProject(commonUtils):
                             layer_temp.append(idx)
                     else:
                         pass
-            # for idx in aprx_indices:
-            #     csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
-            #     csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
-            #     df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
-            #     setattr(self, df_lyR_aprx_str, df_lyR_inv_aprx)
+            for idx in aprx_indices:
+                csString = df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED']
+                csString_updated = self.parse_csString_utils(csString, remove_item=subproject)
+                df_lyR_inv_aprx.loc[idx, 'APRX_UPDATED'] = csString_updated
+                setattr(self, df_lyR_aprx_str, df_lyR_inv_aprx)
             aprx = getattr(self, f"aprx_{subproject}")
             aprx.save()
 
@@ -2465,7 +2476,53 @@ class proProject(commonUtils):
             else:
                 pass
         return(df)
+    def custom_merge(self, df_str_src, df_str_tgt, tc_src, tc_tgt, cols_update,
+                     concat_omitted=False, overwrite_var=False, **kwargs):
+        '''
+        Update df from another df, specifically df_lyR_aprx to update maestro
+        Useful to populate ALL layers from lyr_aprx to maestro
+        ZU 20250416
+        Args:
+            df_str_src:         self explanatory i.e. df_lyr_APRX
+            df_str_tgt:         self explanatory i.e. df_maestro
+            tc_src:             target col
+            tc_tgt:             target col
+            cols_update:        list of cols
+            overwrite_var:       False if only update NA, True if update all overlapping (see docs .update)
+            concat_ommitted:    if
+            **kw['subset']:     any lengh dict with key:val = col_name:value
+        Returns:
+            df_tgt:             updated df_tgt
+        '''
+        df_src=getattr(self, df_str_src)
+        df_tgt=getattr(self, df_str_tgt)
+        if df_src.index.name!=tc_src:
+            df_src.reset_index().set_index(tc_src, inplace=True)
+        if df_tgt.index.name!=tc_tgt:
+            df_tgt.reset_index().set_index(tc_tgt, inplace=True)
+        # If subsettig by target value in df_src
+        try:
+            d = kwargs['subset']
+            for k,v in zip(*d.items()):
+                if 'subset' not in locals():
+                    subset=df_src[df_src[key]==val]
+                else:
+                    subset = pd.concat(subset, df_src[df_src[key]==val])
+            df_src=copy.copy(subset)
+        except KeyError:
+            pass
+        committed_idx=list(set(df_tgt.index).intersection(df_src.index))
+        omitted_idx=list(set(df_src.index)-set(df_tgt.index))
+        df_omitted = df_src.loc[omitted_idx, cols_update]
 
+        # Update cols on intersected if value for columns
+        df_committed = df_src.loc[committed_idx, cols_update]
+        df_tgt.update(df_committed, overwrite=overwrite_var)
+        if concat_omitted:
+            df_omitted.reset_index(inplace=True)
+            df_tgt.reset_index(inplace=True)
+            df_tgt=pd.concat([df_tgt, df_omitted])
+        setattr(self, df_str_tgt, df_tgt)
 class AgolAccess(commonUtils):
     '''
     Basic init for AGOL access

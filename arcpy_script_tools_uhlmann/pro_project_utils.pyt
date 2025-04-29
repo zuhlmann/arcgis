@@ -7,7 +7,7 @@ import os
 import copy
 import ntpath
 
-class ToolBox(object):
+class Toolbox(object):
     def __init__(self):
         '''
         Define the toolbox (name of the toolbox is name of .pyt file).

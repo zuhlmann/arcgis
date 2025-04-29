@@ -14,28 +14,28 @@ fp_offline = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utili
 olt = pd.read_csv(fp_offline, index_col = 'gdb_str')
 prj_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files'
 
-# subproject = 'SFT_master'
-#
-# gdb_str = '{}_gdb'.format(subproject)
-# gdb_pro = pl.loc[gdb_str, 'fp_gdb']
-# prj_file = os.path.join(prj_dir, pl[pl.subproject == subproject].prj_file.values[0])
-#
-# # TOLT
-# import spyder_arcgis_oop as agolZ
-# importlib.reload(sys.modules['utilities'])
-# importlib.reload(sys.modules['spyder_arcgis_oop'])
-# agol_obj = agolZ.commonUtils()
-# agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
-#
-# # # INDICES
+subproject = 'sitka_inundation'
+
+gdb_str = '{}_gdb'.format(subproject)
+gdb_pro = pl.loc[gdb_str, 'fp_gdb']
+prj_file = os.path.join(prj_dir, pl[pl.subproject == subproject].prj_file.values[0])
+
+# TOLT
+import spyder_arcgis_oop as agolZ
+importlib.reload(sys.modules['utilities'])
+importlib.reload(sys.modules['spyder_arcgis_oop'])
+agol_obj = agolZ.commonUtils()
+agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
+
+# # INDICES
 # agol_obj.selection_idx('df', indices = [18])
-# agol_obj.selection_idx('df', target_action= 'rename_rd3')
-#
-# print('nothing')
-#
-# agol_obj.take_action('df', 'rename', target_col = 'DATA_LOCATION_MCMILLEN',
-#                      dry_run = False, save_df = True,
-#                      offline_source=False, offline_target=False)
+agol_obj.selection_idx('df', target_action= 'delete')
+
+print('nothing')
+
+agol_obj.take_action('df', 'delete', target_col = 'DATA_LOCATION_MCMILLEN',
+                     dry_run = True, save_df = True,
+                     offline_source=False, offline_target=False)
 
 fp_aprx=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\PSP_2024\PSP_2024.aprx"
 csv=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0.csv"

@@ -11,8 +11,8 @@ import numpy as np
 # Creating indices with ll beginning tile coordinates, num rows, num cols and overlap.  Set overlap to 0
 # if none desired
 
-x0 = -2471220
-y0 = 2652820
+x0 = 1128250
+y0 = 937900
 # total overlap for two adjacent indices
 overlap = 0.05
 # split between the two tiles
@@ -21,7 +21,7 @@ layout_width = 12
 layout_ht = 8
 # Set true for relative, false for 1 inch = n feet scale convention
 relative=False
-ft_to_in_scale = 150
+ft_to_in_scale = 440
 relative_scale = 24000
 # multiply by 0.5 because we are starting at centroid.  dx + dx = full indice width
 # _relative and _in2feet are for the two scale representations.  Set one above along with boolean
@@ -48,9 +48,9 @@ for c in range(cols):
         ll = (x-dx, y-dy)
         polys.append(Polygon([ul,ur,lr,ll]))
 features = [i for i in range(len(polys))]
-crs = "ESRI:102003"
+crs = "ESRI:102966"
 gdr = gpd.GeoDataFrame({'feature': features, 'geometry':polys}, crs=crs)
-fp_out = r'C:\Box\MCM Projects\City of Sitka\24-066 TO4 Green Lake Dam Breach\6.0 Plans and Specs\6.4 GIS\GIS_files\staging\sitka_indices_1to100.shp'
+fp_out = r'C:\Box\MCM Projects\City of Sitka\24-066 TO4 Green Lake Dam Breach\6.0 Plans and Specs\6.4 GIS\GIS_files\staging\sitka_indices_1to440_AK_albers.shp'
 gdr.to_file(fp_out)
 
 # # load df

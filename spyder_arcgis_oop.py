@@ -1385,7 +1385,7 @@ class commonUtils(object):
                     except KeyError:
                         pass
 
-                    df_target = pd.concat([df_target, ser_append])
+                    df_target = pd.concat([df_target, ser_append.to_frame().T])
                     debug_idx = 8
                     if action_type == 'copy_replace':
                         # similar in function to updating dictionary, but instead, updating row in df if new vals
@@ -1404,7 +1404,7 @@ class commonUtils(object):
                         df = df.reindex(columns=col_order_orig)
                         print('debugging Z')
                     else:
-                        df = pd.concat([df ser_append])
+                        df = pd.concat([df, ser_append.to_frame().T])
 
                     if rename:
                         # Replace indice with new feat name
@@ -1499,8 +1499,7 @@ class commonUtils(object):
                     fp_csv_target = os.path.join(inventory_dir, fname_csv)
                     df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 else:
-                    fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[
-                        0]
+                    fp_csv_target = lookup_table[lookup_table.subproject == self.subproject_str].standalone_csv.values[0]
                     df_str_target = 'df_{}_standalone'.format(self.subproject_str)
 
                 # Only grabs TargetGDB once per gdb
@@ -1514,7 +1513,8 @@ class commonUtils(object):
                     df_target = getattr(self, df_str_target)
 
                 # Since adding new row, it's append
-                df_target = df_target.append(df_append)
+                df_target = pd.concat([df_target, ser_append.to_frame().T])
+
                 # since updating existing NOT append
                 print(df)
                 print('\n')
@@ -1600,7 +1600,7 @@ class commonUtils(object):
                 df_target = getattr(self, df_str_target)
 
             # Since adding new row, it's append
-            df_target = df_target.append(df_append)
+            df_target = pd.concat([df_target, ser_append.to_frame().T])
             # since updating existing NOT append
             print(df)
             print('\n')

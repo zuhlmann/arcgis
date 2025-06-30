@@ -948,7 +948,7 @@ def mxd_inventory_csv(fp_base, fname_csv, **kwargs):
     # ADD 3/10/2021
     # lyr.minScale, lyr.maxScale, lyr.definitionQuery, lyr.transparency, showLable
 
-def write_folder_contents(fp, **kwargs):
+def write_folder_contents(fp,output_type='.txt',**kwargs):
     '''
     simple readme that lists all items and files in fp argument.  Filename will
     be README_<folder_name>_<date>.txt.  Will indicate date in file
@@ -962,6 +962,7 @@ def write_folder_contents(fp, **kwargs):
     folder_name = os.path.split(fp)[-1]
     fname_readme = 'README_{}.txt'.format(folder_name)
     fp_out = os.path.join(fp, fname_readme)
+    fp_out_df = os.path.join(fp, f"{folder_name}_inv.csv")
     files = os.listdir(fp)
     files_fp = [os.path.join(fp, f) for f in files]
     files_fp.sort(key=os.path.getctime)
@@ -987,20 +988,26 @@ def write_folder_contents(fp, **kwargs):
         str_piece = files_fp
     except KeyError:
         str_piece = [os.path.split(fp)[-1] for fp in files_fp]
-    basic_str = '\n'.join(str_piece)
-    todays_date = datetime.datetime.today().strftime('%B %d %Y')
-    signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
-    file_name = 'README_{}'.format(folder_name)
-    basic_str = file_name + '\n' + signature + '\n\nContents\n' + basic_str
-    try:
-        kwargs['add_quotes']
-        with open(fp_out, 'w') as out_file:
-            str_piece = [r'"{}"'.format(sp) for sp in str_piece]
-            basic_str = '\n'.join(str_piece)
-            out_file.write(basic_str)
-    except KeyError:
-        with open(fp_out, 'w') as out_file:
-            out_file.write(basic_str)
+    if output_type=='.txt':
+        basic_str = '\n'.join(str_piece)
+        todays_date = datetime.datetime.today().strftime('%B %d %Y')
+        signature = 'Created By Zach Uhlmann on {}'.format(todays_date)
+        file_name = 'README_{}'.format(folder_name)
+        basic_str = file_name + '\n' + signature + '\n\nContents\n' + basic_str
+        try:
+            kwargs['add_quotes']
+            with open(fp_out, 'w') as out_file:
+                str_piece = [r'"{}"'.format(sp) for sp in str_piece]
+                basic_str = '\n'.join(str_piece)
+                out_file.write(basic_str)
+        except KeyError:
+            with open(fp_out, 'w') as out_file:
+                out_file.write(basic_str)
+    elif output_type=='.csv':
+        fnames=[os.path.splitext(os.path.basename(fn))[0] for fn in files_fp]
+        df=pd.DataFrame(np.column_stack([fnames, files_fp]), columns=['filename','filepath'])
+        df.to_csv(fp_out_df)
+
 def enum_fp_list(fp_base, return_full_path, **kwargs):
     '''
     will this print
@@ -1048,22 +1055,6 @@ def enum_fp_list(fp_base, return_full_path, **kwargs):
     except NameError:
         pass
 
-def create_df_inventory(fp_base, fp_csv, version = 1):
-    '''
-    utility to create a list of mxds and pdfs to keep track of multiple maps
-    in a project.  This will be drawn upon to create an inventory list
-    ZU 20201213
-    fp_base             directory containing mxds
-    fp_out              where to save inventory
-    fp_inventory        full name of file path including .csv for inventory
-    '''
-    mxd_list = [fname for fname in os.listdir(fp_base) if 'mxd' in fname]
-    pdf_append = '_version_{}.pdf'.format(version)
-    fname_pdf = [os.path.splitext(fname_mxd)[0] + pdf_append for fname_mxd in mxd_list]
-    df = pd.DataFrame(np.column_stack(
-                        [mxd_list, fname_pdf, [fp_base] * len(fname_pdf)]),
-                        columns = ['mxd_filename', 'pdf_filename', 'base_dir'])
-    pd.DataFrame.to_csv(df, fp_csv)
 def return_mxd_obj(fp_mxd):
     '''
     helpful methods and such to add to mapping doc
@@ -1990,7 +1981,7 @@ def aprx_inventory(aprx_dir, csv_dir_out):
             if 'df_lyt' not in locals():
                 df_lyt = df_map_dict[mn]
             else:
-                df_lyt = df_lyt.append(df_map_dict[mn])
+                df_lyt = pd.concat([df_lyt, df_map_dict[mn]])
         pd.DataFrame.to_csv(df_lyt, fp_csv_out)
         del df_lyt
 

@@ -79,3 +79,6 @@ csv_aprx_lyR_2=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\DLA\data_in
 # pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
 # df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'PSP_2024_2', 'PSP_2024_2')
 # df.to_csv(fp_lyR_inv_maestro)
+
+df_reSource=pd.read_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\staging\SFT_lyR_reSourcing.csv")
+df_lyr0=pd.read

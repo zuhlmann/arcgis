@@ -134,7 +134,7 @@ class project_lyT_inv(object):
             unused_maps = list(set(project_maps) - set(el_map_formatted))
             df_maps = pd.DataFrame(project_maps, columns = ['map_name'])
             df_maps = df_maps.set_index('map_name')
-            df_maps.loc[unused_maps,'used_in_layout']=false
+            df_maps.loc[unused_maps,'used_in_layout']=False
             df_maps.loc[list(set(el_map_formatted)), 'used_in_layout']=True
             proj_name = os.path.split(aprx.filePath)[-1][:-5]
             csv_maps = os.path.join(parameters[2].valueAsText, '{}_map_inv.csv'.format(proj_name))

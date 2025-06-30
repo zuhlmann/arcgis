@@ -1,4 +1,4 @@
-import importlib
+jimport importlib
 import spyder_arcgis_oop as agolZ
 from debugging_pro import df_lyR_inv_aprx
 
@@ -13,7 +13,7 @@ import os
 subproject='PSP_2024_2'
 fp_pathlist = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv"
 fp_pathlist_aprx = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_aprx.xlsx"
-prj_file=r'NAD_1983_HARN_StatePlane_Washington_North_FIPS_4601_Feet.prj'
+prj_file = r'NAD_1983_HARN_StatePlane_Washington_North_FIPS_4601_Feet.prj'
 
 # Initiaate
 pro_obj = agolZ.proProject()
@@ -46,14 +46,14 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 # # A2b) Create map matrix - just do once
 # pro_obj.expand_rows(subproject, fp_map_matrix)
 
-# # A2b Multiple APRX
-# pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
-# pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
-# cf = ['ITEM','IS_RASTER','IS_BROKEN']
-# pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-# df_lyR_all=pd.read_csv(fp_lyR_inv_all)
-# df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
-# df_aggregated.to_csv(fp_lyR_inv_maestro)
+# A2b Multiple APRX
+pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
+pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
+cf = ['ITEM','IS_RASTER','IS_BROKEN']
+pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+df_lyR_all=pd.read_csv(fp_lyR_inv_all)
+df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
+df_aggregated.to_csv(fp_lyR_inv_maestro)
 
 # # A3) After creating lyR_inv
 # df_lyR_str = f"df_{subproject}_lyR_maestro"

@@ -1,9 +1,11 @@
-import geopandas as gpd
-import fiona
+# import geopandas as gpd
+# import fiona
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
 from datetime import date
+import copy
+import math
 
 def schema_to_df(schema, prop_key):
     # take a fiona schema object and convert to df
@@ -223,8 +225,6 @@ def gdf_shp_merge(gdf_tgt, gdf_src, feat_out, csv, geom_type, crs, **kwargs):
     return(gdf_joined, schema_updated)
 
 
-import geopandas as gpd
-import os
 def gpd_overlay(config_file):
     '''
     Used this but never developed because the FERC boundary was geometrically way off.
@@ -245,5 +245,56 @@ def gpd_overlay(config_file):
 
     dir_out = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\gis_requests\requests_McMillen\2024PAD_general\seattle_acreage'
     union_seattle.to_file(os.path.join(dir_out, 'seattle_acreage_ferc_bdry.shp'))
+
+def deg_min_sec(dd):
+    # https: // stackoverflow.com / questions / 2579535 / convert - dd - decimal - degrees - to - dms - degrees - minutes - seconds - in -python
+    # mult = -1 if dd < 0 else 1
+    mnt, sec = divmod(abs(dd) * 3600, 60)
+    deg, mnt = divmod(mnt, 60)
+    deg, mnt, sec = int(deg), int(mnt), int(sec)
+    return (deg, mnt, sec)
+def deg_min_sec_reverse(deg,mnt,sec):
+    '''
+    May 2025.  Convert degrees, minutes, seconds to decimal degrees.
+    deg:        degrees
+    mnt:        minutes
+    sec:        seconds
+    '''
+    dec_deg = (deg*3600+mnt*60+sec)/3600
+    return(dec_deg)
+def create_segment(dd, easting, northing, segment_len, direction, fp_line):
+    '''
+    Creates line segment feature given starting point (easting, northing), direction (dd), bearing (direction),
+    segment length (segment_len).  Line added to fp_line feature.  ZU 20250513.  Check cooper_lk_license (Advanced notebook)
+    for usage.
+    :param dd:              decimal degrees (direction) of line to be created
+    :param easting:         starting point in easting units of fp_line
+    :param northing:        starting point in northing units of fp_line
+    :param segment_len:     length of segment to be created
+    :param direction:       bearing i.e. SW NW SE NE
+    :param fp_line:         existing line (in Table of Contents if calling in Pro, or path/to/line feature
+    :return:
+    '''
+    import arcpy
+    if direction=="SW":
+        bearing_dd=270-dd
+    elif direction=='NW':
+        bearing_dd=dd+90
+    elif direction=='SE':
+        bearing_dd=270+dd
+    elif direction=='NE':
+        bearing_dd=90-dd
+    print(bearing_dd)
+    with arcpy.da.InsertCursor(fp_line, ["SHAPE@"]) as cursor:
+        x=math.cos(math.radians(bearing_dd))*segment_len + easting
+        y=math.sin(math.radians(bearing_dd))*segment_len + northing
+        arr = arcpy.Array([arcpy.Point(easting, northing), arcpy.Point(x, y)])
+        line = arcpy.Polyline(arr)
+        cursor.insertRow([line])
+    del cursor
+
+
+
+
 
 

@@ -7,7 +7,7 @@ def format_names(indir):
     fnames = os.listdir(indir)
     for fn in fnames:
         fp_in = str(os.path.join(indir, fn))
-        replace_dict = {' ':'_','(2)':'','-':'_'}
+        replace_dict = {' ':'_','-':'_','(':'',')':''}
         for k,v in replace_dict.items():
             fn = fn.replace(k, v)
             os.rename(fp_in, os.path.join(indir, fn))

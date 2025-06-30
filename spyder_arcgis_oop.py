@@ -1384,8 +1384,9 @@ class commonUtils(object):
                         df_target.drop(feat_name, inplace=True)
                     except KeyError:
                         pass
-
-                    df_target = pd.concat([df_target, ser_append.to_frame().T])
+                    df_append = ser_append.to_frame().T
+                    df_append.index.name='ITEM'
+                    df_target = pd.concat([df_target, df_append])
                     debug_idx = 8
                     if action_type == 'copy_replace':
                         # similar in function to updating dictionary, but instead, updating row in df if new vals
@@ -1404,7 +1405,7 @@ class commonUtils(object):
                         df = df.reindex(columns=col_order_orig)
                         print('debugging Z')
                     else:
-                        df = pd.concat([df, ser_append.to_frame().T])
+                        df = pd.concat([df, df_append])
 
                     if rename:
                         # Replace indice with new feat name
@@ -1476,6 +1477,10 @@ class commonUtils(object):
                 df_append = pd.DataFrame(d)
                 df_append = df_append.set_index('ITEM')
 
+                ser_append = pd.Series(data=d,
+                                       index=list(d.keys()),
+                                       name=feat_name)
+
                 # Get TARGET DF/CSV/STR
                 fp_components = fp_fcs_new.split(os.sep)
                 for idx, comp in enumerate(fp_components):
@@ -1516,12 +1521,8 @@ class commonUtils(object):
                 df_target = pd.concat([df_target, ser_append.to_frame().T])
 
                 # since updating existing NOT append
-                print(df)
-                print('\n')
-                print(df_append)
+
                 df.update(df_append)
-                print('AFTERWARDS/n')
-                print(df)
                 setattr(self, df_str_target, df_target)
                 setattr(self, df_str, df)
 
@@ -1600,14 +1601,9 @@ class commonUtils(object):
                 df_target = getattr(self, df_str_target)
 
             # Since adding new row, it's append
-            df_target = pd.concat([df_target, ser_append.to_frame().T])
+            df_target = pd.concat([df_target, df_append])
             # since updating existing NOT append
-            print(df)
-            print('\n')
-            print(df_append)
             df.update(df_append)
-            print('AFTERWARDS/n')
-            print(df)
             setattr(self, df_str_target, df_target)
             setattr(self, df_str, df)
 

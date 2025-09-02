@@ -116,7 +116,7 @@ class project_lyT_inv(object):
         el_map_formatted = []
         for lyt in lyt_list:
             el = lyt.listElements()
-            el_map = [e.map.name for e in el if e.type == 'MAPFRAME_ELEMENT']
+            el_map = [e.map.name for e in el if (e.type == 'MAPFRAME_ELEMENT') and e.visible]
             el_map_formatted = el_map_formatted + el_map
             lyt_name = lyt_name + ([lyt.name] * len(el_map))
 

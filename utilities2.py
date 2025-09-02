@@ -48,14 +48,14 @@ def aggregate_rows(csv_in, csv_out, group_by_field, agg_field, **kwargs):
 
 def subset_PDF(df, flag,pdf_in, pdf_out):
     # https://stackoverflow.com/questions/51567750/extract-specific-pages-of-pdf-and-save-it-with-python
-    from PyPDF2 import PdfFileReader, PdfFileWriter
-    pdfReader = PdfFileReader(pdf_in)
-    pdfWriter = PdfFileWriter()
+    from PyPDF2 import PdfReader, PdfWriter
+    pdfReader = PdfReader(pdf_in)
+    pdfWriter = PdfWriter()
     df_subset = df[getattr(df, flag)]
 
     for idx in df_subset.index:
         page_num = int(df_subset.loc[idx, 'PAGE_PDF'])
-        pdfWriter.addPage(pdfReader.getPage(page_num - 1))
+        pdfWriter.add_page(pdfReader.pages[page_num - 1])
     with open(pdf_out, 'wb') as out:
         pdfWriter.write(pdf_out)
 

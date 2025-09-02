@@ -18,42 +18,6 @@ from importlib import reload
 # from pathlib import Path
 # reload(logging)
 
-def show_table(display_preference):
-    '''
-    ARGS:
-    display_preference:  desc or path. string
-    '''
-    from tabulate import tabulate
-    paths_table = """C:/Users/uhlmann/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
-    # use index_col = 0 for show_table.  So .iloc values will accompany table
-    df = pd.read_csv(paths_table, index_col = 0)
-    df.index.name = 'index'
-    # somehow need to be accessed this way
-    display_list = ['alias']
-    display_list.append(display_preference)
-    df2 = df[display_list]
-    table = tabulate(df2, headers = 'keys', colalign = ["left",  "left"], tablefmt = "github")
-    # display table with options for filepaths
-    print('')
-    print(table)
-def get_path(idx, path_type):
-    '''
-    args:
-    idx         integer for iloc or string of alias
-    '''
-    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
-    df = pd.read_csv(paths_table, index_col = 1)
-    # if passing index with iloc
-    col_dict = {'gdb':'path_gdb',
-                'csv':'path_csv'}
-    col_name = col_dict[path_type]
-    if isinstance(idx, int):
-        path_out = df.iloc[idx][col_name]
-    # if passing string of alias
-    else:
-        path_out = df.loc[idx][col_name]
-    return(path_out)
-
 def update_path_dict(idx_list, path_type, paths_table):
 
     kv_scratch_gdb = kwargs['pro_project_dict']['gdb']
@@ -65,229 +29,6 @@ def update_path_dict(idx_list, path_type, paths_table):
     col_name = col_dict[path_type]
     for idx in idx_list:
         path_out = df.loc[idx][col_name]
-
-
-def add_table_entry(alias, desc, fp):
-    '''
-    can add table entry by passing three required args
-    ARGS
-    alias       string. alias should be 'fp_<descriptive name>'
-    desc        description of feature class
-    fp          file path to dataset
-    '''
-    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
-    df = pd.read_csv(paths_table, index_col = 0)
-    if isinstance(df, pd.DataFrame):
-        pass
-    else:
-        df = pd.read_csv(df, index_col = 0)
-    cols = df.columns.tolist()
-    row_list = [alias, desc, fp]
-    new_row = {c: row_list[idx] for idx, c in enumerate(cols)}
-    new_row = pd.Series(new_row)
-    df_concat = pd.concat([df, pd.DataFrame(new_row).T])
-    # reindex hack
-    df_concat.index = range(len(df_concat))
-    pd.DataFrame.to_csv(df_concat, paths_table)
-def remove_table_entry(alias):
-    '''
-    remove table entry by passing alias
-    ARGS
-    alias       string. alias
-    '''
-    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
-    df = pd.read_csv(paths_table, index_col = 1)
-    # get index of row
-    row_idx = df.index[getattr(df, 'alias') == alias]
-    # remove the row
-    df.drop(row_idx, inplace = True)
-    # reindex
-    df.index = range(len(df))
-    pd.DataFrame.to_csv(df, paths_table)
-def replace_table_entry(alias_or_path, original, replacement):
-    '''
-    replace alias or path with a new value
-    Useful if alias is off or path has been changed.
-    ZRU 5/29/2020
-    ARGS
-    alias_or_path       string. acceptable values 'alias' or 'path'
-    original            original value for alias
-    replacement         value to replace with
-    '''
-    paths_table = """C:/Box/GIS/Project_Based/Klamath_River_Renewal_MJA/GIS_Data/data_inventory_and_tracking/path_list.csv"""
-    df = pd.read_csv(paths_table, index_col = 0)
-    row_idx = df.index[getattr(df, 'alias') == original]
-    if alias_or_path.lower() == 'alias':
-        df.loc[row_idx, 'alias'] = replacement
-    elif alias_or_path.lower() == 'path':
-        df.loc[row_idx, 'path'] = replacement
-    pd.DataFrame.to_csv(df, paths_table)
-def attribute_inventory(fp_feat, fp_out, exclude, attr_list):
-    '''
-    adapted and updated from compare_data.py unique_values
-    ZRU 5/26/20 need to update utils
-
-    ARGS
-    fp_feat           path/to/feature
-    fp_out            base/path/to/save
-    exclude           boolean if True then list of fields will be excluded.
-                      otherwise the list will be considered fields desired
-    attr_list         list. common fields like shape_Length
-    '''
-    import arcpy
-    import pandas as pd
-
-
-    # exclude fields
-    if exclude:
-        # get attribute fields
-        fields = [str(f.name) for f in arcpy.ListFields(fp_feat)]
-        fields = list(set(fields) - set(attr_list))
-    # use fields provided
-    else:
-        fields = attr_list
-    feat_name = fp_feat.split('\\')[-1]
-    for field in fields:
-        print(field)
-        with arcpy.da.SearchCursor(fp_feat, [field]) as cursor:
-            # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
-            vals = [row[0] for row in cursor]
-            df = pd.DataFrame(vals, columns = ['value'])
-            series_sort = df.groupby('value').size()
-            df = pd.DataFrame(series_sort.sort_values())
-            pd.DataFrame.to_csv(df, os.path.join(fp_out, '{}_{}.csv'.format(feat_name, field)))
-
-def list_unique_fields(fp_feat, field, data_storage, **kwargs):
-    '''
-    ZRU 6/1/20
-    ARGS:
-    fp_feat         file path to feature (string).  could prob be feature layer too
-    field           N = 1 or more field names from attribute table.  List of strings
-                    Individual string will also be handled if just one field
-    data_storage    string.  options: 'in_memory', 'feature_layere', 'none'
-    kwargs          currently, specify 'name' Keywork = Value pair when specifying
-                    data_storage value not 'none'
-    '''
-    import arcpy
-    import pandas as pd
-
-    # turn FIELD into list if not a list
-    if isinstance(field, list):
-        pass
-    else:
-        field = [field]
-    # try except and kwargs should be removed.  Apparently da.searchcursor only
-    # accepts feature classes or tables - not feature layers.  False statment??
-    if data_storage == 'in_memory':
-        feat = 'in_memory\\{}'.format(kwargs['name'])
-        arcpy.MakeFeatureLayer_management(fp_feat, feat)
-    elif data_storage == 'feature_layer':
-        feat = kwargs['name']
-        arcpy.MakeFeatureLayer_management(fp_feat, feat)
-    elif data_storage == 'none':
-        feat = fp_feat
-
-    with arcpy.da.SearchCursor(feat, field) as cursor:
-        rows = [row for row in cursor]
-        vals = zip(*rows)
-        for idx, field in enumerate(field):
-            if 'dict' not in locals():
-                dict = {field : vals[idx]}
-            else:
-                dict[field] = vals[idx]
-        df = pd.DataFrame(dict)
-    return(df)
-def where_clause_2023(fld,  vals, **kwargs):
-    '''
-    ZU 20230206
-    Args:
-        fld:            single field (string)
-        vals:           list of vals
-        **kwargs:
-
-    Returns:
-        wc:             where_clause argument
-    '''
-    if not isinstance(vals[0], str):
-        v = [str(vi) for vi in vals]
-        v_str = ','.join(v)
-    else:
-        #     v_str = r'"{}"'.format('","'.join(vals))
-        v_str = r"'{}'".format("','".join(vals))
-
-        # now create wc
-    delimited_fld = arcpy.AddFieldDelimiters(arcpy.env.workspace, fld)
-    wc = '{} in ({})'.format(delimited_fld, v_str)
-    return(wc)
-
-def custom_select(fp_or_feat, field, target_vals):
-    '''
-    used to get indices for selecting features.  getting objectid from dataframe
-    easier than running multiple arcpy and CopyFeature_management functions.
-    ZRU 6/2/2020
-    Needs to be generalized.
-    ARGS:
-    fp_or_feat              seems to work with either lyr object or file path
-    field                   currently only takes one field as str
-    target_vals             list of vals
-    RETURNS:
-    df                      dataframe which will be used to extract indices/objectid
-    '''
-    with arcpy.da.SearchCursor(fp_or_feat, ['OBJECTID', field]) as cursor:
-        # This row[0] will access teh object to grab the field.  If n fields > 1, n idx >1
-        objectid, source_val = [], []
-        for row in cursor:
-            objectid.append(row[0])
-            source_val.append(row[1])
-    df = pd.DataFrame(np.column_stack([objectid, source_val]), columns = ['OBJECTID', 'val'],  index = objectid)
-    df = df[df.val.isin(target_vals)]
-    return(df)
-def feature_table_as_csv(fp_in, fp_csv, field_names):
-    '''
-    feed it field names in a list of strings and returns csv of attributes
-    table. Updated ZRU 10/9/2020
-    ARGS:
-    fp_in       yeah
-    fp_csv      the csv path for table
-    field_name  field names - list of strings
-    '''
-    # hack
-    field_names_objid = ['OBJECTID']
-    for item in field_names:
-        field_names_objid.append(item)
-    with arcpy.da.SearchCursor(fp_in, field_names_objid) as cursor:
-        # rows creates a list of tuples where len of each tuple = number of field names + 1 (objectid)
-        # zip transects pos 1,2...n for number of fields + 1 yielding a list of size n = n rows
-        # for each of the fields + objectid
-        rows = [row for row in cursor]
-        field_tuple = zip(*rows)
-        df = pd.DataFrame(np.column_stack(field_tuple), columns = field_names_objid)
-        pd.DataFrame.to_csv(df, fp_csv)
-def add_path_multiIndex(df, layer, loc_idx, new_path, append):
-    '''
-    Fix hacky if/else to be vararg or something better.  Also should be a class
-    ZRU 5/14/2020
-    ARGS:
-    df          dataframe
-    layer       layer name string
-    loc_idx     either 1 or 2 (int) to be formatted to "loc1" or "loc2"
-    new_path    path to be addes
-    append      True or False.  False will print dataframe
-    '''
-    try:
-        isinstance(loc_idx, int)
-    except:
-        print('loc varible must be an integer, either 1 or 2')
-
-    level_idx = 'loc{}'.format(loc_idx)
-    try:
-        if append == True:
-            df.loc[(layer, level_idx), 'Original_Location'] = new_path
-            return df
-        else:
-            print(df.loc[(layer, level_idx), 'Original_Location'])
-    except KeyError:
-        print('layer key does not exist i.e. FERC Boundary.  Check spelling')
 
 def update_field(fp_fcs, field_dict, field_match, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
     '''
@@ -390,24 +131,6 @@ def copy_with_fields(in_fc, out_fc, keep_fields, where=''):
     # copy features
     path, name = os.path.split(out_fc)
     arcpy.conversion.FeatureClassToFeatureClass(in_fc, path, name, where, fmap)
-
-def buffer_and_create_feat(fp_line, fp_out, buff_dist, line_end_type = 'ROUND', dissolve_option = 'NONE'):
-    '''
-    ZRU 6/24/2020
-    buffer and output file
-    ARGS:
-    '''
-    # Attrocious hack to account for my lack of fixing file path slash issue with windows and python
-    # try except to handle both .shp and feat classes from gdb
-    try:
-        feat = fp_line.split('/')[-1].split('\\')[-1].split('.')[-2]
-    except IndexError:
-        feat = fp_line.split('/')[-1].split('\\')[-1]
-    arcpy.MakeFeatureLayer_management(fp_line, feat)
-    fp_temp = os.path.join(get_path('fp_scratch'), 'temp_buff')
-    arcpy.Buffer_analysis(feat, fp_temp, buff_dist, 'FULL', line_end_type, dissolve_option)
-    # arcpy.Union_management()
-    # os.path.remove
 
 def field_mappings(fp_target, fp_append, mapping_csv, fp_out, unmapped):
     '''
@@ -1062,8 +785,6 @@ def return_mxd_obj(fp_mxd):
     '''
     mxd = arcpy.mapping.MapDocument(fp_mxd)
     return(mxd)
-def test_run(string_print):
-    print('FUUUUUUCKKKK {}'.format(string_print))
 def parse_item_desc(sub_item_list, target_key, target_val, add = True):
     '''
     Quick utility used for adding and updating Item Description metadata via
@@ -2084,7 +1805,7 @@ def detect_df_changes(df_orig, df_current, tc = 'DATA_LOCATION_MCMILLEN'):
     omitted = list(so - sc)
 
     # APPEND and remove duplicates
-    df_assim = df_orig.append(df_current)
+    df_assim = pd.concat([df_orig, df_current])
     # oddly, keep first will Flag the last duplicates as True, the first
     # duplicates as false, and non-duplicates as false ZU 20220202
     df_assim = df_assim[~df_assim.index.duplicated(keep='first')]

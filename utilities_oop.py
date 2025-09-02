@@ -157,7 +157,7 @@ class utilities(object):
                     pass
                     # logging.info('SKIPPED THIS FILE due to file type filter: {}'.format(f.path))
             # Find directory NOT .zip (needs work - ZU 202406200
-            elif (f.is_dir()) & (f.name[-4:] == '.zip'):
+            elif (f.is_dir()) & (f.name[-4:] == '.gdb'):
                 # base_subdir = directory name one deeper than parent
                 try:
                     # try triggering exception - need idx + 1 because f.path inncludes filename

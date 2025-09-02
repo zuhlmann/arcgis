@@ -29,25 +29,23 @@ import numpy as np
 # base_dir=r'C:\Box\MCMGIS\Project_Based\Nuyakuk_Hydro\Maps\ISR_Maps'
 # utilities.mxd_inventory_csv(base_dir, 'ISR_mxd_layer_inv.csv')
 
-# Inventory Dir
-# INVENTORY DIRECTORY
-# 20240722
-# from cowlitz_dbase notebook
-
-
+# # Inventory Dir
+# # INVENTORY DIRECTORY
+# # 20240722
+# # from cowlitz_dbase notebook
 # tc = 'DATA_LOCATION_MCMILLEN'
 # parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
 # csv_lyt_inv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents\map_documents_aprx_inv.csv"
 # subdir_inv_obj = utilities_oop.utilities(parent_dir, tc)
-
+#
 # # a) no filetype filter
 # subdir_inv_obj.subdir_inventory(new_inventory = csv_lyt_inv)
-
+#
 # # b) filetype fileter
 # ft_filt = ['.gdb','.cpg','.dbf','.idx','.shx','.xml','.shp','.ipynb']
 # exclude_sd = ['aprx_inventories','archive','backups']
 # subdir_inv_obj.subdir_inventory(ft_filt, exclude_sd, new_inventory = csv_lyt_inv)
-
+#
 # # b2) filter filetype
 # projects = ['geosyntec_pad_H20_p2', 'recreation_PAD_p2','SFT_common_maps','terrrestrial_PAD']
 # subdir = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\map_documents\{}\{}'
@@ -111,51 +109,51 @@ import numpy as np
 # flag='MAP'
 # utilities2.subset_PDF(df,flag,pdf_in,pdf_out)
 
-
-# Expand_csRow
-parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
-tc = r"whatever"
-utils_obj = utilities_oop.utilities(parent_dir, tc)
-
-fnames=['PRIMARY','TRINOMIAL','USFS']
-split_keys=['primary_num','trinomial','FS_num']
-fnames=[f"Mokelumne_HPMP_Site_Table_2024_20240116_{v}.csv" for v in fnames]
-table_dir=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables'
-fps=[os.path.join(table_dir, fn) for fn in fnames]
-
-# Create initial table and generate counts
-for csv_out, sk in zip(fps,split_keys):
-    csv_orig=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables\Mokelumne_HPMP_Site_Table_20240116.csv"
-    df=pd.read_csv(csv_orig)
-    utils_obj.expand_csRow(df, csv_out, r'FERC_14794_ref',sk)
-    df=pd.read_csv(csv_out)
-    df=df[~pd.isna(df[sk])]
-    t = df.FERC_14794_ref.to_list()
-    if 'count_list' not in locals():
-        count_list=copy.copy(t)
-    else:
-        count_list.extend(t)
-v, c = np.unique(count_list, return_counts=True)
-v=list(v)
-c=list(c)
-
-# Add counts to each
-# When done, delete the two columns not split
-df.sort_values(by=['FERC_14794_ref'], inplace=True)
-for csv_out, sk in zip(fps,split_keys):
-    df=pd.read_csv(csv_out)
-    df = df[~pd.isna(df[sk])]
-    # Issue with try/except not working; use this instead
-    bandaid=df['FERC_14794_ref'].to_list()
-    df=df.set_index('FERC_14794_ref')
-    for idx, ct in zip(v,c):
-        if idx in bandaid:
-            df.at[idx, 'Count']=ct
-        else:
-            pass
-    df.sort_values(by=['FERC_14794_ref'], inplace=True)
-    df.reset_index()
-    df.to_csv(csv_out)
+# #  MOKELUMNE FORMAT
+# # Expand_csRow
+# parent_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\map_documents"
+# tc = r"whatever"
+# utils_obj = utilities_oop.utilities(parent_dir, tc)
+#
+# fnames=['PRIMARY','TRINOMIAL','USFS']
+# split_keys=['primary_num','trinomial','FS_num']
+# fnames=[f"Mokelumne_HPMP_Site_Table_2024_20240116_{v}.csv" for v in fnames]
+# table_dir=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables'
+# fps=[os.path.join(table_dir, fn) for fn in fnames]
+#
+# # Create initial table and generate counts
+# for csv_out, sk in zip(fps,split_keys):
+#     csv_orig=r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables\Mokelumne_HPMP_Site_Table_20240116.csv"
+#     df=pd.read_csv(csv_orig)
+#     utils_obj.expand_csRow(df, csv_out, r'FERC_14794_ref',sk)
+#     df=pd.read_csv(csv_out)
+#     df=df[~pd.isna(df[sk])]
+#     t = df.FERC_14794_ref.to_list()
+#     if 'count_list' not in locals():
+#         count_list=copy.copy(t)
+#     else:
+#         count_list.extend(t)
+# v, c = np.unique(count_list, return_counts=True)
+# v=list(v)
+# c=list(c)
+#
+# # Add counts to each
+# # When done, delete the two columns not split
+# df.sort_values(by=['FERC_14794_ref'], inplace=True)
+# for csv_out, sk in zip(fps,split_keys):
+#     df=pd.read_csv(csv_out)
+#     df = df[~pd.isna(df[sk])]
+#     # Issue with try/except not working; use this instead
+#     bandaid=df['FERC_14794_ref'].to_list()
+#     df=df.set_index('FERC_14794_ref')
+#     for idx, ct in zip(v,c):
+#         if idx in bandaid:
+#             df.at[idx, 'Count']=ct
+#         else:
+#             pass
+#     df.sort_values(by=['FERC_14794_ref'], inplace=True)
+#     df.reset_index()
+#     df.to_csv(csv_out)
 
 # # Find Duplicates missed during QGIS join
 # # 20250124
@@ -167,6 +165,5 @@ for csv_out, sk in zip(fps,split_keys):
 #     dft=pd.read_csv(fp)
 #     csv=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\tables\intermediary\duplicated_nums_{}.csv'.format(tc)
 #     utils_obj.aggregate_rows(dft, csv, tc, r'FERC_14794_ref')
-
 
 

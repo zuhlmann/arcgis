@@ -1927,7 +1927,7 @@ class commonUtils(object):
                                                   'ITEM', 'DATA_LOCATION_SHARED',
                                                   'DATA_LOCATION_MCMILLEN',
                                                   'DATE'])
-            df_tracking = df_tracking.append(df_new_rows)
+            df_tracking = pd.concat([df_tracking, df_new_rows])
             pd.DataFrame.to_csv(df_tracking, fp_csv_tracking)
 
     def parse_csString_utils(self, csString, **kwargs):
@@ -2124,7 +2124,7 @@ class proProject(commonUtils):
             df_map_matrix_subset = df_map_matrix.loc[indices]
             t1 = ', '.join(included_indices)
             t2 = ', '.join(excluded_indices)
-            msg_str='\nINCLUDING: {}\nNOT PRESENT IN {}: {}'.format(t1,subproject, t2)
+            msg_str='\nINDICES PASSED WHICH WERE PRESENT IN {} MATRIX: \n{} \nINDICES NOT PRESENT IN MATRIX {}: \n{}'.format(t1,subproject, t2)
             logging.info(msg_str)
             no_layers_aprx=False
         except KeyError:
@@ -2176,7 +2176,6 @@ class proProject(commonUtils):
                                 lyr_cim.featureTable.dataConnection = dc
                             lyr.setDefinition(lyr_cim)
 
-                            # new_path = df_lyR_inv.loc[idx,'DATA_LOCATION_MCM_RESOURCE']
                             idx_all=(idx, subproject, m.name)
                             df_lyR_inv_all.loc[idx_all,'RESOURCED_COMPLETE']=True
                             setattr(self, df_lyR_all_str, df_lyR_inv_all)
@@ -2258,7 +2257,7 @@ class proProject(commonUtils):
 
     def aprx_map_inv2(self, csv_in, csv_out):
         '''
-        20241021
+        20241021.  updated 20250701
         Compiling single inv from multiple aprx paths via aprx inv
         Need a True/False FLAG field to subset rows to inventory
         Args:
@@ -2268,16 +2267,21 @@ class proProject(commonUtils):
 
         '''
         df = getattr(self, 'pl_aprx')
+        # FLAG Flag just groups together whatever in group i.e. all the Tolt
         df = df[df.FLAG]
         src_list, map_list, broken, raster = [], [], [], []
         for idx in df.index:
             aprx_path = df.loc[idx, 'fp_aprx']
-            if 'df_concat' not in locals():
-                df_concat = self.aprx_map_inv(aprx_path)
-                df_concat['APRX']=len(df_concat)*[idx]
-            else:
+            # REINVENTORY means redo the inventory if changes to aprx made (takes time!)
+            if df.loc[idx,'REINVENTORY']:
                 t = self.aprx_map_inv(aprx_path)
-                t['APRX']=len(t)*[idx]
+            else:
+                t = pd.read_csv(df.loc[idx,'fp_lyR_inv'])
+            t['APRX']=len(t)*[idx]
+
+            if 'df_concat' not in locals():
+                df_concat=copy.copy(t)
+            else:
                 df_concat=pd.concat([df_concat, t])
         df_concat.to_csv(csv_out)
     def expand_rows(self, subproject, csv_out, update=False):
@@ -2296,7 +2300,12 @@ class proProject(commonUtils):
         Returns:
 
         '''
-        df_lyR_inv=pd.read_csv(self.pl_aprx.loc[subproject, 'fp_lyR_inv'], index_col='DATA_LOCATION_MCMILLEN')
+        # At some point 6 months down roead, needed to create a non-aggregated lyr_inv, so new file name followed
+        # as this requires AGGREGATED
+        fp_lyR_inv = self.pl_aprx.loc[subproject, 'fp_lyR_inv']
+        fp_lyR_inv_agg = fp_lyR_inv.replace('.csv', '_aggregated.csv')
+        df_lyR_inv=pd.read_csv(fp_lyR_inv_agg, index_col = 'DATA_LOCATION_MCMILLEN')
+        df_lyR_inv=df_lyR_inv.replace('.csv','_aggregated.csv')
 
         maps = df_lyR_inv.MAP_NAME
         maps_unique=[y.strip() for x in maps for y in x.split(',')]

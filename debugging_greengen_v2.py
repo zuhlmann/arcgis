@@ -5,7 +5,7 @@ importlib.reload(sys.modules['spyder_arcgis_oop'])
 import pandas as pd
 import os
 
-subproject='geosyntec_pad_H20_p2'
+subproject='SFT_common_maps2'
 fp_pathlist = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv"
 fp_pathlist_aprx = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_aprx.xlsx"
 prj_file = r'NAD_1983_HARN_StatePlane_Washington_North_FIPS_4601_Feet.prj'
@@ -44,35 +44,35 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 # # A2b) Create map matrix - just do once
 # pro_obj.expand_rows(subproject, fp_map_matrix)
 
-# # A1b)  Create Single Inventories from DF
-# # This will recreate individual inventories- Do ocassionally
-# # ALL FLAGGED
-# df_pl_aprx=getattr(pro_obj,'pl_aprx')
-# df_pl_aprx=df_pl_aprx[df_pl_aprx.FLAG]
+# A1b)  Create Single Inventories from DF
+# This will recreate individual inventories- Do ocassionally
+# ALL FLAGGED
+df_pl_aprx=getattr(pro_obj,'pl_aprx')
+df_pl_aprx=df_pl_aprx[df_pl_aprx.FLAG]
 #
-# for idx in df_pl_aprx.index:
-#     df_layers = pro_obj.aprx_map_inv(df_pl_aprx.loc[idx, 'fp_aprx'])
-#     # Raw, unaggregated NEED for creating _0 _1 _2 invs
-#     fp_lyR_inv_temp = df_pl_aprx.loc[idx, 'fp_lyR_inv']
-#     df_layers.to_csv(fp_lyR_inv_temp)
-#     cf = ['ITEM','IS_RASTER','IS_BROKEN']
-#     df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-#     df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv_temp)[0]))
-#
-# # Matrix from DF
-# for idx in df_pl_aprx.index:
-#     fp_map_matrix_temp=df_pl_aprx.loc[idx, 'fp_map_matrix']
-#     pro_obj.expand_rows(idx, fp_map_matrix_temp)
+for idx in df_pl_aprx.index:
+    df_layers = pro_obj.aprx_map_inv(df_pl_aprx.loc[idx, 'fp_aprx'])
+    # Raw, unaggregated NEED for creating _0 _1 _2 invs
+    fp_lyR_inv_temp = df_pl_aprx.loc[idx, 'fp_lyR_inv']
+    df_layers.to_csv(fp_lyR_inv_temp)
+    cf = ['ITEM','IS_RASTER','IS_BROKEN']
+    df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+    df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv_temp)[0]))
 
-# # # A2 Multiple APRX all in one
-# # # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
-# pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
-# pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
-# cf = ['ITEM','IS_RASTER','IS_BROKEN']
-# pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-# df_lyR_all=pd.read_csv(fp_lyR_inv_all)
-# df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
-# df_aggregated.to_csv(fp_lyR_inv_maestro)
+# Matrix from DF
+for idx in df_pl_aprx.index:
+    fp_map_matrix_temp=df_pl_aprx.loc[idx, 'fp_map_matrix']
+    pro_obj.expand_rows(idx, fp_map_matrix_temp)
+
+# # A2 Multiple APRX all in one
+# # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
+pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
+pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
+cf = ['ITEM','IS_RASTER','IS_BROKEN']
+pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+df_lyR_all=pd.read_csv(fp_lyR_inv_all)
+df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
+df_aggregated.to_csv(fp_lyR_inv_maestro)
 
 # # A3) After creating lyR_inv
 # df_lyR_str = f"df_{subproject}_lyR_maestro"
@@ -195,19 +195,19 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 
 # FLAGGING DFs FOR RESOURCE, RENAMING ETC
 # 20250820
-# # Step 1 lag cols containing csString vals i.e. PSP_2024
-# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-# df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'geosyntec_pad_H20', 'geosyntec_pad_H20')
-# df.to_csv(fp_lyR_inv_maestro)
+# Step 1 lag cols containing csString vals i.e. PSP_2024
+pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'SFT_common_maps2', 'SFT_common_maps2')
+df.to_csv(fp_lyR_inv_maestro)
 
-# # Step 2 Transfer aprx flag column to df_maestro
-# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-# pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
-# df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
-# df_lyR_inv_maestro = df_lyR_inv_maestro[['geosyntec_pad_H20_p2']]
-# df_maestro=getattr(pro_obj, 'df_maestro')
-# df_new = df_maestro.merge(df_lyR_inv_maestro, how='left', left_index=True, right_index=True)
-# df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro.csv")
+# Step 2 Transfer aprx flag column to df_maestro
+pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
+df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
+df_lyR_inv_maestro = df_lyR_inv_maestro[['SFT_common_maps2']]
+df_maestro=getattr(pro_obj, 'df_maestro')
+df_new = df_maestro.merge(df_lyR_inv_maestro, how='left', left_index=True, right_index=True)
+df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro.csv")
 
 # # Step 3 Flag if already resourced
 # pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')

@@ -205,43 +205,30 @@ class project_lyR_inv(object):
         validation is performed.  This method is called whenever a parameter
         has been changed.
         '''
+        if not parameters[0].altered and not parameters[1].altered:
+            parameters[0].value = True
+            parameters[1].enabled=False
+        elif parameters[0].altered and not parameters[0].value:
+            parameters[1].enabled = True
+        elif parameters[0].altered and parameters[0].value:
+            parameters[1].enabled = False
 
-        if parameters[1].altered and not parameters[1].hasBeenValidated:
-            parameters[0].value=False
-            prodoc_selected = True
-            parameters[2].values = None
-            parameters[3].values = None
-            parameters[4].values = None
-        elif parameters[0].altered and not parameters[0].hasBeenValidated:
-            parameters[1].value=None
-            prodoc_selected=True
-            parameters[2].values = None
-            parameters[3].values = None
-            parameters[4].values = None
-        else:
-            prodoc_selected  = False
-        if prodoc_selected:
-            parameters[2].values = None
-            parameters[3].values = None
-            parameters[4].values = None
         return parameters
-
-
     def updateMessages(self, parameters):
         """Modify the messages created by internal validation for each tool
         parameter.  This method is called after internal validation."""
         return
     def execute(self, parameters, messages):
         """The source code of the tool."""
-        if parameters[0].value is not None:
+        if parameters[0].value:
             prodoc = 'current'
-        elif parameters[1].value is not None:
+        else:
             prodoc = parameters[1].valueAsText
 
         aprx = arcpy.mp.ArcGISProject(prodoc)
         lyt_list = aprx.listLayouts()
 
-        lyt_name, ds_list, lyr_name, map_element, map_name = [], [], [], [], []
+        lyt_name, ds_list, lyr_name, map_element, map_name, exp_list = [], [], [], [], [], []
         for lyt in lyt_list:
             # el = lyt.listElements()
             el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
@@ -256,11 +243,15 @@ class project_lyR_inv(object):
                             ds_list.append(lyr.dataSource)
                         except AttributeError:
                             ds_list.append('NA')
+                        try:
+                            exp_list.append(lyr.definitionQuery)
+                        except AttributeError:
+                            exp_list.append('')
                     else:
                         pass
 
-        df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list]),
-                          columns = ['layout','map_element','map_name','layer','source'])
+        df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list, exp_list]),
+                          columns = ['layout','map_element','map_name','layer','source', 'SQL'])
 
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)

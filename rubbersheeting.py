@@ -25,11 +25,13 @@ src_filename = GLO_7N_15E
 shp_filename = r"C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\digitized\GLO_T7_R14_map_ref_pts_NAD83_CAII_ft.shp"
 csv=r'C:\Box\MCMGIS\Project_Based\GreenGen_Mokelumne\Data\Cultural_Resources\CUL2_data\GLO_direct\gcs_7N_15E.csv'
 
-# CHIGNIK
+# TOLT
 # 20250828
 src_filename = r"C:\Box\MCMGIS\Project_Based\ANTHC\chignik\data\vector\field_map\rubbersheet\chignik_site_map_projected_AKSP6.tif"
+src_filename = r"C:\Users\ZacharyUhlmann\Documents\staging\tolt\bathymetry\1951\1951_contours_sheet10.tif"
 shp_filename = r"C:\Box\MCMGIS\Project_Based\ANTHC\chignik\data\vector\field_map\chignik_conceptual_plan_georegistering_pts_src_AKSP6.shp"
-csv = r"C:\Box\MCMGIS\Project_Based\ANTHC\chignik\data\vector\field_map\rubbersheet\gcs_chignik_site_map_AKSP6.csv"
+shp_filename = r"C:\Users\ZacharyUhlmann\Documents\staging\tolt\bathymetry\1951\tolt_contours_1951_src.shp"
+csv = r"C:\Users\ZacharyUhlmann\Documents\staging\tolt\bathymetry\1951\gcp_tolt_1951_contours.csv"
 
 # src_ds=gdal.Open(src_filename)
 # gt_forward=src_ds.GetGeoTransform()
@@ -88,6 +90,10 @@ for idx in df2.index:
    substr.append(' '.join(t1))
 full_str = ' -gcp '.join(substr)
 print(full_str)
+
+fp_CL = r'C:\Users\ZacharyUhlmann\Documents\staging\tolt\bathymetry\1951\gdp_substring.txt'
+with open(fp_CL, 'w') as txt:
+   txt.write(full_str)
 
 # FORMAT AND CALL IN CLI - note two consecutive calls
 # b) gdal_translate -gcp 507 482 6246215 2268541 -gcp 1594 289 6246103 2268561 -gcp 3000 674 6245981 2268666 test_projected.tif test_projected_gcp_3pts.tif

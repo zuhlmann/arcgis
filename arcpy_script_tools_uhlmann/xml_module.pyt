@@ -171,7 +171,7 @@ class define_xml_elements(object):
         # Path/to/xml create or identify
         if desc.dataType == 'ShapeFile':
             fp_xml = '{}.xml'.format(fp_fc)
-        elif desc.dataType == 'FeatureClass':
+        elif desc.dataType in ('FeatureClass','FeatureLayer'):
             fp_xml = os.path.join(processing_dir, '{}.xml'.format(fname))
 
         tgt_item_md = md.Metadata(fp_fc)

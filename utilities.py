@@ -14,9 +14,6 @@ import glob
 import copy
 import compare_data
 import logging
-from importlib import reload
-# from pathlib import Path
-# reload(logging)
 
 def update_path_dict(idx_list, path_type, paths_table):
 
@@ -685,7 +682,8 @@ def write_folder_contents(fp,output_type='.txt',**kwargs):
     folder_name = os.path.split(fp)[-1]
     fname_readme = 'README_{}.txt'.format(folder_name)
     fp_out = os.path.join(fp, fname_readme)
-    fp_out_df = os.path.join(fp, f"{folder_name}_inv.csv")
+    fname_inv = r'{}_inv.csv'.format(folder_name)
+    fp_out_df = os.path.join(fp, fname_inv)
     files = os.listdir(fp)
     files_fp = [os.path.join(fp, f) for f in files]
     files_fp.sort(key=os.path.getctime)

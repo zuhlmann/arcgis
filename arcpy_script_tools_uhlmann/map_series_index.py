@@ -112,7 +112,7 @@ class create_series_from_centroid(object):
                 d = {val:idx for idx, val in enumerate(fields_cursor) if val in calc_fields_order}
                 for row in cursor_centroid:
                     layout_ht=row[d['LAYOUT_HT']]
-                    layout_width=row[d['LAYOUT_WIDTH']]
+                    layout_width=row[d['LAYOUT_WD']]
                     scale_factor = row[d['SCALE_FACTOR']]
                     dx, dy = get_scale_factor(relative, scale_factor, layout_width, layout_ht)
                     x,y = row[0]

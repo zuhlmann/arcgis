@@ -7,7 +7,7 @@
 from __future__ import print_function, unicode_literals, absolute_import
 import os, sys
 
-from xarray.util.generate_ops import inplace
+# from xarray.util.generate_ops import inplace
 
 sys.path = [p for p in sys.path if '86' not in p]
 from arcgis.gis import GIS
@@ -2124,7 +2124,7 @@ class proProject(commonUtils):
             df_map_matrix_subset = df_map_matrix.loc[indices]
             t1 = ', '.join(included_indices)
             t2 = ', '.join(excluded_indices)
-            msg_str='\nINDICES PASSED WHICH WERE PRESENT IN {} MATRIX: \n{} \nINDICES NOT PRESENT IN MATRIX {}: \n{}'.format(t1,subproject, t2)
+            msg_str='\nINDICES PASSED WHICH WERE PRESENT IN {} MATRIX: \n{} \nINDICES NOT PRESENT IN MATRIX {}: \n{}'.format(subproject,t1,subproject, t2)
             logging.info(msg_str)
             no_layers_aprx=False
         except KeyError:
@@ -2181,10 +2181,14 @@ class proProject(commonUtils):
                             setattr(self, df_lyR_all_str, df_lyR_inv_all)
                             # Once successful, remove map name of resource layer from list
                             idx_map = (idx, subproject)
-                            csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
-                            csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
-                            df_lyR_inv_map.loc[idx_map, 'MAP_NAME_UPDATED'] = csString_updated
-                            setattr(self, df_lyR_map_str, df_lyR_inv_map)
+                            try:
+                                csString = df_lyR_inv_map.loc[(idx_map), 'MAP_NAME_UPDATED']
+                                csString_updated = self.parse_csString_utils(csString, remove_item = m.name)
+                                df_lyR_inv_map.loc[idx_map, 'MAP_NAME_UPDATED'] = csString_updated
+                                setattr(self, df_lyR_map_str, df_lyR_inv_map)
+                            except AttributeError:
+                                # css update removed a map_name already. ZU 202601
+                                pass
 
                             df_map_matrix.loc[idx,m.name]='FIXED'
                             setattr(self, f"df_{subproject}_map_matrix", df_map_matrix)
@@ -2485,16 +2489,18 @@ class proProject(commonUtils):
                      concat_omitted=False, overwrite_var=False, **kwargs):
         '''
         Update df from another df, specifically df_lyR_aprx to update maestro
-        Useful to populate ALL layers from lyr_aprx to maestro
+        Useful to populate ALL layers from lyr_aprx to maestro.
+        If concat_ommitted, any rows not prsent in tgt from srs will be concatenated.
+        Note that using kwarg['subset'] will
         ZU 20250416
         Args:
             df_str_src:         self explanatory i.e. df_lyr_APRX
             df_str_tgt:         self explanatory i.e. df_maestro
             tc_src:             target col
             tc_tgt:             target col
-            cols_update:        list of cols
+            cols_update:        list of cols to update if overlap when appending and joining
             overwrite_var:       False if only update NA, True if update all overlapping (see docs .update)
-            concat_ommitted:    if
+            concat_ommitted:    if want to append ommitted rows from src to tgt (see desc above)
             **kw['subset']:     any lengh dict with key:val = col_name:value
         Returns:
             df_tgt:             updated df_tgt
@@ -2508,11 +2514,11 @@ class proProject(commonUtils):
         # If subsettig by target value in df_src
         try:
             d = kwargs['subset']
-            for k,v in zip(*d.items()):
+            for k,v in d.items():
                 if 'subset' not in locals():
-                    subset=df_src[df_src[key]==val]
+                    subset=df_src[df_src[k]==v]
                 else:
-                    subset = pd.concat(subset, df_src[df_src[key]==val])
+                    subset = pd.concat(subset, df_src[df_src[k]==v])
             df_src=copy.copy(subset)
         except KeyError:
             pass
@@ -2533,13 +2539,13 @@ class AgolAccess(commonUtils):
     Basic init for AGOL access
     '''
 
-    def __init__(self, prj_file, subproject_str, fp_csv_agol):
+    def __init__(self, fp_csv_agol):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
-        super().__init__(prj_file, subproject_str)
+        super().__init__()
         u_name = 'uhlmann_mcm'
-        p_word = 'Mmleciln138!'
+        p_word = 'Lebron!1230'
         setattr(self, 'mcm_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcm_gis.properties.portalHostname, self.mcm_gis.users.me.username))
         # dictionary that can be expanded upon

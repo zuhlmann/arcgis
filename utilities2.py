@@ -5,6 +5,8 @@ import pandas as pd
 def join_list(v):
     vn = v.to_list()
     vn = list(set(vn))
+    # won't join numeric - needs to be string
+    vn = [str(int(i)) for i in vn]
     vn = ', '.join(vn)
     return (vn)
 

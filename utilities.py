@@ -27,7 +27,8 @@ def update_path_dict(idx_list, path_type, paths_table):
     for idx in idx_list:
         path_out = df.loc[idx][col_name]
 
-def update_field(fp_fcs, field_dict, field_match, incr = 1, sequential = True, fp_csv = 'path/to/csv', **kwargs):
+def update_field(fp_fcs, field_dict, field_match, incr = 1,
+                 sequential = True, fp_csv = 'path/to/csv', **kwargs):
     '''
     Fixed up to include add list of text to new field as option 2.
     the default is adding sequential numbers (for page_num) ZU 20210304
@@ -1846,7 +1847,7 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
                 df_current = compare_data.file_paths_arc(gdb, True, basic_cols)
             else:
                 temp = compare_data.file_paths_arc(gdb, True, basic_cols)
-                df_current = df_current.append(temp)
+                df_current = pd.concat([df_current, temp])
 
     # standardize paths
     df_current = norm_file_path_df(df_current, target_col = tc)

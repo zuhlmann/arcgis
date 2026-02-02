@@ -5,7 +5,7 @@ importlib.reload(sys.modules['spyder_arcgis_oop'])
 import pandas as pd
 import os
 
-subproject='SFT_common_maps2'
+subproject='geosyntec_pad_H20'
 fp_pathlist = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv"
 fp_pathlist_aprx = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_aprx.xlsx"
 prj_file = r'NAD_1983_HARN_StatePlane_Washington_North_FIPS_4601_Feet.prj'
@@ -27,7 +27,6 @@ fp_map_matrix =pro_obj.pl_aprx.loc[subproject, 'fp_map_matrix']
 fp_lyR_inv = pro_obj.pl_aprx.loc[subproject, 'fp_lyR_inv']
 
 fp_aprx=pro_obj.pl_aprx.loc[subproject,'fp_aprx']
-fp_df_maestro = pro_obj.pl_aprx.loc[subproject,'fp_df_maestro']
 fp_map_matrix = pro_obj.pl_aprx.loc[subproject,'fp_map_matrix']
 fp_maestro = pro_obj.pl_aprx.loc[subproject,'fp_df_maestro']
 fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
@@ -41,38 +40,38 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 # cf = ['ITEM','IS_RASTER','IS_BROKEN']
 # df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
 # df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0]))
-# # A2b) Create map matrix - just do once
+# A2b) Create map matrix - just do once
 # pro_obj.expand_rows(subproject, fp_map_matrix)
 
-# A1b)  Create Single Inventories from DF
-# This will recreate individual inventories- Do ocassionally
-# ALL FLAGGED
-df_pl_aprx=getattr(pro_obj,'pl_aprx')
-df_pl_aprx=df_pl_aprx[df_pl_aprx.FLAG]
+# # A1b)  Create Single Inventories from DF
+# # This will recreate individual inventories- Do ocassionally
+# # ALL FLAGGED
+# df_pl_aprx=getattr(pro_obj,'pl_aprx')
+# df_pl_aprx=df_pl_aprx[df_pl_aprx.FLAG]
+# #
+# for idx in df_pl_aprx.index:
+#     df_layers = pro_obj.aprx_map_inv(df_pl_aprx.loc[idx, 'fp_aprx'])
+#     # Raw, unaggregated NEED for creating _0 _1 _2 invs
+#     fp_lyR_inv_temp = df_pl_aprx.loc[idx, 'fp_lyR_inv']
+#     df_layers.to_csv(fp_lyR_inv_temp)
+#     cf = ['ITEM','IS_RASTER','IS_BROKEN']
+#     df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+#     df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv_temp)[0]))
 #
-for idx in df_pl_aprx.index:
-    df_layers = pro_obj.aprx_map_inv(df_pl_aprx.loc[idx, 'fp_aprx'])
-    # Raw, unaggregated NEED for creating _0 _1 _2 invs
-    fp_lyR_inv_temp = df_pl_aprx.loc[idx, 'fp_lyR_inv']
-    df_layers.to_csv(fp_lyR_inv_temp)
-    cf = ['ITEM','IS_RASTER','IS_BROKEN']
-    df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-    df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv_temp)[0]))
+# # Matrix from DF
+# for idx in df_pl_aprx.index:
+#     fp_map_matrix_temp=df_pl_aprx.loc[idx, 'fp_map_matrix']
+#     pro_obj.expand_rows(idx, fp_map_matrix_temp)
 
-# Matrix from DF
-for idx in df_pl_aprx.index:
-    fp_map_matrix_temp=df_pl_aprx.loc[idx, 'fp_map_matrix']
-    pro_obj.expand_rows(idx, fp_map_matrix_temp)
-
-# # A2 Multiple APRX all in one
-# # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
-pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
-pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
-cf = ['ITEM','IS_RASTER','IS_BROKEN']
-pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-df_lyR_all=pd.read_csv(fp_lyR_inv_all)
-df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
-df_aggregated.to_csv(fp_lyR_inv_maestro)
+# # # A2 Multiple APRX all in one
+# # # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
+# pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
+# pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
+# cf = ['ITEM','IS_RASTER','IS_BROKEN']
+# pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+# df_lyR_all=pd.read_csv(fp_lyR_inv_all)
+# df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
+# df_aggregated.to_csv(fp_lyR_inv_maestro)
 
 # # A3) After creating lyR_inv
 # df_lyR_str = f"df_{subproject}_lyR_maestro"
@@ -90,21 +89,25 @@ df_aggregated.to_csv(fp_lyR_inv_maestro)
 # df_lyR_str=f"df_{subproject}_aprx_lyR"
 # pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
 
-# # B0) UPDATE - like outer join but replacing back and forth between maestro and aprx_maestro
-# # Note this will add ALL data sources, i.e. HydrMcM_Streams and Tolt_Streams_2024
-# # April 2025
-# csv_tgt=fp_maestro
-# csv_src=fp_lyR_inv_maestro
-# df_str_tgt = 'df'
-# df_str_src = df_lyR_aprx_str
-# pro_obj.add_df(csv_tgt, df_str_tgt, 'DATA_LOCATION_MCMILLEN')
-# pro_obj.add_df(csv_src, df_str_src, 'DATA_LOCATION_MCMILLEN')
-# tc_src, tc_tgt ='DATA_LOCATION_MCMILLEN', 'DATA_LOCATION_MCMILLEN'
-# d={'ACTION':'resource_others','ACTION':'rename','ACTION':'copy_rd4','ACTION':'lebron'}
-# pro_obj.custom_merge(df_str_src, df_str_tgt, tc_src, tc_tgt, ['ACTION'],False, True)
-# df_updated=getattr(pro_obj, df_str_tgt)
-# df_updated.to_csv(csv_tgt)
-
+# B0) UPDATE - like outer join but replacing back and forth between maestro and aprx_maestro
+# Note this will add ALL data sources, i.e. HydrMcM_Streams and Tolt_Streams_2024
+# Used Jan 2026, umsure on the Ommitted argument purpose
+csv_2=fp_lyR_inv_maestro
+csv_1=fp_maestro
+df_str_2 = df_lyR_aprx_str
+df_str_1 = 'df'
+pro_obj.add_df(csv_1, df_str_1, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(csv_2, df_str_2, 'DATA_LOCATION_MCMILLEN')
+tc_1, tc_2 ='DATA_LOCATION_MCMILLEN', 'DATA_LOCATION_MCMILLEN'
+d={'ACTION':'resource_others','ACTION':'rename','ACTION':'copy_rd4','ACTION':'lebron'}
+d={'ACTION':'rename_geosyntec'}
+cols_update = ['ITEM','ACTION', 'geosyntec_pad_H20_p2']
+pro_obj.custom_merge(df_str_2, df_str_1, tc_2, tc_1, cols_update,
+                     True, True, subset=d)
+df_updated=getattr(pro_obj, df_str_1)
+csv_1 = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro_temp.csv"
+df_updated.to_csv(csv_1)
+# #
 # # B1) JOINS manual - lyR to df_maestro
 # csv_temp=r"C:\Users\UhlmannZachary\Documents\fuck.csv"
 # csv_left=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\staging\SFT_lyR_DELETE_maestro.csv"
@@ -136,7 +139,7 @@ df_aggregated.to_csv(fp_lyR_inv_maestro)
 # df2.to_csv(fp_lyR_inv_maestro)
 # # df1.to_csv(fp_maestro)
 
-# # #----------RESOURCING TRANSFERS------------
+#----------RESOURCING TRANSFERS------------
 # # Add Resourcing vals to df_reSource
 # # Indices for reSource
 # df_base_str = df_reSource_str.replace('df_', '')
@@ -148,33 +151,33 @@ df_aggregated.to_csv(fp_lyR_inv_maestro)
 # t = getattr(pro_obj, df_reSource_str)
 # t.to_csv(fp_reSource)
 
-# # D) Resource Time
-# # Indices for lyR
-# df_lyR_str=f"df_{subproject}_aprx_lyR"
-# df_base_str = df_lyR_str.replace('df_', '')
-# ta = 'resource_geosyntec2'
-# prop_str_indices = '{}_indices'.format(df_base_str)
-# pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
-# pro_obj.selection_idx(df_lyR_str, target_action=ta)
-# #
-# # load maps
-# pro_obj.add_aprx(subproject,lyR_maestro=True)
-# pro_obj.add_maps(subproject)
-# fp_log_prop_str = f"fp_log_{subproject}_aprx_lyR"
-# pro_obj.re_source_lyR_maestro(subproject,prop_str_indices, fp_log_prop_str)
-# # # SAVE
-# df_lyR_inv_all = getattr(pro_obj, df_lyR_all_str)
-# df_lyR_inv_all.reset_index(inplace=True)
-# df_lyR_inv_map = getattr(pro_obj, df_lyR_map_str)
-# df_lyR_inv_map.reset_index(inplace=True)
-# df_lyR_inv_aprx = getattr(pro_obj, df_lyR_aprx_str)
-# df_lyR_inv_aprx.reset_index(inplace=True)
-# df_map_matrix = getattr(pro_obj, df_map_matrix_str)
-# df_map_matrix.reset_index(inplace=True)
-# df_lyR_inv_all.to_csv(fp_lyR_inv_all)
-# df_lyR_inv_map.to_csv(fp_lyR_inv_map)
-# df_lyR_inv_aprx.to_csv(fp_lyR_inv_maestro)
-# df_map_matrix.to_csv(fp_map_matrix)
+# D) Resource Time
+# Indices for lyR
+df_lyR_str=f"df_{subproject}_aprx_lyR"
+df_base_str = df_lyR_str.replace('df_', '')
+ta = 'resource_geosyntec'
+prop_str_indices = '{}_indices'.format(df_base_str)
+pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
+pro_obj.selection_idx(df_lyR_str, target_action=ta)
+#
+# load maps
+pro_obj.add_aprx(subproject,lyR_maestro=True)
+pro_obj.add_maps(subproject)
+fp_log_prop_str = f"fp_log_{subproject}_aprx_lyR"
+pro_obj.re_source_lyR_maestro(subproject,prop_str_indices, fp_log_prop_str)
+# # SAVE
+df_lyR_inv_all = getattr(pro_obj, df_lyR_all_str)
+df_lyR_inv_all.reset_index(inplace=True)
+df_lyR_inv_map = getattr(pro_obj, df_lyR_map_str)
+df_lyR_inv_map.reset_index(inplace=True)
+df_lyR_inv_aprx = getattr(pro_obj, df_lyR_aprx_str)
+df_lyR_inv_aprx.reset_index(inplace=True)
+df_map_matrix = getattr(pro_obj, df_map_matrix_str)
+df_map_matrix.reset_index(inplace=True)
+df_lyR_inv_all.to_csv(fp_lyR_inv_all)
+df_lyR_inv_map.to_csv(fp_lyR_inv_map)
+df_lyR_inv_aprx.to_csv(fp_lyR_inv_maestro)
+df_map_matrix.to_csv(fp_map_matrix)
 
 # # D_a) Update CSS from maestro
 # # After Re-Sourcing, remove aprx name from csSring
@@ -194,23 +197,26 @@ df_aggregated.to_csv(fp_lyR_inv_maestro)
 # pro_obj.write_xml('df', offline=False)
 
 # FLAGGING DFs FOR RESOURCE, RENAMING ETC
-# 20250820
-# Step 1 lag cols containing csString vals i.e. PSP_2024
-pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'SFT_common_maps2', 'SFT_common_maps2')
-df.to_csv(fp_lyR_inv_maestro)
 
-# Step 2 Transfer aprx flag column to df_maestro
-pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
-df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
-df_lyR_inv_maestro = df_lyR_inv_maestro[['SFT_common_maps2']]
-df_maestro=getattr(pro_obj, 'df_maestro')
-df_new = df_maestro.merge(df_lyR_inv_maestro, how='left', left_index=True, right_index=True)
-df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro.csv")
+# # 20250820
+# # Step 1 lag cols containing csString vals i.e. PSP_2024
+# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+# df = pro_obj.flag_csString_val('df_lyR_maestro', 'APRX', 'swca_economics', 'swca_econommics')
+# df.to_csv(fp_lyR_inv_maestro)
+
+# # Step 2 Transfer aprx flag column to df_maestro
+# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+# pro_obj.add_df(fp_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
+# df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
+# df_lyR_inv_maestro = df_lyR_inv_maestro[df_lyR_inv_maestro['ACTION'].isin(['swca_economics', 'swca_economics_rename'])]
+# left_table = df_lyR_inv_maestro[['ACTION','ITEM']]
+# # left_table = left_table.reset_index().set_index('ITEM')
+# df_maestro=getattr(pro_obj, 'df_maestro')
+# df_new = df_maestro.merge(left_table, how='outer', left_index=True, right_index=True)
+# df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro_temp.csv")
 
 # # Step 3 Flag if already resourced
-# pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
+# pro_obj.add_df(fp_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
 # csv_reSource = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_reSourcing.csv"
 # df_resource=pd.read_csv(csv_reSource)
 # df_maestro=getattr(pro_obj, 'df_maestro')
@@ -220,21 +226,21 @@ df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories
 # flag_resource['ALREADY_RENAMED']=True
 # df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0_temp.csv")
 
-# Step 2b After maestro Action populated, copy back to df_lyR_maestro
-pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-pro_obj.add_df(fp_df_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
-df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
-df_maestro=getattr(pro_obj, 'df_maestro')
-df_maestro = df_maestro[['ACTION']]
-df_new = df_lyR_inv_maestro.merge(df_maestro, how='left', left_index=True, right_index=True)
-df_new.to_csv(fp_lyR_inv_maestro)
-
-# GENERAL JOIN / MERGE POST UPDATE
-# Step 2 Transfer aprx flag column to df_maestro
-csv_orig = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0_backup20250820.csv"
-df_src = pd.read_csv(csv_orig, index_col='DATA_LOCATION_MCMILLEN')
-df_src = df_src[['ACTION']]
-pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
-df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
-df_new = df_lyR_inv_maestro.merge(df_src, how='left', left_index=True, right_index=True)
-df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0_temp.csv")
+# # Step 2b After maestro Action populated, copy back to df_lyR_maestro
+# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+# pro_obj.add_df(fp_maestro, 'df_maestro', 'DATA_LOCATION_MCMILLEN')
+# df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
+# df_maestro=getattr(pro_obj, 'df_maestro')
+# df_maestro = df_maestro[['ACTION']]
+# df_new = df_lyR_inv_maestro.merge(df_maestro, how='left', left_index=True, right_index=True)
+# df_new.to_csv(fp_lyR_inv_maestro)
+#
+# # GENERAL JOIN / MERGE POST UPDATE
+# # Step 2 Transfer aprx flag column to df_maestro
+# csv_orig = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0_backup20250820.csv"
+# df_src = pd.read_csv(csv_orig, index_col='DATA_LOCATION_MCMILLEN')
+# df_src = df_src[['ACTION']]
+# pro_obj.add_df(fp_lyR_inv_maestro, 'df_lyR_maestro', 'DATA_LOCATION_MCMILLEN')
+# df_lyR_inv_maestro=getattr(pro_obj, 'df_lyR_maestro')
+# df_new = df_lyR_inv_maestro.merge(df_src, how='left', left_index=True, right_index=True)
+# df_new.to_csv(r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\SFT_lyR_deliverable_inv2_v3_0_temp.csv")

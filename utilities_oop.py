@@ -49,6 +49,12 @@ class utilities(object):
         setattr(self, 'ftype_filters',ftype_filters)
 
         try:
+            kwargs['parse_gdb']
+            setattr(self, 'parse_gdb', True)
+        except KeyError:
+            setattr(self, 'parse_gdb', False)
+
+        try:
             new_csv = kwargs['new_inventory']
             df_subdir = self.subdir_inventory_create()
             df_subdir = df_subdir.set_index(self.target_col)
@@ -71,7 +77,7 @@ class utilities(object):
             # this will retain the first row, and remove the new inventory
             df_concat = df_concat[~df_concat.index.duplicated(keep='first')]
             # Now find removed
-            removed = set(df_orig.index) - set(df_subdir.index)
+            removed = list(set(df_orig.index) - set(df_subdir.index))
             df_concat['REMOVED']=False
             df_concat.loc[removed, 'REMOVED']=True
             df_concat.to_csv(updated_csv)
@@ -166,14 +172,34 @@ class utilities(object):
                 except IndexError:
                     # in root of parent_dir
                     base_subdir = os.path.normpath(self.parent_dir).split(os.sep)[-1]
-                feat_name.append('{}.zip'.format(f.name))
-                feat_path.append('{}.zip'.format(f.path))
-                subdir_name.append(Path(f.path).parent.name)
-                filetype.append(None)
-                base_subdir_list.append(base_subdir)
-                time_modified.append(strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path))))
-                file_size.append(math.floor(os.path.getsize(f.path / 1000)))
-                flag.append('None')
+                if self.parse_gdb:
+                    import arcpy
+                    arcpy.env.workspace = copy.copy(f.path)
+                    ct=0
+                    dsets = arcpy.ListDatasets()
+                    if dsets is not None:
+                        for dset in dsets:
+                            feats = arcpy.ListFeatureClasses(feature_dataset=dset)
+                            for feat in feats:
+                                feat_name.append(feat)
+                                feat_path.append(os.path.join(f.path, dset, feat))
+                                filetype.append('.gdb/<FeatureClass>')
+                                ct+=1
+                    for feat in arcpy.ListFeatureClasses():
+                        feat_name.append(feat)
+                        feat_path.append(os.path.join(f.path, feat))
+                        filetype.append('.gdb/<FeatureClass>')
+                        ct+=1
+                else:
+                    filetype.append('.gdb')
+                    feat_name.append(f.name)
+                    feat_path.append(f.path)
+                    ct=1
+                subdir_name.extend([Path(f.path).parent.name]*ct)
+                base_subdir_list.extend([base_subdir]*ct)
+                time_modified.extend([strftime(r'%Y-%m-%d', time.gmtime(os.path.getmtime(f.path)))]*ct)
+                file_size.extend([math.floor(os.path.getsize(f.path)/1000)]*ct)
+                flag.extend(['None']*ct)
             # keeps running if another folder encountered
             elif os.path.normpath(f.path) not in self.exclude_dir_list:
                 t0,t1,t2,t3,t4,t5,t6,t7 = self.subdir_inventory_scan(f.path)

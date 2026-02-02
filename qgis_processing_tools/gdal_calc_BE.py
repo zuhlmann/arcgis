@@ -26,7 +26,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFolderDestination,
                        QgsProcessingOutputString)
 
-class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
+class gdal_calc_BE(QgsProcessingAlgorithm):
     """
     Use tile index file to perform gdal functions. Tile feature must have attribute
     with path/to/raster/tiles.  
@@ -39,12 +39,9 @@ class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    RASTER_INTERIOR = 'INPUT1'
-    RASTER_EXTERIOR = 'INPUT2'
-    OUTFILE = 'OUTPUT'
-    OUTPUT_DIR = 'output_dir'
-    BASE_FILENAME = 'base_filename'
-    FILE_OUT = 'file_out'
+    INPUT_A = 'INPUT_A'
+    INPUT_B = 'INPUT_B'
+    OUTFILE = 'Output File'
 
     def tr(self, string):
         """
@@ -53,7 +50,7 @@ class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
         return QCoreApplication.translate('Processing', string)
 
     def createInstance(self):
-        return gdalbuildvrt_from_slxn()
+        return gdal_calc_BE()
 
     def name(self):
         """
@@ -70,7 +67,7 @@ class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('gdalbuildvrt_from_slxn')
+        return self.tr('gdal_calc_cutline')
 
     def group(self):
         """
@@ -107,30 +104,24 @@ class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
         # geometry.
         self.addParameter(
             QgsProcessingParameterFeatureSource(
-                self.INPUT,
-                self.tr('Input Layer'),
-                [QgsProcessing.TypeVectorAnyGeometry]
-            )
-        )
-        
-        self.addParameter(
-            QgsProcessingParameterField(
-                self.LOCATION_FIELD,
-                'Select tile location field from input table',
-                '',
-                self.INPUT
+                self.INPUT_A,
+                self.tr('Input Raster Interior'),
+                [QgsProcessing.TypeRaster]
             )
         )
         self.addParameter(
-            QgsProcessingParameterFolderDestination(
-                self.OUTPUT_DIR,
-                'Output Directory for inventory of rasters and for index'
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_B,
+                self.tr('Input Raster Exterior'),
+                [QgsProcessing.TypeRaster]
             )
         )
         self.addParameter(
-            QgsProcessingParameterString(
-                self.BASE_FILENAME, 
-                'Filename for raster and index'
+            QgsProcessingParameterParameterFileDestination(
+                self.OUTFILE,
+                self.tr('Output raster from calculator'),
+                self.fileFilter('.tif'),
+                self.defaultValue('.tif')
             )
         )
         # https://docs.qgis.org/3.34/en/docs/user_manual/processing/scripts.html
@@ -149,61 +140,43 @@ class gdalbuildvrt_from_slxn(QgsProcessingAlgorithm):
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(
+        fp_raster1 = self.parameterAsFile(
             parameters,
-            self.INPUT,
+            self.INPUT_1,
             context)
-        output_dir = self.parameterAsString(
+        fp_raster2 = self.parameterAsFile(
             parameters,
-            self.OUTPUT_DIR,
+            self.INPUT_2,
             context)
-        location_field = self.parameterAsString(
+        fp_raster_out = self.parameterAsString(
             parameters,
-            self.LOCATION_FIELD,
+            self.OUTFILE,
             context)
-        base_filename = self.parameterAsString(
-            parameters,
-            self.BASE_FILENAME,
-            context)
-        
 
         # If source was not found, throw an exception to indicate that the algorithm
         # encountered a fatal error. The exception text can be any string, but in this
         # case we use the pre-built invalidSourceError method to return a standard
         # helper text for when a source cannot be evaluated
-        if source is None:
-            raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT))
+        if raster1 is None:
+            raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT_A))
+        if raster2 is None:
+            raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT_B))
 
         #(sink, dest_id) = self.parameterAsSink(
         #    parameters,
         #    self.OUTPUT,
         #    context, source.fields(),source.wkbType(),source.sourceCrs())
 
-        # #Send some information to the user
-        # feedback.pushInfo('CRS is {}'.format(source.sourceCrs().authid()))
-        fp_optfile = r'{}.txt'.format(os.path.join(output_dir, base_filename))
-        features = source.getFeatures()
-        vals = []
-        for f in features:
-            t = f[location_field]
-            vals.append(t)
-        with open(fp_optfile, 'w') as list_out:
-            basic_str = '\n'.join(vals)
-            list_out.write(basic_str)    
 
-        vrt_out = r'{}.vrt'.format(os.path.join(output_dir, base_filename))
-        
+        CL_gdal_calc = f'gdal_calc -A r"{fp_raster1}" -B r"{fp_raster2}" --extent union --co COMPRESS=LZW --NoDataValue -9999 --outfile fp_out --calc="A-B"'
+
         import subprocess
 
         # constants
-        gdalbuildvrt = r'"C:\Program Files\QGIS 3.22.6\bin\gdalbuildvrt.exe"'
-        fp_shp = '{}.shp'.format(os.path.join(output_dir, base_filename))
-        cmd = f'gdalbuildvrt -input_file_list "{fp_optfile}" "{vrt_out}" '
-        
-        # fullCmd = ' '.join([gdalbuildvrt, cmd])
+        output_dir = r'E:\tolt\2022'
         with open(os.path.join(output_dir, 'command_call.txt'),'w') as txt_file2:
-            txt_file2.write(cmd)
-        subprocess.run(cmd)
+            txt_file2.write(CL_gdal_calc)
+        subprocess.run(CL_gdal_calc)
         
         results= {self.OUTPUT: cmd}
         

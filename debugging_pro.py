@@ -14,7 +14,7 @@ fp_offline = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utili
 olt = pd.read_csv(fp_offline, index_col = 'gdb_str')
 prj_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files'
 
-subproject = 'PSP_2024_2'
+subproject = 'Nuyakuk_FercG'
 
 gdb_str = '{}_gdb'.format(subproject)
 gdb_pro = pl.loc[gdb_str, 'fp_gdb']
@@ -28,12 +28,12 @@ agol_obj = agolZ.commonUtils()
 agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
 
 # # INDICES
-# agol_obj.selection_idx('df', indices = [18])
-agol_obj.selection_idx('df', target_action= 'delete_psp2_test')
+agol_obj.selection_idx('df', indices = [-1])
+agol_obj.selection_idx('df', target_action= 'move')
 
 print('nothing')
 
-agol_obj.take_action('df', 'delete', target_col = 'DATA_LOCATION_MCMILLEN',
-                     dry_run = True, save_df = False,
+agol_obj.take_action('df', 'move', target_col = 'DATA_LOCATION_MCMILLEN',
+                     dry_run = False, save_df = False,
                      offline_source=False, offline_target=False)
 

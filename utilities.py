@@ -1877,46 +1877,6 @@ def update_df_inventory(df_orig, gdb_dir_list, tc = 'DATA_LOCATION_MCMILLEN_JACO
 
     df_assim = detect_df_changes(df_orig, df_current, tc='DATA_LOCATION_MCMILLEN')
     return(df_assim)
-def mark_duplicate_rows(df, target_col, ispath = False):
-    '''
-    function for finding duplicates from "seen = set()" to "seen.add()"
-    should be decomposed into utilities and imported here.
-    This funciton was used when cleaning up the Klamath mess to find duplicate
-    files used so I would not delete a fc that was turned off (unnecessary)
-    in one map, but present in another 200 rows down.  ZU 20210302
-    ARGUMENTS
-    df_str                  string to access dataframe attribute.  Note: use
-                            self.add_df(fp_csv_target) to add dataframe to
-                            object
-    target_col              column in dataframe to find duplicates
-    '''
-    # adapted from here:
-    # https://stackoverflow.com/questions/9835762/how-do-i-find-the-duplicates-in-a-list-and-create-another-list-with-them
-    seen = set()
-    dup = []
-    target_lst = df[target_col].to_list()
-    if ispath:
-        target_lst = [os.path.realpath(item) for item in target_lst]
-    for x in target_lst:
-        if x in seen:
-            dup.append(x)
-        else:
-            seen.add(x)
-    # remove duplicate duplicates
-    dup = list(set(dup))
-    # initiate new column
-    df['duplicate'] = math.nan
-    for idx, item in enumerate(dup):
-        loc = df.index[df[target_col] == item]
-        df.loc[loc, 'duplicate'] = idx
-    # setattr to replace original dataframe with new df with added col
-    return(df)
-# # NOTES
-# # getting path componenets
-# # 20210409
-# pathnorm = os.path.normpath(fp_desired)
-# path_components = pathnorm.split(os.sep)
-
 def rectify_source_maestro(df_source, df_maestro, dir_out, fname_source, fname_maestro):
     '''
     Used to rectify a maestro and source (kauai_offline_gdb_inentory for instance)

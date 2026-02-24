@@ -6,6 +6,8 @@ import numpy as np
 import os
 import copy
 import ntpath
+import logging
+import datetime
 
 class Toolbox(object):
     def __init__(self):
@@ -225,6 +227,14 @@ class project_lyR_inv(object):
         else:
             prodoc = parameters[1].valueAsText
 
+        banner = '    {}    '.format('-' * 50)
+        logger = logging.getLogger('Layer_Inv')
+        fp_logfile = r'{}_LOG.log'.format(os.path.splitext(parameters[3].valueAsText)[0])
+        logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
+        date_str = datetime.datetime.today().strftime('%D %H:%M')
+        msg_str = '\n{}\n{}'.format(banner, date_str)
+        logging.info(msg_str)
+
         aprx = arcpy.mp.ArcGISProject(prodoc)
         lyt_list = aprx.listLayouts()
 
@@ -233,22 +243,25 @@ class project_lyR_inv(object):
             # el = lyt.listElements()
             el = [e for e in lyt.listElements() if e.type == 'MAPFRAME_ELEMENT']
             for em in el:
-                for lyr in em.map.listLayers():
-                    if lyr.visible:
-                        lyr_name.append(lyr.name)
-                        lyt_name.append(lyt.name)
-                        map_element.append(em.name)
-                        map_name.append(em.map.name)
-                        try:
-                            ds_list.append(lyr.dataSource)
-                        except AttributeError:
-                            ds_list.append('NA')
-                        try:
-                            exp_list.append(lyr.definitionQuery)
-                        except AttributeError:
-                            exp_list.append('')
-                    else:
-                        pass
+                try:
+                    for lyr in em.map.listLayers():
+                        if lyr.visible:
+                            lyr_name.append(lyr.name)
+                            lyt_name.append(lyt.name)
+                            map_element.append(em.name)
+                            map_name.append(em.map.name)
+                            try:
+                                ds_list.append(lyr.dataSource)
+                            except AttributeError:
+                                ds_list.append('NA')
+                            try:
+                                exp_list.append(lyr.definitionQuery)
+                            except AttributeError:
+                                exp_list.append('')
+                        else:
+                            pass
+                except AttributeError as e:
+                    logger.info('ERROR: {}'.format(e))
 
         df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list, exp_list]),
                           columns = ['layout','map_element','map_name','layer','source', 'SQL'])

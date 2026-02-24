@@ -1,6 +1,7 @@
 import copy
 import arcpy
 import os
+import pandas as pd
 
 # AMAZING RESOURE
 #https://gis.stackexchange.com/questions/339744/python-toolbox-only-update-parameter-when-specific-parameter-changes

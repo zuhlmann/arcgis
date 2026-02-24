@@ -14,7 +14,7 @@ fp_offline = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utili
 olt = pd.read_csv(fp_offline, index_col = 'gdb_str')
 prj_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files'
 
-subproject = 'Nuyakuk_FercG'
+subproject = 'SFT_aquatics'
 
 gdb_str = '{}_gdb'.format(subproject)
 gdb_pro = pl.loc[gdb_str, 'fp_gdb']
@@ -28,12 +28,27 @@ agol_obj = agolZ.commonUtils()
 agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
 
 # # INDICES
-agol_obj.selection_idx('df', indices = [-1])
-agol_obj.selection_idx('df', target_action= 'move')
+agol_obj.selection_idx('df', indices = [244])
+agol_obj.selection_idx('df', target_action= 'copy_geosyntec')
 
 print('nothing')
 
-agol_obj.take_action('df', 'move', target_col = 'DATA_LOCATION_MCMILLEN',
+agol_obj.take_action('df', 'copy_replace', target_col = 'DATA_LOCATION_MCMILLEN',
                      dry_run = False, save_df = False,
                      offline_source=False, offline_target=False)
+#
+# import arcpy
+# import copy
+# from arcpy import metadata as md
+# import xml.etree.ElementTree as ET
+#
+# fp_xml = r"E:\tolt\metadata\scratch\2.xml"
+# tree = ET.parse(fp_xml)
+# # root is the root ELEMENT of a tree
+# root = tree.getroot()
+# # remove the mess in root
+# # Parent for idPurp
+# for el in root.find('mdContact'):
+#     print(el.text)
+#     print('zach')
 

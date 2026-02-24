@@ -124,3 +124,5 @@ base_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\qgis_utils'
 #     str_formatted = '\n'.join(gdal_dset_atts)
 #     out_file.write(str_formatted)
 # out_file.close()
+
+

@@ -47,7 +47,7 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 # # This will recreate individual inventories- Do ocassionally
 # # ALL FLAGGED
 # df_pl_aprx=getattr(pro_obj,'pl_aprx')
-# df_pl_aprx=df_pl_aprx[df_pl_aprx.FLAG]
+# df_pl_aprx=df_pl_aprx[df_pl_aprx.REINVENTORY]
 # #
 # for idx in df_pl_aprx.index:
 #     df_layers = pro_obj.aprx_map_inv(df_pl_aprx.loc[idx, 'fp_aprx'])
@@ -65,12 +65,25 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 
 # # # A2 Multiple APRX all in one
 # # # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
-# pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
-# pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
+# # pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
+# # pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
 # cf = ['ITEM','IS_RASTER','IS_BROKEN']
-# pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+# # pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
 # df_lyR_all=pd.read_csv(fp_lyR_inv_all)
 # df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
+# df_aggregated.reset_index().set_index('DATA_LOCATION_MCMILLEN', inplace=True)
+# fp_lyR_inv_maestro_staging = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\v3_0_staging.csv'
+# df_aggregated.to_csv(fp_lyR_inv_maestro_staging)
+# df_lyR_aggregated_str=r'df_aprx_lyR_aggregated'
+# pro_obj.add_df(fp_lyR_inv_maestro_staging, df_lyR_aggregated_str, 'DATA_LOCATION_MCMILLEN')
+# pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
+#
+# csv = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\omitted.csv'
+# tc = 'DATA_LOCATION_MCMILLEN'
+# dict_separate = {'csv':csv,'subset_col':tc}
+# pro_obj.custom_merge(df_lyR_aggregated_str, df_lyR_aprx_str ,tc,tc,False, separate = dict_separate,
+#                     append_new=True, remove_omitted=True)
+# df_aggregated = getattr(pro_obj, df_lyR_aprx_str)
 # df_aggregated.to_csv(fp_lyR_inv_maestro)
 
 # # A3) After creating lyR_inv
@@ -85,44 +98,44 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 
 # --------DF TO DF TRANSFERS------
 
-# # Initiate
-# df_lyR_str=f"df_{subproject}_aprx_lyR"
-# pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
+# Initiate
+df_lyR_str=f"df_{subproject}_aprx_lyR"
+pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
 
 # B0) UPDATE - like outer join but replacing back and forth between maestro and aprx_maestro
 # Note this will add ALL data sources, i.e. HydrMcM_Streams and Tolt_Streams_2024
 # Used Jan 2026, umsure on the Ommitted argument purpose
-csv_2=fp_lyR_inv_maestro
-csv_1=fp_maestro
-df_str_2 = df_lyR_aprx_str
-df_str_1 = 'df'
-pro_obj.add_df(csv_1, df_str_1, 'DATA_LOCATION_MCMILLEN')
-pro_obj.add_df(csv_2, df_str_2, 'DATA_LOCATION_MCMILLEN')
-tc_1, tc_2 ='DATA_LOCATION_MCMILLEN', 'DATA_LOCATION_MCMILLEN'
+csv_src=fp_maestro
+csv_tgt=fp_lyR_inv_maestro
+df_str_src = 'df'
+df_str_tgt = df_lyR_aprx_str
+pro_obj.add_df(csv_src, df_str_src, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(csv_tgt, df_str_tgt, 'DATA_LOCATION_MCMILLEN')
+tc_src, tc_tgt ='DATA_LOCATION_MCMILLEN', 'DATA_LOCATION_MCMILLEN'
 d={'ACTION':'resource_others','ACTION':'rename','ACTION':'copy_rd4','ACTION':'lebron'}
-d={'ACTION':'rename_geosyntec'}
-cols_update = ['ITEM','ACTION', 'geosyntec_pad_H20_p2']
-pro_obj.custom_merge(df_str_2, df_str_1, tc_2, tc_1, cols_update,
-                     True, True, subset=d)
-df_updated=getattr(pro_obj, df_str_1)
+d={'ACTION':'resource_geosyntec2a'}
+cols = ['ACTION']
+pro_obj.custom_merge(df_str_src, df_str_tgt, tc_src, tc_tgt, True, subset=d,
+                     cols_update = cols)
+df_updated=getattr(pro_obj, df_str_tgt)
 csv_1 = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro_temp.csv"
 df_updated.to_csv(csv_1)
-# #
-# # B1) JOINS manual - lyR to df_maestro
-# csv_temp=r"C:\Users\UhlmannZachary\Documents\fuck.csv"
-# csv_left=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\staging\SFT_lyR_DELETE_maestro.csv"
-# df_left=pd.read_csv(fp_lyR_inv_maestro, index_col=['DATA_LOCATION_MCMILLEN'])
-# df_right=pd.read_csv(fp_maestro, index_col=['DATA_LOCATION_MCMILLEN'])
-# cols=['ACTION','DATA_LOCATION_MCM_RESOURCE','workspace_factory','feature_dataset','dataset','dbase_connection' ]
-# cols=['ACTION']
-# # If masking df_maestro to join DATA_lOCATION_MCM_RESOURCE. NOTE change index col in read_csv 20250414
-# # mask=df_right[~pd.isnull(df_lyR_maestro_orig[['DATA_LOCATION_MCM_RESOURCE', 'ACTION']]).all(1)]
-# # subset=df_right.loc[mask.index,cols]
-# # idx = [i for i in df_right.index if df_right.loc[i, 'ACTION'] in ['rename_again','rename_psp2']]
-# # subset=df_right.loc[idx, cols]
-# subset=df_right['ACTION']
-# df_merged = pd.merge(df_left, subset, left_index=True, right_index=True, how='left')
-# df_merged.to_csv(csv_temp)
+
+# B1) JOINS manual - lyR to df_maestro
+csv_temp=r"C:\Users\UhlmannZachary\Documents\fuck.csv"
+csv_left=r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\staging\SFT_lyR_DELETE_maestro.csv"
+df_left=pd.read_csv(fp_lyR_inv_maestro, index_col=['DATA_LOCATION_MCMILLEN'])
+df_right=pd.read_csv(fp_maestro, index_col=['DATA_LOCATION_MCMILLEN'])
+cols=['ACTION','DATA_LOCATION_MCM_RESOURCE','workspace_factory','feature_dataset','dataset','dbase_connection' ]
+cols=['ACTION']
+# If masking df_maestro to join DATA_lOCATION_MCM_RESOURCE. NOTE change index col in read_csv 20250414
+# mask=df_right[~pd.isnull(df_lyR_maestro_orig[['DATA_LOCATION_MCM_RESOURCE', 'ACTION']]).all(1)]
+# subset=df_right.loc[mask.index,cols]
+# idx = [i for i in df_right.index if df_right.loc[i, 'ACTION'] in ['rename_again','rename_psp2']]
+# subset=df_right.loc[idx, cols]
+subset=df_right['ACTION']
+df_merged = pd.merge(df_left, subset, left_index=True, right_index=True, how='left')
+df_merged.to_csv(csv_temp)
 
 # # # # B2_copy/move APPX) TAKE_ACTION
 # # # # Probably best performed in Pro to confirm everything was moved

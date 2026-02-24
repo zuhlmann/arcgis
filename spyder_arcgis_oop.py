@@ -872,6 +872,23 @@ class commonUtils(object):
         csv = lookup_table_project[lookup_table_project.subproject == self.subproject_str].offline_lookup_table.values[0]
         olt = pd.read_csv(csv, index_col = 'gdb_str')
         indices = getattr(self, prop_str_indices)
+        # Stop if MOVE_LOCATION does not have proper csv, fp, etc.  20260223
+        if action_type in ['move','copy_no_replace', 'copy_replace','create_poly','create_line','create_point','fc_to_fc_conv']:
+            fix=False
+            try:
+                olt.loc[df.loc[indices, 'MOVE_LOCATION'], 'online']
+            except KeyError as e:
+                msg_str = f'''\
+                Target gdb (MOVE_LOCATION) does not exist in offline and df.\n\
+                Check correct path/to/csv or if exists\n\
+                occured at in indices \n{e}'''
+                logging.info(msg_str)
+                fix = True
+            if fix:
+                return
+        else:
+            pass
+
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
             for index in indices:
@@ -1251,8 +1268,12 @@ class commonUtils(object):
         elif action_type in ['copy_no_replace', 'copy_replace']:
             # Get indices where duplicates occur
             dup_idx = list(set(df[df.index.duplicated(keep=False)].index))
+            df.duplicated='False'
+            df.loc[dup_idx, 'DUPLICATED']='True'
             if len(dup_idx):
-                logging.info(f"DUPLICATES ON THESE INDICES {dup_idx}")
+                logging.info(f"DUPLICATES ON THESE INDICES {dup_idx}\nSAVED dataframe")
+                setattr(self, df_str, df)
+                pd.DataFrame.to_csv(df, getattr(self, 'fp_csv'))
                 # Stop running if duplicate indices
                 return
             for index in indices:
@@ -2485,12 +2506,16 @@ class proProject(commonUtils):
             else:
                 pass
         return(df)
-    def custom_merge(self, df_str_src, df_str_tgt, tc_src, tc_tgt, cols_update,
-                     concat_omitted=False, overwrite_var=False, **kwargs):
+    def custom_merge(self, df_str_src, df_str_tgt, tc_src, tc_tgt,
+                     overwrite_var=False, **kwargs):
         '''
-        Update df from another df, specifically df_lyR_aprx to update maestro
-        Useful to populate ALL layers from lyr_aprx to maestro.
-        If concat_ommitted, any rows not prsent in tgt from srs will be concatenated.
+        Update df from another df.  Initially for maestro to df_lyR_aprx, but now both ways
+        Albeit with specific kwargs for each direction.
+        Updated 20260224
+        If kwarg[concat_ommitted', any rows not prsent in tgt from srs will be concatenated.
+        If kwarg['separate'], all ommitted will be exported to separate csv; either concatented did not exist or udpated.
+        If kwarg['subset'] only use subset from src
+        If kwarg['cols_update'] df_tgt.update(df_src, cols_update) i.e. overwrite col values in tgt from src
         Note that using kwarg['subset'] will
         ZU 20250416
         Args:
@@ -2498,9 +2523,7 @@ class proProject(commonUtils):
             df_str_tgt:         self explanatory i.e. df_maestro
             tc_src:             target col
             tc_tgt:             target col
-            cols_update:        list of cols to update if overlap when appending and joining
             overwrite_var:       False if only update NA, True if update all overlapping (see docs .update)
-            concat_ommitted:    if want to append ommitted rows from src to tgt (see desc above)
             **kw['subset']:     any lengh dict with key:val = col_name:value
         Returns:
             df_tgt:             updated df_tgt
@@ -2523,29 +2546,70 @@ class proProject(commonUtils):
         except KeyError:
             pass
         committed_idx=list(set(df_tgt.index).intersection(df_src.index))
-        omitted_idx=list(set(df_src.index)-set(df_tgt.index))
-        df_omitted = df_src.loc[omitted_idx, cols_update]
+        new_idx = list(set(df_src.index) - set(committed_idx))
+        omitted_idx=list(set(df_tgt.index)-set(df_src.index))
+        # Export vals omitted from tgt to src to csv (from dict in kwarg).
+        # Retain csv for record.  Will be continually appended to, with duplicates superceded by first.
+        try:
+            dict_separate = kwargs['separate']
+            df_tgt = df_tgt.loc[committed_idx]
+            try:
+                csv=dict_separate['csv']
+                subset_col = dict_separate['subset_col']
+                df_omitted = pd.read_csv(csv, index_col='DATA_LOCATION_MCMILLEN')
+                df_omitted_append = df_tgt.loc[omitted_idx]
+                df_omitted = pd.concat([df_omitted, df_omitted_append])
+                df_omitted.drop_duplicates(subset= subset_col, inplace=True)
+                df_omitted.to_csv(csv)
+                # Only output committed for this
+            except FileNotFoundError as e:
+                msg = f'''
+                        {e}\nFile does not exist.  Either entered wrong path/to/csv or intented to initialize new csv\n
+                        Does NOT Exist ----- {csv}'''
+                logging.info(msg)
+                csv = dict_separate['csv']
+                df_omitted = df_tgt.loc[omitted_idx]
+                df_omitted.to_csv(csv)
+        except KeyError:
+            pass
 
         # Update cols on intersected if value for columns
-        df_committed = df_src.loc[committed_idx, cols_update]
-        df_tgt.update(df_committed, overwrite=overwrite_var)
-        if concat_omitted:
-            df_omitted.reset_index(inplace=True)
+        # 20260224 - Relevant for maestro to _0 - i.e. when transfering ACTION, ITEM, etc.
+        try:
+            cols_update = kwargs['cols_update']
+            df_committed = df_src.loc[committed_idx, cols_update]
+            df_tgt.update(df_committed, overwrite=overwrite_var)
+        except KeyError:
+            pass
+        # Append any new rows from src to tgt
+        try:
+            kwargs['append_new']
+            df_new = df_src.loc[new_idx]
+            df_new.reset_index(inplace=True)
             df_tgt.reset_index(inplace=True)
-            df_tgt=pd.concat([df_tgt, df_omitted])
+            df_tgt=pd.concat([df_tgt, df_new])
+            df_tgt.reset_index(tc_tgt, inplace=True)
+        except KeyError:
+            pass
+        # Remove omitted rows for tgt if no longer in src.
+        # Can use with kwarg['separate'] to track what was removed
+        try:
+            kwargs['remove_omitted']
+            df_src.reset_index().set_index(tc_src, inplace=True)
+            df_tgt = df_tgt.loc[committed_idx]
+        except KeyError:
+            pass
         setattr(self, df_str_tgt, df_tgt)
 class AgolAccess(commonUtils):
     '''
     Basic init for AGOL access
     '''
 
-    def __init__(self, fp_csv_agol):
+    def __init__(self, fp_csv_agol, u_name,  p_word):
         '''
         need to add credentials like a key thing.  hardcoded currently
         '''
         super().__init__()
-        u_name = 'uhlmann_mcm'
-        p_word = 'Lebron!1230'
         setattr(self, 'mcm_gis',  GIS(username = u_name, password = p_word))
         print('Connected to {} as {}'.format(self.mcm_gis.properties.portalHostname, self.mcm_gis.users.me.username))
         # dictionary that can be expanded upon

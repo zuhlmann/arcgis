@@ -1,7 +1,17 @@
-import subprocess
+from shapely.geometry import box, mapping
+import fiona
+import rasterio
 
-p1 = subprocess.Popen('dir', shell=True, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-p2 = subprocess.Popen('sort /R', shell=True, stdin=p1.stdout)
+# create a Polygon from the raster bounds
+bbox = box(-119.0, 33.5, -117.2, 34.75)
 
-p1.stdout.close()
-out, err = p2.communicate()
+# create a schema with no properties
+schema = {'geometry': 'Polygon', 'properties': {}}
+
+src_crs = fiona.crs.from_epsg(4326)
+shp = r'C:\Box\MCMGIS\Project_Based\RsrcDistSantaMonicaMtns\SouthLACoConnectivityPlan\data\vector\dbase_devel\LA_bbox_4326.shp'
+
+# create shapefile
+with fiona.open(shp, 'w', driver='ESRI Shapefile',
+                crs=src_crs, schema=schema) as c:
+    c.write({'geometry': mapping(bbox), 'properties': {}})

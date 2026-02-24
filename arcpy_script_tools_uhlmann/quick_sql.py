@@ -1,11 +1,12 @@
 import copy
 import arcpy
 import os
+import pandas as pd
 
 # AMAZING RESOURE
 #https://gis.stackexchange.com/questions/339744/python-toolbox-only-update-parameter-when-specific-parameter-changes
 
-class ToolBox(object):
+class Toolbox(object):
     def __init__(self):
         '''
         Define the toolbox (name of the toolbox is name of .pyt file).
@@ -74,7 +75,7 @@ class selection_to_sql(object):
     def isLicensed(self):
         '''
         set whether tool is licensed to execute.
-        '''~
+        '''
         return True
     def updateParameters(self, parameters):
         '''

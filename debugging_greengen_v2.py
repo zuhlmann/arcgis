@@ -63,34 +63,34 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 #     fp_map_matrix_temp=df_pl_aprx.loc[idx, 'fp_map_matrix']
 #     pro_obj.expand_rows(idx, fp_map_matrix_temp)
 
-# # # A2 Multiple APRX all in one
-# # # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
-# # pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
-# # pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
-# cf = ['ITEM','IS_RASTER','IS_BROKEN']
-# # pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-# df_lyR_all=pd.read_csv(fp_lyR_inv_all)
-# df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
-# df_aggregated.reset_index().set_index('DATA_LOCATION_MCMILLEN', inplace=True)
-# fp_lyR_inv_maestro_staging = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\v3_0_staging.csv'
-# df_aggregated.to_csv(fp_lyR_inv_maestro_staging)
-# df_lyR_aggregated_str=r'df_aprx_lyR_aggregated'
-# pro_obj.add_df(fp_lyR_inv_maestro_staging, df_lyR_aggregated_str, 'DATA_LOCATION_MCMILLEN')
-# pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
-#
-# csv = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\omitted.csv'
-# tc = 'DATA_LOCATION_MCMILLEN'
-# dict_separate = {'csv':csv,'subset_col':tc}
-# pro_obj.custom_merge(df_lyR_aggregated_str, df_lyR_aprx_str ,tc,tc,False, separate = dict_separate,
-#                     append_new=True, remove_omitted=True)
-# df_aggregated = getattr(pro_obj, df_lyR_aprx_str)
-# df_aggregated.to_csv(fp_lyR_inv_maestro)
+# # A2 Multiple APRX all in one
+# # THIS!!! Re-up the lyr_2 lyr_1 lyr_0
+cf = ['ITEM','IS_RASTER','IS_BROKEN']
 
-# # A3) After creating lyR_inv
-# df_lyR_str = f"df_{subproject}_lyR_maestro"
-# pro_obj.add_aprx(subproject, lyR_maestro=use_maestro)
+# # STEP 1 - _2, _1
+# pro_obj.aprx_map_inv2(fp_pathlist_aprx, fp_lyR_inv_all)
+# pro_obj.add_df(fp_lyR_inv_all, df_lyR_all_str, 'DATA_LOCATION_MCMILLEN')
+# pro_obj.concatenate_aggregate(fp_lyR_inv_all, fp_lyR_inv_map, 'APRX', 'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+# STEP 2 _0 with new tracking omitted protocol 20260224
+df_lyR_all=pd.read_csv(fp_lyR_inv_all)
+df_aggregated = pro_obj.aggregate_rows(df_lyR_all,'DATA_LOCATION_MCMILLEN', 'APRX', carry_fields=cf)
+df_aggregated.reset_index().set_index('DATA_LOCATION_MCMILLEN', inplace=True)
+fp_lyR_inv_maestro_staging = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\v3_0_staging.csv'
+df_aggregated.to_csv(fp_lyR_inv_maestro_staging)
+df_lyR_aggregated_str=r'df_aprx_lyR_aggregated'
+pro_obj.add_df(fp_lyR_inv_maestro_staging, df_lyR_aggregated_str, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
+
+csv = r'C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\sharepoint\templates\SCL_data_package_devel\omitted.csv'
+tc = 'DATA_LOCATION_MCMILLEN'
+dict_separate = {'csv':csv,'subset_col':tc}
+pro_obj.custom_merge(df_lyR_aggregated_str, df_lyR_aprx_str ,tc,tc,False, separate = dict_separate,
+                    append_new=True, remove_omitted=True)
+df_aggregated = getattr(pro_obj, df_lyR_aprx_str)
+df_aggregated.to_csv(fp_lyR_inv_maestro)
 
 # # A2) Create fixed path column
+# ESRI path fix for moved aprx
 # # Manually add 'target' and 'replace' vals for DATA_LOCATION.replace('target','replace')
 # # to iterate and create DATA_LOCATION_RESOURCE
 # pro_obj.selection_idx('df_PAD_aerials_lyR', target_action='fix')
@@ -102,9 +102,8 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 df_lyR_str=f"df_{subproject}_aprx_lyR"
 pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
 
-# B0) UPDATE - like outer join but replacing back and forth between maestro and aprx_maestro
-# Note this will add ALL data sources, i.e. HydrMcM_Streams and Tolt_Streams_2024
-# Used Jan 2026, umsure on the Ommitted argument purpose
+# B0) Maestro to aprx_maestro (_0).  Could work in reverse.
+# Feb 24, 2026, umsure on the Ommitted argument purpose
 csv_src=fp_maestro
 csv_tgt=fp_lyR_inv_maestro
 df_str_src = 'df'

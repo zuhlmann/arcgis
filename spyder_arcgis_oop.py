@@ -873,21 +873,21 @@ class commonUtils(object):
         olt = pd.read_csv(csv, index_col = 'gdb_str')
         indices = getattr(self, prop_str_indices)
         # Stop if MOVE_LOCATION does not have proper csv, fp, etc.  20260223
-        if action_type in ['move','copy_no_replace', 'copy_replace','create_poly','create_line','create_point','fc_to_fc_conv']:
-            fix=False
-            try:
-                olt.loc[df.loc[indices, 'MOVE_LOCATION'], 'online']
-            except KeyError as e:
-                msg_str = f'''\
-                Target gdb (MOVE_LOCATION) does not exist in offline and df.\n\
-                Check correct path/to/csv or if exists\n\
-                occured at in indices \n{e}'''
-                logging.info(msg_str)
-                fix = True
-            if fix:
-                return
-        else:
-            pass
+        # if action_type in ['move','copy_no_replace', 'copy_replace','create_poly','create_line','create_point','fc_to_fc_conv']:
+        #     fix=False
+        #     try:
+        #         olt.loc[df.loc[indices, 'MOVE_LOCATION'], 'online']
+        #     except KeyError as e:
+        #         msg_str = f'''\
+        #         Target gdb (MOVE_LOCATION) does not exist in offline and df.\n\
+        #         Check correct path/to/csv or if exists\n\
+        #         occured at in indices \n{e}'''
+        #         logging.info(msg_str)
+        #         fix = True
+        #     if fix:
+        #         return
+        # else:
+        #     pass
 
         if action_type == 'delete':
             logging.info('DELETING FEATURES:')
@@ -1288,7 +1288,6 @@ class commonUtils(object):
                     rename = False
 
                 fp_components = fp_fcs_current.split(os.sep)
-                fp_move = olt.loc[df_item['MOVE_LOCATION'], 'online']
 
                 for idx, comp in enumerate(fp_components):
                     if '.gdb' in comp:
@@ -1312,22 +1311,15 @@ class commonUtils(object):
                     fp_csv_source = os.path.join(inventory_dir, fname_csv)
                     print('FP CSV SOURCE:  {}'.format(fp_csv_source))
 
-                # Get TARGET DF/CSV/STR
-                fp_components_target = fp_move.split(os.sep)
-                tgt_gdb_or_dir = fp_components_target[-1]
-                # dir as target
-                if '.gdb' not in tgt_gdb_or_dir:
-                    tgt_gdb_or_dir = fp_components_target[-1]
-                    tgt_gdb_or_dir_str = '{}_dir'.format(tgt_gdb_or_dir)
-                # GDB as target
+                ## WAS HERE!!!!!
+                # pass to next iterable (continue) if errors in take_action_check.
+                # otherwise, proceed (==False)
+                iter_dict = self.take_action_check(index, df_item)
+                if not iter_dict['v0']:
+                    tgt_gdb_or_dir_str, fp_move, fp_csv_target, df_str_target = list(iter_dict.values())[1:]
                 else:
-                    tgt_gdb_or_dir_str = '{}_gdb'.format(tgt_gdb_or_dir[:-4])
+                    continue
 
-                inventory_dir = lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
-                fname_csv = lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
-                fp_csv_target = os.path.join(inventory_dir, fname_csv)
-                print('CSV TARGET:    --->',  fp_csv_target)
-                df_str_target = lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
                 # Only grabs TargetGDB once per gdb
                 try:
                     df_target = getattr(self, df_str_target)
@@ -1972,6 +1964,79 @@ class commonUtils(object):
                 return(csString)
         except KeyError:
             return(csString)
+    def take_action_check(self, index, df_item):
+        # Get TARGET DF/CSV/STR
+        # initialize idx_remove if first time
+        try:
+            idx_remove = getattr(self, 'idx_remove')
+        except AttributeError:
+            idx_remove = []
+        lookup_table = copy.copy(self.lookup_table)
+        move_loc_key = df_item['MOVE_LOCATION']
+        # dir as target
+        if 'gdb' not in move_loc_key:
+            # If not with manual_ precedent then quit checking after try/except
+            try:
+                c1, c2 = move_loc_key.split('manual_')
+                done_checking = False
+            except ValueError as e:
+                logging.info(e)
+                msg = f'''INDEX: {index}\n
+                        MOVE_LOCATION withOUT "_gdb" specified in table as {df_item['MOVE_LOCATION']}, but text convention "manual_<project>"\n
+                        not followed. Specifically no "manual_" precedent.'''
+                next_iterable = True
+                tgt_gdb_or_dir_str, fp_move, fp_csv_target, df_str_target = 'none', 'none', 'none', 'none'
+                done_checking = True
+            # format for standalone tgt = "manual_<subproject withOUT "_gdb"> i.e. manual_sft_master instead of manual_sft_master_gdb
+            if not done_checking:
+                if c1 == '':
+                    try:
+                        # ADD CHECK FOR MOVE_LOCATION_MANUAL column before anything.
+                        tgt_gdb_or_dir_str = f"{c2}_gdb"
+                        fp_move = df_item['MOVE_LOCATION_MANUAL']
+                        fp_csv_target = self.lookup_table.loc[tgt_gdb_or_dir_str, 'standalone_csv']
+                        # fp_csv_target = df_item.loc[tgt_gdb_or_dir_str, 'standalone_csv']
+                        print('CSV TARGET:    --->', fp_csv_target)
+                        df_str_target = f"{self.lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']}_standalone"
+                        next_iterable = False
+                        if not os.path.exists(fp_move):
+                            idx_remove.append(index)
+                            setattr(self, 'idx_remove', idx_remove)
+                            msg = f'''INDEX: {index}\n
+                                    MOVE_LOCATION_MANUAL path does not exist:\n{fp_move}'''
+                            logging.info(msg)
+                            next_iterable = True
+                            tgt_gdb_or_dir_str, fp_move, fp_csv_target, df_str_target = 'none', 'none', 'none', 'none'
+                    except KeyError:
+                        idx_remove.append(index)
+                        setattr(self, 'idx_remove', idx_remove)
+                        msg = f'''INDEX: {index}\n
+                                MOVE_LOCATION component indicated in <> "manual_<{c2}>\n"
+                                is not present in lookup table.  Must be a value in "subproject" column.'''
+                        logging.info(msg)
+                        next_iterable = True
+                        tgt_gdb_or_dir_str, fp_move, fp_csv_target, df_str_target = 'none', 'none', 'none', 'none'
+                else:
+                    idx_remove.append(index)
+                    setattr(self, 'idx_remove', idx_remove)
+                    msg = f'''INDEX: {index}\n
+                            MOVE_LOCATION withOUT "_gdb" specified in table, but text convention "manual_<project>"\n
+                            not followed.'''
+                    logging.info(msg)
+                    next_iterable = True
+                    tgt_gdb_or_dir_str, fp_move, fp_csv_target, df_str_target = 'none', 'none', 'none', 'none'
+        # GDB as target
+        else:
+            tgt_gdb_or_dir_str = copy.copy(move_loc_key)
+            fp_move = self.lookup_table.loc[tgt_gdb_or_dir_str, 'fp_gdb']
+            inventory_dir = self.lookup_table.loc[tgt_gdb_or_dir_str, 'inventory_dir']
+            fname_csv = self.lookup_table.loc[tgt_gdb_or_dir_str, 'fname_csv']
+            fp_csv_target = os.path.join(inventory_dir, fname_csv)
+            print('CSV TARGET:    --->', fp_csv_target)
+            df_str_target = self.lookup_table.loc[tgt_gdb_or_dir_str, 'df_str']
+            next_iterable = False
+        d = {'v0':next_iterable, 'v1':tgt_gdb_or_dir_str, 'v2': fp_move, 'v3': fp_csv_target, 'v4': df_str_target}
+        return(d)
 
 class proProject(commonUtils):
     '''

@@ -6,25 +6,38 @@
 
 # 20240502 Output values from selected features in location field
 
-lyr_name = 'lidar_index_2022'
+
+lyr_name = 'king_county_east_2021_DTM_index'
 layer_in = QgsProject.instance().mapLayersByName(lyr_name)
 layer_in = layer_in[0].selectedFeatures()
 
 
 # Append a list with the values of your field
-values_field = []
+in_tif_list = []
+out_tif_list = []
 for feature in layer_in:
-    values_field.append(feature['location']) # gml_id is the name of my field
+    in_tif = feature['location']
+    in_tif_list.append(in_tif) # gml_id is the name of my field
+    out_tif_list.append(os.path.join(out_dir, os.path.split(in_tif)[-1]))
 
-# Open your csv file
-with open(r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\qgis_utils\staging2\tutorial_data_reproject.txt', 'w') as file:
-    # Write in your file
-    for feature in values_field:
-        file.write(feature)
-        file.write('\n') # line break
 
-# Close your csv file
-file.close()
+# # Open your csv file
+# with open(r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\qgis_utils\staging2\tutorial_data_reproject.txt', 'w') as file:
+#     # Write in your file
+#     for feature in values_field:
+#         file.write(feature)
+#         file.write('\n') # line break
+#
+# # Close your csv file
+# file.close()
+#
+import shutil
+from pathlib import Path
+
+for dst, src in zip(in_tif_list,out_tif_list):
+    shutil.copy(Path(src), Path(dst))
+    print(Path(src))
+
 
 # A) Creating Vector File
 # from qgis.core import (

@@ -229,7 +229,8 @@ class project_lyR_inv(object):
 
         banner = '    {}    '.format('-' * 50)
         logger = logging.getLogger('Layer_Inv')
-        fp_logfile = r'{}_LOG.log'.format(os.path.splitext(parameters[3].valueAsText)[0])
+        fname_logfile = r'{}_LOG.log'.format(os.path.splitext(parameters[3].valueAsText)[0])
+        fp_logfile = os.path.join(parameters[2].valueAsText, fname_logfile)
         logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
         date_str = datetime.datetime.today().strftime('%D %H:%M')
         msg_str = '\n{}\n{}'.format(banner, date_str)
@@ -264,7 +265,7 @@ class project_lyR_inv(object):
                     logger.info('ERROR: {}'.format(e))
 
         df = pd.DataFrame(np.column_stack([lyt_name, map_element,map_name, lyr_name, ds_list, exp_list]),
-                          columns = ['layout','map_element','map_name','layer','source', 'SQL'])
+                          columns = ['LAYOUT','MAP_ELEMENT','MAP_NAME','LAYER','DATA_LOCATION_MCMILLEN', 'SQL'])
 
         if os.path.splitext(parameters[3].valueAsText)[-1]=='.csv':
             fname = copy.copy(parameters[3].valueAsText)
@@ -282,11 +283,12 @@ class project_lyR_inv(object):
                 vn = ', '.join(vn)
                 return (vn)
 
-            groupby_source = df.groupby('source').agg({'map_name': join_list})
+            groupby_source = df.groupby('DATA_LOCATION_MCMILLEN').agg({'MAP_NAME': join_list})
             groupby_source = groupby_source.reset_index()
 
-            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source.source]
+            fnames = [os.path.splitext(ntpath.basename(fp))[0] for fp in groupby_source.DATA_LOCATION_MCMILLEN]
             groupby_source['ITEM'] = fnames
+            groupby_source = groupby_source[['ITEM','DATA_LOCATION_MCMILLEN','MAP_NAME']]
             groupby_source.to_csv(csv)
 
         return

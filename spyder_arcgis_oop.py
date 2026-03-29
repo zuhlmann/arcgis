@@ -1965,7 +1965,17 @@ class commonUtils(object):
         except KeyError:
             return(csString)
     def take_action_check(self, index, df_item):
-        # Get TARGET DF/CSV/STR
+        '''
+        Primarily to allow shapefile to shapefile creation (moving, copying, etc.).
+        will be spread to ['move', 'fc_to_fc', 'create_<geom>', etc] to allow expor to shp funcitonality.
+        ZU 20260225
+
+        :param index:   Index from take_action (single index value from for loop)
+        :param df_item: subset of df from index
+        :return: dictionary containing multiple strings used in take_action.  Note that dictionary
+                    v0 is simply a flag to check.  If True, break loop i.e. skip current index
+                    and proceed to next.
+        '''
         # initialize idx_remove if first time
         try:
             idx_remove = getattr(self, 'idx_remove')
@@ -2110,6 +2120,11 @@ class proProject(commonUtils):
             # idx_lyR = os.path.normpath(df_gdb_inv.loc[idx, source_orig])
             # fp_new = os.path.normpath(df_gdb_inv.loc[idx, source_new])
             fp_new = os.path.normpath(df.loc[idx, source_new])
+            if pd.isnull(df.loc[idx, 'IS_RASTER']):
+                msg = f"Resource Dataframe ({fp_csv})\nFor Dataset: {idx}\n Does NOT have IS_RASTER populated"
+                self.init_logfile(subproject)
+                self.logger.info(msg)
+                continue
             if not df.loc[idx, 'IS_RASTER']:
                 if fp_new[-4:] == '.shp':
                     dbase_connection, fname = os.path.split(fp_new)
@@ -2142,7 +2157,9 @@ class proProject(commonUtils):
         setattr(self, df_str, df)
 
     def re_source_lyR_maestro(self, subproject, prop_str_indices, fp_log_prop_str, tc='DATA_LOCATION_MCMILLEN',**kwargs):
-
+        # INIT LOGFILE
+        call_str = 're_source_lyR_maestro {}:\n'.format(subproject)
+        self.init_logfile(subproject, init_call_str = call_str)
         fp_logfile = getattr(self, fp_log_prop_str)
         logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
         # Save call string to logfile
@@ -2199,21 +2216,19 @@ class proProject(commonUtils):
 
         indices = getattr(self, prop_str_indices)
 
-        # INIT LOGFILE
-        self.init_logfile(subproject)
         map_temp, layer_temp=[],[]
 
         # Returns rows in index and columns with any True valeus
         included_indices = list(set(indices).intersection(set(df_map_matrix.index)))
         excluded_indices = list(set(indices)-set(df_map_matrix.index))
-        try:
-            df_map_matrix_subset = df_map_matrix.loc[indices]
+        if len(included_indices)!=0:
+            df_map_matrix_subset = df_map_matrix.loc[included_indices]
             t1 = ', '.join(included_indices)
             t2 = ', '.join(excluded_indices)
             msg_str='\nINDICES PASSED WHICH WERE PRESENT IN {} MATRIX: \n{} \nINDICES NOT PRESENT IN MATRIX {}: \n{}'.format(subproject,t1,subproject, t2)
             logging.info(msg_str)
             no_layers_aprx=False
-        except KeyError:
+        else:
             msg_str = '\nNONE of the indices were present in {}'.format(subproject)
             logging.info(msg_str)
             no_layers_aprx=True
@@ -2297,16 +2312,18 @@ class proProject(commonUtils):
             aprx = getattr(self, f"aprx_{subproject}")
             aprx.save()
 
-    def init_logfile(self, subproject):
-        logger = logging.getLogger(subproject)
+    def init_logfile(self, subproject, **kwargs):
+        logger = logging.getLogger()
         fp_logfile = self.pl_aprx.loc[subproject, 'fp_logfile']
         logging.basicConfig(filename=fp_logfile, level=logging.DEBUG)
         banner = '    {}    '.format('-' * 50)
-        call_str = 're_source_lyR_maestro {}:\n'.format(subproject)
-        fct_call_str = 'Performing function called as:\n{}'.format(call_str)
         date_str = datetime.datetime.today().strftime('%D %H:%M')
-        msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, fct_call_str)
-        logging.info(msg_str)
+        try:
+            init_call_str = kwargs['init_call_str']
+            msg_str = '\n{}\n{}\n{}\n{}'.format(banner, date_str, banner, init_call_str)
+            logging.info(msg_str)
+        except KeyError:
+            pass
         setattr(self, 'logger', logger)
     def aprx_map_inv(self, aprx_path):
         '''
@@ -2595,6 +2612,7 @@ class proProject(commonUtils):
         '''
         df_src=getattr(self, df_str_src)
         df_tgt=getattr(self, df_str_tgt)
+        cols_tgt = df_tgt.columns.to_list()
         if df_src.index.name!=tc_src:
             df_src.reset_index().set_index(tc_src, inplace=True)
         if df_tgt.index.name!=tc_tgt:
@@ -2617,14 +2635,15 @@ class proProject(commonUtils):
         # Retain csv for record.  Will be continually appended to, with duplicates superceded by first.
         try:
             dict_separate = kwargs['separate']
-            df_tgt = df_tgt.loc[committed_idx]
             try:
                 csv=dict_separate['csv']
                 subset_col = dict_separate['subset_col']
-                df_omitted = pd.read_csv(csv, index_col='DATA_LOCATION_MCMILLEN')
+                df_omitted = pd.read_csv(csv, index_col=tc_tgt)
                 df_omitted_append = df_tgt.loc[omitted_idx]
                 df_omitted = pd.concat([df_omitted, df_omitted_append])
+                df_omitted.reset_index(inplace=True)
                 df_omitted.drop_duplicates(subset= subset_col, inplace=True)
+                df_omitted.reset_index().set_index(tc_tgt, inplace=True)
                 df_omitted.to_csv(csv)
                 # Only output committed for this
             except FileNotFoundError as e:
@@ -2642,7 +2661,13 @@ class proProject(commonUtils):
         # 20260224 - Relevant for maestro to _0 - i.e. when transfering ACTION, ITEM, etc.
         try:
             cols_update = kwargs['cols_update']
-            df_committed = df_src.loc[committed_idx, cols_update]
+            df_committed = df_src.loc[committed_idx]
+            if type(cols_update) is list:
+                pass
+            else:
+                cols_update = [cols_update]
+            df_comitted=df_committed[cols_update]
+            # Default = True in PD
             df_tgt.update(df_committed, overwrite=overwrite_var)
         except KeyError:
             pass
@@ -2653,7 +2678,7 @@ class proProject(commonUtils):
             df_new.reset_index(inplace=True)
             df_tgt.reset_index(inplace=True)
             df_tgt=pd.concat([df_tgt, df_new])
-            df_tgt.reset_index(tc_tgt, inplace=True)
+            df_tgt.reset_index().set_index(tc_tgt, inplace=True)
         except KeyError:
             pass
         # Remove omitted rows for tgt if no longer in src.

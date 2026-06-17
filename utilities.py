@@ -34,14 +34,12 @@ def update_field(fp_fcs, field_dict, field_match, incr = 1,
     the default is adding sequential numbers (for page_num) ZU 20210304
     ARGUMENTS
     fp_fcs              file path to feat class
-    field               field for da.searchCursor AND if adding text, set sequential
-                        to FALSE and pass a path to csv.  Field will need to match
-                        on csv and for attribute field in fc
-                        update 20240328 pass a DICT {'feat':<field to populate in feat>,'csv_idx_col': matching field in csv}
-    incr                option to change
+    field_dict          {'feat':<val>,'csv_idx_col':<val>}
+                        val1 = field name to populate in feature (i.e. label).  Will be added as field if not present
+                        val2 = field/col name in csv to match to draw from when populating feature (i.e. the csv vals you fill out
+    field_match         i.e. OBJECTID - join key
     sequential          Set to False to use the csv updating protocol
     fp_csv              pass this if adding text field to fp_fcs
-    field_match         to  match for df.loc
     kwarg               flag = subset csv to flag field = True
     '''
 
@@ -674,7 +672,9 @@ def write_folder_contents(fp,output_type='.txt',**kwargs):
     simple readme that lists all items and files in fp argument.  Filename will
     be README_<folder_name>_<date>.txt.  Will indicate date in file
     ARGS
-    fp          file path for folder to README
+    fp              file path for folder to README
+    output_type     options = ['.csv','.txt].  Export as csv inventory or README .txt
+
     KWARGS
     add_quotes    for file names with spaces, special characters that will result in errors in gdaltindex
     filetype        more like file extentsion
@@ -689,13 +689,6 @@ def write_folder_contents(fp,output_type='.txt',**kwargs):
     files_fp = [os.path.join(fp, f) for f in files]
     files_fp.sort(key=os.path.getctime)
     files_fp.reverse()
-    try:
-        kwargs['shp']
-        files_fp = [f for f in files_fp if '.shp' in f]
-        files_fp = [f for f in files_fp if '.lock' not in f]
-        files_fp = [f for f in files_fp if '.xml' not in f]
-    except KeyError:
-        pass
     try:
         ft = kwargs['filetype']
         # ensure filetype passed as kw has .
@@ -2328,3 +2321,46 @@ def parse_comma_sep_list(df, col_to_parse):
             # nans from pd.read_csv(...) are saved as floats which have
             parsed_csl_temp.append([items])
     return(parsed_csl_temp)
+def flag_duplicates(df, sc, tc, **kwargs):
+    '''
+
+    :param df:      ddtaframe in
+    :param sc:      source column to detect duplicates
+    :param tc:      target column to flag duplicates
+    :return:        dataframe
+    '''
+    if df.index.name == sc:
+        idx_orig = copy.copy(df.index.name)
+        df.reset_index(inplace=True)
+    else:
+        pass
+    if type(sc) is list:
+        pass
+    if type(sc) is str:
+        sc = [sc]
+        dup_idx = df[df.duplicated(subset=sc, keep=False)].index
+    try:
+        df.loc[dup_idx, tc] = True
+    except:
+        df[tc]=False
+        df.loc[dup_idx, tc] = True
+    try:
+        csv = kwargs['csv']
+        df.to_csv(csv)
+    except KeyError:
+        pass
+    df.set_index(idx_orig)
+    return(df)
+def fname_from_path(csv, src_col, tgt_col, **kwargs):
+    '''
+    Add filename to new (or existing field) from field with path. ZU 20260610
+
+    :param csv:             STRING path/to/csv to generate filename
+    :param src_col:         STRING column with path/to/filename to parse into filename
+    :param tgt_col:         STRING where to save filename list
+    :return:
+    '''
+    df = pd.read_csv(csv)
+    fname_list = [os.path.split(fp)[-1] for fp in df[src_col]]
+    df[tgt_col]=fname_list
+    df.to_csv(csv)

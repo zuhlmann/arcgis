@@ -1,14 +1,6 @@
 import pandas as pd
 import os
-
-# # cloudcompare
-# clouds = [c1, c2]
-#
-# param_file =
-# cloudComPy.M3C2.computeM3C2()
-#
-# in_cloud =
-# cloudComPy.RasterizeGeoTiffOnly(in_cloud, gridStep=1.5, )
+# import utilities_tolt
 
 # # Adding 0 to improper NV5 index for 2023
 # csv = r"C:\Users\ZacharyUhlmann\Documents\staging\tolt\AQ07\gcd\2023\2023_Tiles_GCD_test.csv"
@@ -46,51 +38,42 @@ import os
 # with open(txt_path, 'w') as t:
 #     t.write(pdal_str)
 
-# Histgram
-from osgeo import gdal
-import numpy as np
-import matplotlib.pyplot as plt
-import copy
-
-# def get_stats(al, fname, fp_csv):
-#     m,mx,mn,sd = [],[],[],[]
-#     for a in al:
-#         m.append(round(np.mean(a),2))
-#         sd.append(round(np.std(a),2))
-#         mn.append(round(np.min(a),2))
-#         mx.append(round(np.max(a),2))
-#     df = pd.DataFrame(np.column_stack([fname, m, mn, mx, sd]), columns=['fname','mean', 'min','max',' std'])
-#     df.to_csv(fp_csv)
+# # Histgram
+# from osgeo import gdal
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import copy
 #
 #
 # fp_2024_2020 = r"C:\Users\ZacharyUhlmann\Documents\staging\tolt\AQ07\gcd\m3c2_processed\2024_2020_m3c2.tif"
-# fp_2024_2014 = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\field_planning\study_data\gcd\m3c2_processed\2024_2014_m3c2.tif"
+# fp_2024_2014 = r"E:\tolt\add_2026\12proj\2024_2014_M3C2_12proj_mean_0208thresh.tif"
 # ds1 = gdal.Open(fp_2024_2020)
 # ds2 = gdal.Open(fp_2024_2014)
 # ds1_b1 = ds1.GetRasterBand(1)
 # ds2_b1 = ds2.GetRasterBand(1)
 # img_array1 = ds1_b1.ReadAsArray()
 # img_array2 = ds2_b1.ReadAsArray()
-# img_array1 = img_array1[~np.isnan(img_array1)]
-# img_array2 = img_array2[~np.isnan(img_array2)]
+# nan_arr1 = ds1_b1.GetNoDataValue()
+# nan_arr2 = ds2_b1.GetNoDataValue()
+# img_array1 = img_array1[img_array1!=nan_arr1]
+# img_array2 = img_array2[img_array2!=nan_arr2]
+# #
+# # csv = r'C:\Users\ZacharyUhlmann\Documents\staging\tolt\AQ07\gcd\gcd_stats.csv'
+# # fname = [fp_2024_2020, fp_2024_2014]
+# # array_list = [img_array1, img_array2]
+# utilities_tolt.get_stats(array_list, fname, csv)
 #
-# csv = r'C:\Users\ZacharyUhlmann\Documents\staging\tolt\AQ07\gcd\gcd_stats.csv'
-# fname = [fp_2024_2020, fp_2024_2014]
-# array_list = [img_array1, img_array2]
-# get_stats(array_list, fname, csv)
-#
-# arr = copy.copy(img_array1)
+# arr = copy.copy(img_array2)
 # t =  'Surface Change: 2020 to 2024'
 # fname = "GCD_2020_to_2024"
 # # STd Dev
 # m = np.mean(arr)
 # sd = np.std(arr)
-#
-#
+# arr_disp = arr[(arr<m+4*sd) & (arr>m-4*sd)]
 #
 # fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
 # # axs[0].hist(img_array1, bins=100)
-# axs.hist(arr, bins=100, color='c', edgecolor='k')
+# axs.hist(arr_disp, bins=100, color='c', edgecolor='k')
 # axs.axvline(m, color='k', linestyle='dashed')
 # axs.axvline(m+sd, color='y', linestyle='dashed')
 # axs.axvline(m-sd, color='y', linestyle='dashed')
@@ -98,18 +81,20 @@ import copy
 # axs.axvline(m- 2*sd, color='y', linestyle='dashed')
 # axs.axvline(m+ 3*sd, color='y', linestyle='dashed')
 # axs.axvline(m- 3* sd, color='y', linestyle='dashed')
-# mx = round(max(arr),1)
-# mn = round(min(arr),1)
-# tv = [mn,-5,-2.5,0,2.5,5, mx]
+# upper = round(m+3.05*sd,1)
+# lower = round(m-3.05*sd,1)
+# tv = [-5,-2.5,0,2.5,5]
 # tl = [str(v) for v in tv]
 # axs.set_xticks(tv)
 # axs.set_xticklabels(tl)
+# axs.set_xlim([-6,6])
 # axs.set_xlabel('Change (ft)', fontsize=12)
 # axs.set_ylabel('Relative Abundance', fontsize=12)
 # axs.set_title(t)
 # axs.set_yticks([])
 #
-# plt.savefig(f"C:/Users/ZacharyUhlmann/Documents/staging/tolt/AQ07/gcd/{fname}.png",dpi=300)
+# # plt.savefig(f"C:/Users/ZacharyUhlmann/Documents/staging/tolt/AQ07/gcd/{fname}.png",dpi=300)
+# plt.savefig(f"E:/tolt/add_2026/6proj/{fname}.png",dpi=300)
 
 #
 # rng = np.random.default_rng(19680801)
@@ -158,12 +143,35 @@ import copy
 #
 # plt.savefig(f"C:/Box/MCMGIS/Project_Based/South_Fork_Tolt/data/field_planning/study_data/gcp_correction_1951_fmt.png",dpi=300)
 
-# contours for formatting
-def contour_range(start,stop, incr):
-    l = list(range(start, stop, incr))
-    l = [str(v) for v in l]
-    l  = ' '.join(l)
-    return(l)
 
-ll = contour_range(1750,1762, 2)
-lu = contour(range)
+# ll = contour_range(1750,1762, 2)
+
+# Formatting model inventory table for Donnie
+# 20260520ish
+csv = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\field_planning\study_data\hydraulic_model\AQ06_Lower_SFT_Hydr_Model_NHC\202604\NHC_Hydr_Models_202604_inv.csv"
+df = pd.read_csv(csv)
+subdir = ['Depth','Velocity','WSE']
+mod_category = ['cfs_Depth','cfs_Velocity','cfs_WSE']
+mod_type = ['yr_Nat', 'yr_Reg']
+file_mod1 = [f"{mt}_{c}" for mt in mod_type for c in subdir]
+file_mod2 = file_mod1 + mod_category
+new_col = []
+val_col = []
+for index in df.index:
+    fname = df.loc[index, 'ITEM']
+    title = fname[14:]
+    appended=False
+    for fm in file_mod2:
+        if fm in title:
+            new_col.append(fm)
+            v = title.split(fm)[0]
+            val_col.append(v)
+            appended = True
+        else:
+            pass
+    if not appended:
+        new_col.append('MISSED')
+df['Model_Type'] = new_col
+df['Value'] = val_col
+df.to_csv(csv)
+

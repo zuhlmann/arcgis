@@ -6,12 +6,12 @@ import pandas as pd
 # src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\Eklutna2022_Topobathy_clip.tif'
 # # src_dset = r'E:\box_offline\small_projects\eklutna_d\2022_lidar\EklutnaRiver_BE_DEM_UTM6.tif'
 # dir_out = r'E:\box_offline\small_projects\eklutna_d\lu_clip_dem_20230810\clipped_aerials\jpg'
-#
+
 src = osr.SpatialReference()
 src.SetFromUserInput('EPSG:6335')
 tgt = osr.SpatialReference()
 tgt.SetFromUserInput('ESRI:102634')
-#
+
 # # REsampling options
 # # CUBIC gdal.GRA_cubic
 # # NEAREST gdal.GRA_NearestNeighber
@@ -138,8 +138,6 @@ for n in sc_num:
     # gdal.Warp(tgt_dset, src_dset, options = options)
     gdal.Translate(tgt_dset, src_dset, options = options_translate)
     ct+=1
-
-
 
 
 

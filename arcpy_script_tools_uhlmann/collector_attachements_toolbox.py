@@ -7,7 +7,7 @@ import os
 import copy
 import ntpath
 
-class ToolBox(object):
+class Toolbox(object):
     def __init__(self):
         '''
         Define the toolbox (name of the toolbox is name of .pyt file).
@@ -80,7 +80,21 @@ class Parse_Attachments(object):
         param6.filter.type="ValueList"
         param6.filter.list=['Branched','Single']
         param6.value = 'Branched'
-        parameters = [param0,param1,param2,param3,param4,param5,param6]
+        param7 = arcpy.Parameter(
+            displayName="Branched Dir Field",
+            name="branched_dir_field",
+            datatype="Field",
+            parameterType="Field",
+            direction="Input")
+        param7.parameterDependencies = [param0.name]
+        param8 = arcpy.Parameter(
+            displayName="Prepend_FNAME",
+            name="prepend_fname",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input")
+        param8.value=True
+        parameters = [param0,param1,param2,param3,param4,param5,param6,param7,param8]
         return parameters
     def isLicensed(self):
         '''
@@ -94,18 +108,23 @@ class Parse_Attachments(object):
         has been changed.
         '''
         fc_in = parameters[0]
-        attach_table = parameters[1]
-        rel_globalid = parameters[2]
-        dir_out = parameters[3]
-        desc_field = parameters[4]
-        use_all_fields=parameters[5]
-        dir_design=parameters[6]
+        # attach_table = parameters[1]
+        # rel_globalid = parameters[2]
+        # dir_out = parameters[3]
+        # desc_field = parameters[4]
+        # use_all_fields=parameters[5]
+        # dir_design=parameters[6]
+        # branch_field=parameters[7]
+
         if fc_in.altered and not fc_in.hasBeenValidated:
             parameters[2].Value = None
             parameters[4].Value = None
+            parameters[7].Value = None
             parameters[2].parameterDependencies = [parameters[0].name]
             parameters[4].parameterDependencies = [parameters[0].name]
+            parameters[7].parameterDependencies = [parameters[0].name]
             parameters[1].Value = None
+            parameters[8] = False
 
         return parameters
 
@@ -120,15 +139,18 @@ class Parse_Attachments(object):
         attach_table = parameters[1].valueAsText
         rel_globalid = parameters[2].valueAsText
         dir_out = parameters[3].valueAsText
-        desc_field = parameters[4].valueAstext
+        desc_field = parameters[4].valueAsText
         use_all_fields=parameters[5]
         dir_design=parameters[6].valueAsText
+        branch_field = parameters[7].valueAsText
+        prepend_fname = parameters[8]
 
         describe_obj = arcpy.da.Describe(fc_in)
         all_fields = [f.name for f in describe_obj['fields'] if 'shape' not in f.name.lower()]
 
         feat_name = os.path.split(fc_in)[-1]
-        base_fields = [desc_field, 'GLOBALID', 'notes']
+        base_fields = [desc_field,'GLOBALID', 'notes']
+        base_fields = [desc_field, branch_field, 'GLOBALID', 'notes']
         if use_all_fields.value:
             fld_list = all_fields
         else:
@@ -197,7 +219,11 @@ class Parse_Attachments(object):
                         os.mkdir(fc_subdir)
                     # Now Make subdir Unless already created (i.e. multiple attachments in a feature)
                     if dir_design=="Branched":
-                        attach_dir = os.path.join(fc_subdir, '{}_{}'.format(desc_field, matched_objid_formatted))
+                        matched_val = df_fc.loc[globid_formatted, branch_field]
+                        if prepend_fname:
+                            attach_dir = os.path.join(fc_subdir, '{}_{}'.format(branch_field, matched_val))
+                        else:
+                            attach_dir = os.path.join(fc_subdir, '{}'.format(matched_val))
                     elif dir_design=="Single":
                         attach_dir = copy.copy(fc_subdir)
                     # for some reason a filename had <filename>_ NOTICe the underscore.

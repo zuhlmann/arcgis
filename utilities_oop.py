@@ -23,13 +23,14 @@ class utilities(object):
         '''
         self.parent_dir=parent_dir
         self.target_col=target_col
-    def subdir_inventory(self, ftype_filters=['.gdb'], exclude_dir_list = [],**kwargs):
+    def subdir_inventory(self, ftype_filters=['.gdb'], exclude_dir_list = [],
+                         just_dir_list=[], **kwargs):
         '''
         Updated 20240620 for general usage
         Args:
-            parent_dir:             directory to inventory
-            target_col:             for matching existing rows
-            filter_by_ftype         boolean - not developed; hardcoded filebype filters in list in subdir_inventory_scan
+            ftype_filters         dont want those
+            exclude_dir_list        [full/path/to/dir] for NOT inventorying
+            just_dir_list           [full/path/to/dir] for just including the directory name (20260406; for potter valley)
             **kwargs:               new_inventory:    step 1 in standalone inventory
                                     update_inventory:  for adding to existing inventory
 
@@ -39,7 +40,9 @@ class utilities(object):
         '''
         # fp_logfile = os.path.join(parent_dir, 'subdir_inventory_log.log')
         exclude_dir_list = [os.path.normpath(fp) for fp in exclude_dir_list]
+        just_dir_list = [os.path.normpath(fp) for fp in just_dir_list]
         setattr(self, 'exclude_dir_list', exclude_dir_list)
+        setattr(self, 'just_dir_list', just_dir_list)
         ftype_filters.extend([t.upper() for t in ftype_filters])
         try:
             kwargs['just_shp']
@@ -101,6 +104,21 @@ class utilities(object):
         col_list = ['ITEM', 'BASE_SUBDIR', 'FINAL_SUBDIR', 'FILETYPE','FILESIZE','TIME_MODIFIED', 'FLAG',self.target_col]
         cols = np.column_stack([fname, base_subdir, subdir_name, filetype, file_size, time_modified, flag, fp])
         df_subdir = pd.DataFrame(cols, columns=col_list)
+        # If squishing inventory into specified just directories
+        if len(self.just_dir_list)>0:
+            dir_only_flag = [self.check_dir_only(fp) for fp in df_subdir.DATA_LOCATION_MCMILLEN]
+            df_subdir['FLAG_DIR_ONLY']=dir_only_flag
+            idx = df_subdir[df_subdir['FLAG_DIR_ONLY'] == True].index
+            df_subdir_preserve = df_subdir.loc[df_subdir.index.difference(idx)]
+            df_subdir_squish = df_subdir.loc[idx]
+            df_subdir_squish['FILETYPE']='DIRECTORY'
+            df_subdir_squish['ITEM'] = df_subdir['FINAL_SUBDIR']
+            mask = df_subdir_squish.duplicated(['FINAL_SUBDIR'])
+            df_subdir_squish = df_subdir_squish[~mask]
+            df_subdir_squish['DATA_LOCATION_MCMILLEN']=[f"{os.sep}".join(os.path.split(fp)[:-1]) for fp in df_subdir_squish.DATA_LOCATION_MCMILLEN]
+            df_subdir = pd.concat([df_subdir_preserve, df_subdir_squish])
+        else:
+            pass
         return(df_subdir)
 
 
@@ -142,7 +160,7 @@ class utilities(object):
                 except IndexError:
                     # in root of parent_dir
                     base_subdir = os.path.normpath(parent_dir).split(os.sep)[-1]
-                if file_ext not in self.ftype_filters:
+                if (file_ext not in self.ftype_filters):
                     feat_name.append(f.name)
                     feat_path.append(f.path)
                     filetype.append(file_ext)
@@ -284,3 +302,16 @@ class utilities(object):
         # df_join.drop(f"{ref_col}_y",inplace=True)
         # df_join.rename(columns={r"{ref_col}_x":ref_col},inplace=True)
         df_join.to_csv(csv_out)
+
+    def check_dir_only(self, fp):
+        # If subpath of current file is some root of just_dir_list item, then need to pass
+        fsearch = os.path.normpath(fp)
+        comps = fsearch.split(os.sep)
+        for src in self.just_dir_list:
+            for i, v in enumerate(comps):
+                tgt = f"{os.sep}".join(comps[:i])
+                if os.path.normpath(src) == os.path.normpath(tgt):
+                    return(True)
+                else:
+                    pass
+        return(False)

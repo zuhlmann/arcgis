@@ -5,7 +5,7 @@ importlib.reload(sys.modules['spyder_arcgis_oop'])
 import pandas as pd
 import os
 
-subproject='terrrestrial_PAD'
+subproject='wetlands_2007'
 fp_pathlist = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv"
 fp_pathlist_aprx = r"C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_aprx.xlsx"
 prj_file = r'NAD_1983_HARN_StatePlane_Washington_North_FIPS_4601_Feet.prj'
@@ -33,13 +33,13 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 
 # # -------CREATE INVENTORIES / FLAG-------
 
-# # A1a) Single APRX from subproject
-# df_layers = pro_obj.aprx_map_inv(fp_aprx)
-# # Raw, unaggregated NEED for creating _0 _1 _2 invs
-# df_layers.to_csv(fp_lyR_inv)
-# cf = ['ITEM','IS_RASTER','IS_BROKEN']
-# df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
-# df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0]))
+# A1a) Single APRX from subproject
+df_layers = pro_obj.aprx_map_inv(fp_aprx)
+# Raw, unaggregated NEED for creating _0 _1 _2 invs
+df_layers.to_csv(fp_lyR_inv)
+cf = ['ITEM','IS_RASTER','IS_BROKEN']
+df_aggregated = pro_obj.aggregate_rows(df_layers,'DATA_LOCATION_MCMILLEN', 'MAP_NAME', carry_fields=cf)
+df_aggregated.to_csv(r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0]))
 
 # # A2b) Create map matrix - just do once
 # pro_obj.expand_rows(subproject, fp_map_matrix)
@@ -59,16 +59,16 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 #     fp_lyR_inv_agg = r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0])
 #     df_aggregated.to_csv(fp_lyR_inv_agg)
 
-# # A2a)  Flag if Resourced in _aggregated | populate ACTION there, and then transfer action to maestro
-# df_lyR_agg_str=r'df_aprx_lyR_aggregated'
-# fp_lyR_inv_agg = r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0])
-# pro_obj.add_df(fp_lyR_inv_agg, df_lyR_agg_str, 'DATA_LOCATION_MCMILLEN')
-# pro_obj.add_df(fp_reSource, df_reSource_str, 'DATA_LOCATION_MCMILLEN')
-# tc = 'DATA_LOCATION_MCMILLEN'
-# cols_update = 'DATA_LOCATION_MCM_RESOURCE'
-# pro_obj.custom_merge( df_reSource_str ,df_lyR_agg_str,tc,tc,True,
-#                     cols_update=cols_update)
-# pro_obj.df_aprx_lyR_aggregated.to_csv(fp_lyR_inv_agg)
+# A2a)  Flag if Resourced in _aggregated | populate ACTION there, and then transfer action to maestro
+df_lyR_agg_str=r'df_aprx_lyR_aggregated'
+fp_lyR_inv_agg = r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0])
+pro_obj.add_df(fp_lyR_inv_agg, df_lyR_agg_str, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(fp_reSource, df_reSource_str, 'DATA_LOCATION_MCMILLEN')
+tc = 'DATA_LOCATION_MCMILLEN'
+cols_update = 'DATA_LOCATION_MCM_RESOURCE'
+pro_obj.custom_merge( df_reSource_str ,df_lyR_agg_str,tc,tc,True,
+                    cols_update=cols_update)
+pro_obj.df_aprx_lyR_aggregated.to_csv(fp_lyR_inv_agg)
 
 # # A2b) Unsure if needed: currently will transfer action from lyR_inv to maestro
 # fp_lyR_inv_agg = r'{}_aggregated.csv'.format(os.path.splitext(fp_lyR_inv)[0])
@@ -82,13 +82,23 @@ fp_reSource = pro_obj.pl_aprx.loc[subproject, 'fp_df_reSource']
 #                     cols_update=cols_update, append_new=True,subset=subset)
 # pro_obj.df.to_csv(fp_maestro)
 
-# # Flag if Resource already created
-# pro_obj.add_df(fp_reSource, df_reSource_str, 'DATA_LOCATION_MCMILLEN')
-# pro_obj.add_df(fp_maestro, 'df', 'DATA_LOCATION_MCMILLEN')
-# resource_indices = getattr(pro_obj, df_reSource_str).index
-# df_append=pd.DataFrame(len(resource_indices)*[True],columns = ['RESOURCE_CREATED'], index=resource_indices)
-# df_temp = pro_obj.df.join(df_append)
-# df_temp.to_csv(csv_temp)
+# Flag if Resource already created
+pro_obj.add_df(fp_lyR_inv_maestro, df_lyR_aprx_str, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(fp_maestro, 'df', 'DATA_LOCATION_MCMILLEN')
+df_append = getattr(pro_obj, df_lyR_aprx_str)[['ITEM','ACTION','APRX_UPDATED']]
+df_append['PRESENT_V3_0'] = len(df_append)*[True]
+df_temp = pro_obj.df.join(df_append, how='outer',lsuffix='_maetro', rsuffix='_v3_0')
+csv_temp = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\gdb_inventories\tolt_devel_maestro_staging.csv"
+df_temp.to_csv(csv_temp)
+
+# Flag in maestro if Present in _0
+pro_obj.add_df(fp_reSource, df_reSource_str, 'DATA_LOCATION_MCMILLEN')
+pro_obj.add_df(fp_maestro, 'df', 'DATA_LOCATION_MCMILLEN')
+resource_indices = getattr(pro_obj, df_reSource_str).index
+df_append=pd.DataFrame(len(resource_indices)*[True],columns = ['RESOURCE_CREATED'], index=resource_indices)
+df_temp = pro_obj.df.join(df_append)
+df_temp.to_csv(csv_temp)
+
 
 # # Matrix from DF
 # for idx in df_pl_aprx.index:

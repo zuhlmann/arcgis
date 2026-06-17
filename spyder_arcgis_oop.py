@@ -176,7 +176,11 @@ class commonUtils(object):
             incl_files = kwargs['renamed_files']
         except KeyError:
             incl_files = copy.copy(self.indices)
-        exist_file = [f[:-4] for f in os.listdir(zip_dir)]
+        try:
+            exist_file = [f[:-4] for f in os.listdir(zip_dir)]
+        except FileNotFoundError:
+            os.mkdir(zip_dir)
+            exist_file = []
         excl_files = list(set(exist_file) - set(incl_files))
         if len(excl_files) > 0:
             print('here ', excl_files)
@@ -2667,6 +2671,9 @@ class proProject(commonUtils):
             else:
                 cols_update = [cols_update]
             df_comitted=df_committed[cols_update]
+            for c in cols_update:
+                if c not in df_tgt.columns:
+                    df_tgt[c]=df_comitted[c]
             # Default = True in PD
             df_tgt.update(df_committed, overwrite=overwrite_var)
         except KeyError:

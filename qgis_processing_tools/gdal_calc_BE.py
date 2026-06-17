@@ -12,6 +12,7 @@
 """
 
 import os
+import copy
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
@@ -24,9 +25,12 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterField,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFolderDestination,
-                       QgsProcessingOutputString)
+                       QgsProcessingOutputString,
+                       QgsProcessingParameterFileDestination,
+                       QgsProcessingParameterRasterLayer,
+                       QgsProcessingParameterNumber)
 
-class gdal_calc_BE(QgsProcessingAlgorithm):
+class gdal_calc_be(QgsProcessingAlgorithm):
     """
     Use tile index file to perform gdal functions. Tile feature must have attribute
     with path/to/raster/tiles.  
@@ -41,6 +45,8 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
 
     INPUT_A = 'INPUT_A'
     INPUT_B = 'INPUT_B'
+    THRESHOLD = 'THRESHOLD'
+    OUTPUT = 'output'
     OUTFILE = 'Output File'
 
     def tr(self, string):
@@ -50,7 +56,7 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
         return QCoreApplication.translate('Processing', string)
 
     def createInstance(self):
-        return gdal_calc_BE()
+        return gdal_calc_be()
 
     def name(self):
         """
@@ -60,14 +66,14 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'GDAL BuildVRT from Selection'
+        return 'gdal_calc_be'
 
     def displayName(self):
         """
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('gdal_calc_cutline')
+        return self.tr('gdal_calc_be')
 
     def group(self):
         """
@@ -92,7 +98,7 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("Using Tile Index, output vrt from tile selected in att table.")
+        return self.tr("gdal_calc for A-B with union for disparate extents.  Also compression set to LQW")
 
     def initAlgorithm(self, config=None):
         """
@@ -103,32 +109,39 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
+            QgsProcessingParameterRasterLayer(
                 self.INPUT_A,
                 self.tr('Input Raster Interior'),
                 [QgsProcessing.TypeRaster]
             )
         )
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
+            QgsProcessingParameterRasterLayer(
                 self.INPUT_B,
-                self.tr('Input Raster Exterior'),
+                'Input Raster Exterior',
                 [QgsProcessing.TypeRaster]
             )
         )
+        (
         self.addParameter(
-            QgsProcessingParameterParameterFileDestination(
+            QgsProcessingParameterNumber(
+                self.THRESHOLD,
+                'upper and lower threshold to discard in gdal_calc',
+                QgsProcessingParameterNumber.Double
+            )
+        )
+        )
+        self.addParameter(
+            QgsProcessingParameterFileDestination(
                 self.OUTFILE,
-                self.tr('Output raster from calculator'),
-                self.fileFilter('.tif'),
-                self.defaultValue('.tif')
+                'Output raster from calculator'
             )
         )
         # https://docs.qgis.org/3.34/en/docs/user_manual/processing/scripts.html
         self.addOutput(
             QgsProcessingOutputString(
                 self.OUTPUT,
-                'test this sting'
+                'Test this string'
             )
         )
         
@@ -140,45 +153,37 @@ class gdal_calc_BE(QgsProcessingAlgorithm):
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-        fp_raster1 = self.parameterAsFile(
-            parameters,
-            self.INPUT_1,
-            context)
-        fp_raster2 = self.parameterAsFile(
-            parameters,
-            self.INPUT_2,
-            context)
+        fp_rasterA = self.parameterDefinition('INPUT_A').valueAsString(parameters['INPUT_A'], context)[0]
+        fp_rasterB = self.parameterDefinition('INPUT_B').valueAsString(parameters['INPUT_B'], context)[0]
         fp_raster_out = self.parameterAsString(
             parameters,
             self.OUTFILE,
+            context)
+        threshold = self.parameterAsDouble(
+            parameters,
+            self.THRESHOLD,
             context)
 
         # If source was not found, throw an exception to indicate that the algorithm
         # encountered a fatal error. The exception text can be any string, but in this
         # case we use the pre-built invalidSourceError method to return a standard
         # helper text for when a source cannot be evaluated
-        if raster1 is None:
+        if fp_rasterA is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT_A))
-        if raster2 is None:
+        if fp_rasterB is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT_B))
-
-        #(sink, dest_id) = self.parameterAsSink(
-        #    parameters,
-        #    self.OUTPUT,
-        #    context, source.fields(),source.wkbType(),source.sourceCrs())
-
-
-        CL_gdal_calc = f'gdal_calc -A r"{fp_raster1}" -B r"{fp_raster2}" --extent union --co COMPRESS=LZW --NoDataValue -9999 --outfile fp_out --calc="A-B"'
+        # https: // gis.stackexchange.com / questions / 204387 / gdal - calc - raster - calculator - syntax - for -logical - operators -and -other-functions
+        CL_gdal_calc = f'gdal_calc -A "{fp_rasterA}" -B "{fp_rasterB}" --extent union --co COMPRESS=LZW --NoDataValue -9999 --outfile "{fp_raster_out}" --calc="(A-B)*logical_or((A-B)<-{threshold},(A-B)>{threshold})"'
 
         import subprocess
 
         # constants
-        output_dir = r'E:\tolt\2022'
-        with open(os.path.join(output_dir, 'command_call.txt'),'w') as txt_file2:
+        base_dir = os.path.split(fp_raster_out)[0]
+        with open(os.path.join(base_dir, 'CL_gdal_calc_BE.txt'),'w') as txt_file2:
             txt_file2.write(CL_gdal_calc)
         subprocess.run(CL_gdal_calc)
         
-        results= {self.OUTPUT: cmd}
+        results= {self.OUTPUT: CL_gdal_calc}
         
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some

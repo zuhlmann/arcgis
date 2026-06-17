@@ -42,14 +42,30 @@ import pandas as pd
 
 
 # Base stats raster
-# 20260122 for Searsville Detention Pond
-fn = r"E:\projects\searsville\detention_pond\Surface\Diff_RoughChanneL_Existing_clipped_DetBasin.tif"
-fn = r"E:\projects\searsville\detention_pond\Surface\Diff_RoughChanneL_Existing_clipped_channel.tif"
-d1 = gdal.Open(fn)
-arr = d1.ReadAsArray()
-arr[arr==-9999]=np.nan
-arr_mean = np.nanmean(arr)
-arr_sum = np.nansum(arr)
-CY_conv = 1/27
-CY_lost = arr_sum * CY_conv
-print(arr_mean)
+# 20262226 for Searsville Detention Pond
+base_dir = r"C:\Box\MCMGIS\Project_Based\South_Fork_Tolt\data\field_planning\study_data\hydraulic_model\AQ06_Lower_SFT_Hydr_Model_NHC\202604"
+xslx = os.path.join(base_dir, r'NHC_Hydr_Models_202604_inv.xlsx')
+df = pd.read_excel(xslx, index_col='FILENAME')
+mn,mx,avg_list, flag = [],[],[],[]
+for idx in df.index:
+    fp = df.loc[idx, 'DATA_LOCATION_MCM_CLEANED_BOX']
+    d1 = gdal.Open(fp)
+    arr = d1.ReadAsArray()
+    arr[arr==-9999]=np.nan
+    avg = round(np.nanmean(arr), 2)
+    avg_list.append(avg)
+    mn.append(round(np.nanmin(arr),2))
+    mx.append(round(np.nanmax(arr)))
+    if avg > 20:
+        flag = True
+    else:
+        flag = False
+    # # Cubic Yards
+    # arr_sum = np.nansum(arr)
+    # CY_conv = 1/27
+    # CY_lost = arr_sum * CY_conv
+df['MEAN'] = avg_list
+df['MIN'] = mn
+df['MAX'] = mx
+df['FLAG'] = flag
+df.to_csv(os.path.join(base_dir, r'NHC_Hydr_Models_202604_inv.csv'))

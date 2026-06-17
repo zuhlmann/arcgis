@@ -6,6 +6,7 @@ import copy
 sys.path.append('c:/users/uhlmann/code')
 sys.path.append('c:/users/uhlmann/code/arcpy_script_tools_uhlmann')
 import importlib
+import utilities
 
 # DATA MANAGEMENT PATHS2
 fp_pathlist = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utility_csvs\path_list_updated.csv'
@@ -14,7 +15,7 @@ fp_offline = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\df_utili
 olt = pd.read_csv(fp_offline, index_col = 'gdb_str')
 prj_dir = r'C:\Box\MCM USERS\3.0 - Employees\zuhlmann\python_df_docs\prj_files'
 
-subproject = 'SouthLACo_ConnectivityPlan'
+subproject = 'SFT_Unofficial_ISR_Era'
 
 gdb_str = '{}_gdb'.format(subproject)
 gdb_pro = pl.loc[gdb_str, 'fp_gdb']
@@ -27,9 +28,14 @@ importlib.reload(sys.modules['spyder_arcgis_oop'])
 agol_obj = agolZ.commonUtils()
 agol_obj.dbase_init(prj_file,subproject,fp_pathlist, use_item_desc=False)
 
+# duplicates index
+gis_dir = pl.loc[gdb_str,'inventory_dir']
+fp_csv = os.path.join(pl.loc[gdb_str, 'inventory_dir'], pl.loc[gdb_str, 'fname_csv'])
+utilities.flag_duplicates(agol_obj.df, 'ITEM', 'FLAG_DUPLICATES', csv = fp_csv)
+
 # # INDICES
 agol_obj.selection_idx('df', indices = [-1])
-agol_obj.selection_idx('df', target_action= 'copy')
+# agol_obj.selection_idx('df', target_action= 'copy')
 
 print('nothing')
 

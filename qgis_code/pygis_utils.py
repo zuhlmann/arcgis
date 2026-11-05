@@ -292,7 +292,61 @@ def create_segment(dd, easting, northing, segment_len, direction, fp_line):
         line = arcpy.Polyline(arr)
         cursor.insertRow([line])
     del cursor
+def bearing_to_dd(dd, direction):
+    if direction=="SW":
+        bearing_dd=270-dd
+    elif direction=='NW':
+        bearing_dd=dd+90
+    elif direction=='SE':
+        bearing_dd=270+dd
+    elif direction=='NE':
+        bearing_dd=90-dd
+    return(bearing_dd)
+def create_geom_dependent(easting, northing, fp_feat, mete_mode, df):
+    '''
+    Creates line segment feature given starting point (easting, northing), direction (dd), bearing (direction),
+    segment length (segment_len).  Line added to fp_line feature.  ZU 20250513.  Check cooper_lk_license (Advanced notebook)
+    for usage.
+    :param dd:              decimal degrees (direction) of line to be created
+    :param easting:         starting point in easting units of fp_line
+    :param northing:        starting point in northing units of fp_line
+    :param segment_len:     length of segment to be created
+    :param direction:       bearing i.e. SW NW SE NE
+    :param fp_line:         existing line (in Table of Contents if calling in Pro, or path/to/line feature
+    :return:
+    '''
+    import arcpy
 
+    if mete_mode == 'line':
+        with arcpy.da.InsertCursor(fp_feat, ["SHAPE@"]) as cursor:
+            x=math.cos(math.radians(bearing_dd))*segment_len + easting
+            y=math.sin(math.radians(bearing_dd))*segment_len + northing
+            arr = arcpy.Array([arcpy.Point(easting, northing), arcpy.Point(x, y)])
+            line = arcpy.Polyline(arr)
+            cursor.insertRow([line])
+        del cursor
+
+    elif mete_mode=='point':
+        for idx in df.index:
+            with arcpy.da.InsertCursor(fp_feat, ["SHAPE@", 'vertice_id', 'link_ref', 'notes']) as cursor:
+                segment_len = df.loc[idx, 'distance']
+                deg = df.loc[idx, 'deg']
+                mnt = df.loc[idx, 'min']
+                sec = df.loc[idx, 'sec']
+                direction = df.loc[idx, 'direction']
+                dd = deg_min_sec_reverse(deg, mnt, sec)
+                bearing_dd = bearing_to_dd(dd, direction)
+                x=math.cos(math.radians(bearing_dd))*segment_len + easting
+                y=math.sin(math.radians(bearing_dd))*segment_len + northing
+                point = arcpy.Point(x, y)
+                # Pull other cols from csv
+                vert_id = df.loc[idx, 'vertice_id']
+                link_ref = df.loc[idx, 'link_ref']
+                notes= df.loc[idx, 'notes']
+                cursor.insertRow([point, vert_id, link_ref, notes])
+                easting = copy.copy(x)
+                northing = copy.copy(y)
+            del cursor
 
 
 

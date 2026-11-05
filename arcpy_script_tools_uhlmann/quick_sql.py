@@ -132,7 +132,7 @@ class selection_to_sql(object):
         """The source code of the tool."""
 
         cond_dict = {'Contains':'IN','Does NOT Contain':'NOT IN'}
-        type_dict = {'String':'String','OID':'number','Double':'number'}
+        type_dict = {'String':'String','OID':'number','Double':'number','Integer':'number'}
         feat = parameters[0].valueAsText
         fld = parameters[1].valueAsText
         cond = parameters[2].valueAsText
